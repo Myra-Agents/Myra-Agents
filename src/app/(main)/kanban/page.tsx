@@ -1,0 +1,225 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+
+import { useTranslations } from "next-intl";
+
+import { CardModal } from "@/components/kanban/card-modal";
+import { FeedbackModal, ReviewModal } from "@/components/kanban/feedback-modal";
+import { KanbanBoard } from "@/components/kanban/kanban-board";
+import { useAgentEvents } from "@/hooks/use-agent-events";
+import { useAgentLogs } from "@/hooks/use-agent-logs";
+import { useCardTemplates } from "@/hooks/use-card-templates";
+import { useColumnPreferences } from "@/hooks/use-column-preferences";
+import { useKanban } from "@/hooks/use-kanban";
+import { useSchedules } from "@/hooks/use-schedules";
+import { useSettings } from "@/hooks/use-settings";
+import { normalizeTag, parseTags } from "@/lib/kanban-tags";
+import type { CardFormData, KanbanCard, KanbanStatus } from "@/types/kanban";
+
+export default function KanbanPage() {
+  const t = useTranslations("kanban");
+  const {
+    cards,
+    loading,
+    error,
+    addCard,
+    updateCard,
+    moveCard,
+    reorderCard,
+    trashCard,
+    restoreCard,
+    deleteCard,
+    addRevisionNote,
+    answerFeedback,
+    launchAgent,
+    upsertCard,
+  } = useKanban();
+
+  const { logs } = useAgentLogs();
+  const { byId } = useSchedules();
+  const { settings } = useSettings();
+  const { templates, saveTemplate } = useCardTemplates();
+  const {
+    preferences: columnPreferences,
+    setColumnHidden,
+    setColumnLabel,
+    resetColumnPreferences,
+  } = useColumnPreferences();
+
+  useAgentEvents(upsertCard);
+
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const card of cards) {
+      for (const tag of card.tags) tags.add(normalizeTag(tag));
+    }
+    return [...tags].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [cards]);
+
+  const [cardModalOpen, setCardModalOpen] = useState(false);
+  const [cardModalMode, setCardModalMode] = useState<"add" | "edit">("add");
+  const [cardModalStatus, setCardModalStatus] = useState<KanbanStatus>("draft");
+  const [editingCard, setEditingCard] = useState<KanbanCard | undefined>();
+
+  const [feedbackCard, setFeedbackCard] = useState<KanbanCard | null>(null);
+  const [reviewCard, setReviewCard] = useState<KanbanCard | null>(null);
+
+  const handleAddCard = useCallback((status: KanbanStatus) => {
+    setCardModalMode("add");
+    setCardModalStatus(status);
+    setEditingCard(undefined);
+    setCardModalOpen(true);
+  }, []);
+
+  const handleEditCard = useCallback((card: KanbanCard) => {
+    setCardModalMode("edit");
+    setEditingCard(card);
+    setCardModalOpen(true);
+  }, []);
+
+  const handleSaveCard = useCallback(
+    async (data: CardFormData, status: KanbanStatus) => {
+      const parsedTags = parseTags(data.tags);
+      const agentPresetId = data.agentPresetId ?? editingCard?.agentPresetId ?? settings.defaultAgentId;
+
+      if (cardModalMode === "add") {
+        await addCard({
+          title: data.title,
+          description: data.description || undefined,
+          agentPrompt: data.agentPrompt || undefined,
+          agentPresetId,
+          tags: parsedTags,
+          status,
+        });
+      } else if (editingCard) {
+        await updateCard({
+          id: editingCard.id,
+          title: data.title,
+          description: data.description || undefined,
+          agentPrompt: data.agentPrompt || undefined,
+          agentPresetId,
+          tags: parsedTags,
+        });
+      }
+    },
+    [addCard, cardModalMode, editingCard, settings.defaultAgentId, updateCard],
+  );
+
+  const handleBulkAddTag = useCallback(
+    async (card: KanbanCard, tag: string) => {
+      const tags = [...new Set([...card.tags.map(normalizeTag), normalizeTag(tag)])].filter(Boolean);
+      await updateCard({
+        id: card.id,
+        title: card.title,
+        description: card.description,
+        agentPrompt: card.agentPrompt,
+        agentPresetId: card.agentPresetId ?? settings.defaultAgentId,
+        tags,
+      });
+    },
+    [settings.defaultAgentId, updateCard],
+  );
+
+  const handleBulkLaunch = useCallback(
+    async (card: KanbanCard) => {
+      await launchAgent(card.id);
+    },
+    [launchAgent],
+  );
+
+  const handleReviewCard = useCallback((card: KanbanCard) => {
+    if (card.status === "waiting_feedback") {
+      setFeedbackCard(card);
+    } else if (card.status === "awaiting_review") {
+      setReviewCard(card);
+    }
+  }, []);
+
+  const handleApprove = useCallback(
+    async (id: string) => {
+      await moveCard(id, "done");
+    },
+    [moveCard],
+  );
+
+  const handleRevise = useCallback(
+    async (id: string, note: string) => {
+      await addRevisionNote(id, note);
+    },
+    [addRevisionNote],
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">{t("loading")}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-destructive">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      <KanbanBoard
+        cards={cards}
+        onAddCard={handleAddCard}
+        onEditCard={handleEditCard}
+        onTrashCard={trashCard}
+        onRestoreCard={restoreCard}
+        onPurgeCard={deleteCard}
+        onMoveCard={moveCard}
+        onReorderCard={reorderCard}
+        onReviewCard={handleReviewCard}
+        onBulkAddTag={handleBulkAddTag}
+        onBulkLaunch={handleBulkLaunch}
+        logsByCard={logs}
+        getSchedule={byId}
+        agentPresets={settings.agents}
+        defaultAgentId={settings.defaultAgentId}
+        columnPreferences={columnPreferences}
+        onColumnHiddenChange={setColumnHidden}
+        onColumnLabelChange={setColumnLabel}
+        onResetColumnPreferences={resetColumnPreferences}
+      />
+
+      <CardModal
+        open={cardModalOpen}
+        mode={cardModalMode}
+        initialStatus={cardModalStatus}
+        card={editingCard}
+        availableTags={availableTags}
+        templates={templates}
+        agentPresets={settings.agents}
+        defaultAgentId={settings.defaultAgentId}
+        onSave={handleSaveCard}
+        onSaveTemplate={saveTemplate}
+        onClose={() => setCardModalOpen(false)}
+      />
+
+      <FeedbackModal
+        open={feedbackCard !== null}
+        card={feedbackCard}
+        onSubmit={async (id, answer) => {
+          await answerFeedback(id, answer);
+        }}
+        onClose={() => setFeedbackCard(null)}
+      />
+
+      <ReviewModal
+        open={reviewCard !== null}
+        card={reviewCard}
+        onApprove={handleApprove}
+        onRevise={handleRevise}
+        onClose={() => setReviewCard(null)}
+      />
+    </div>
+  );
+}
