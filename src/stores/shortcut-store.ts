@@ -6,19 +6,23 @@ import { create } from "zustand";
  * subscribing page re-fires the effect even on repeated presses.
  */
 type ShortcutStore = {
-  newCardNonce: number;
+  // Persistent flag (not a nonce): survives navigation so the kanban page can
+  // consume it on mount when "New card" is triggered from another route.
+  pendingNewCard: boolean;
   focusSearchNonce: number;
   cancelNonce: number;
   requestNewCard: () => void;
+  consumeNewCard: () => void;
   requestFocusSearch: () => void;
   requestCancel: () => void;
 };
 
 export const useShortcutStore = create<ShortcutStore>((set) => ({
-  newCardNonce: 0,
+  pendingNewCard: false,
   focusSearchNonce: 0,
   cancelNonce: 0,
-  requestNewCard: () => set((state) => ({ newCardNonce: state.newCardNonce + 1 })),
+  requestNewCard: () => set({ pendingNewCard: true }),
+  consumeNewCard: () => set({ pendingNewCard: false }),
   requestFocusSearch: () => set((state) => ({ focusSearchNonce: state.focusSearchNonce + 1 })),
   requestCancel: () => set((state) => ({ cancelNonce: state.cancelNonce + 1 })),
 }));

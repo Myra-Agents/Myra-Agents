@@ -193,19 +193,21 @@ export default function KanbanPage() {
   );
 
   // --- Global keyboard shortcut intents (detected in the (main) layout) ---
-  const newCardNonce = useShortcutStore((s) => s.newCardNonce);
+  const pendingNewCard = useShortcutStore((s) => s.pendingNewCard);
+  const consumeNewCard = useShortcutStore((s) => s.consumeNewCard);
   const focusSearchNonce = useShortcutStore((s) => s.focusSearchNonce);
   const cancelNonce = useShortcutStore((s) => s.cancelNonce);
   // Seed refs with the nonce at mount so the effects don't fire on first render.
-  const lastNewCard = useRef(newCardNonce);
   const lastFocusSearch = useRef(focusSearchNonce);
   const lastCancel = useRef(cancelNonce);
 
+  // Consume the persistent flag: fires whether set on this page (shortcut) or
+  // before navigation (sidebar/global shortcut from another route).
   useEffect(() => {
-    if (lastNewCard.current === newCardNonce) return;
-    lastNewCard.current = newCardNonce;
+    if (!pendingNewCard) return;
+    consumeNewCard();
     handleAddCard("draft");
-  }, [newCardNonce, handleAddCard]);
+  }, [pendingNewCard, consumeNewCard, handleAddCard]);
 
   useEffect(() => {
     if (lastFocusSearch.current === focusSearchNonce) return;

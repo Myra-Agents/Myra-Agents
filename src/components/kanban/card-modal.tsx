@@ -195,233 +195,243 @@ export function CardModal({
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 border-b p-4 pr-12">
           <DialogTitle>{mode === "add" ? t("newTitle") : t("editTitle")}</DialogTitle>
           <DialogDescription>{mode === "add" ? t("newDescription") : t("editDescription")}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="card-title">
-              {t("title")} <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              ref={titleRef}
-              id="card-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder={t("titlePlaceholder")}
-              required
-            />
-          </div>
-
-          {mode === "add" && (
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             <div className="space-y-2">
-              <Label>{t("column")}</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {CREATABLE_STATUSES.map((item) => {
-                  const cfg = COLUMN_CONFIG[item];
-                  const isSelected = status === item;
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setStatus(item)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-md border px-3 py-2 font-medium text-xs transition-colors",
-                        isSelected
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border text-muted-foreground hover:border-primary/50",
-                      )}
-                    >
-                      <div className={`h-2 w-2 rounded-full ${cfg.accentBar}`} />
-                      {cfg.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {templates.length > 0 && (
-            <div className="space-y-2">
-              <Label>{t("template")}</Label>
-              <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("templatePlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_TEMPLATE}>{t("noTemplate")}</SelectItem>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="card-desc">{t("description")}</Label>
-            <Textarea
-              id="card-desc"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder={t("descriptionPlaceholder")}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="card-tags">{t("tags")}</Label>
-            <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5">
-              {tagList.map((tag) => (
-                <Badge key={tag} variant="outline" className={tagClassName(tag, "h-6 gap-1 pr-1")}>
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag)}
-                    className="rounded-full p-0.5 hover:bg-background/60"
-                  >
-                    <XIcon className="size-3" />
-                  </button>
-                </Badge>
-              ))}
+              <Label htmlFor="card-title">
+                {t("title")} <span className="text-destructive">*</span>
+              </Label>
               <Input
-                id="card-tags"
-                value={tagInput}
-                onChange={(event) => setTagInput(event.target.value)}
-                onKeyDown={handleTagKeyDown}
-                onBlur={() => addTag(tagInput)}
-                placeholder={tagList.length === 0 ? t("tagsPlaceholder") : t("tagInputPlaceholder")}
-                className="h-7 min-w-32 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                ref={titleRef}
+                id="card-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder={t("titlePlaceholder")}
+                required
               />
             </div>
-            {tagSuggestions.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {tagSuggestions.map((tag) => (
-                  <Button key={tag} type="button" variant="outline" size="xs" onClick={() => addTag(tag)}>
+
+            {mode === "add" && (
+              <div className="space-y-2">
+                <Label>{t("column")}</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {CREATABLE_STATUSES.map((item) => {
+                    const cfg = COLUMN_CONFIG[item];
+                    const isSelected = status === item;
+                    return (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setStatus(item)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-md border px-3 py-2 font-medium text-xs transition-colors",
+                          isSelected
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border text-muted-foreground hover:border-primary/50",
+                        )}
+                      >
+                        <div className={`h-2 w-2 rounded-full ${cfg.accentBar}`} />
+                        {cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {templates.length > 0 && (
+              <div className="space-y-2">
+                <Label>{t("template")}</Label>
+                <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("templatePlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_TEMPLATE}>{t("noTemplate")}</SelectItem>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="card-desc">{t("description")}</Label>
+              <Textarea
+                id="card-desc"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder={t("descriptionPlaceholder")}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="card-tags">{t("tags")}</Label>
+              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5">
+                {tagList.map((tag) => (
+                  <Badge key={tag} variant="outline" className={tagClassName(tag, "h-6 gap-1 pr-1")}>
                     {tag}
-                  </Button>
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="rounded-full p-0.5 hover:bg-background/60"
+                    >
+                      <XIcon className="size-3" />
+                    </button>
+                  </Badge>
                 ))}
+                <Input
+                  id="card-tags"
+                  value={tagInput}
+                  onChange={(event) => setTagInput(event.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  onBlur={() => addTag(tagInput)}
+                  placeholder={tagList.length === 0 ? t("tagsPlaceholder") : t("tagInputPlaceholder")}
+                  className="h-7 min-w-32 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                />
+              </div>
+              {tagSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {tagSuggestions.map((tag) => (
+                    <Button key={tag} type="button" variant="outline" size="xs" onClick={() => addTag(tag)}>
+                      {tag}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {agentPresets.length > 0 && (
+              <div className="space-y-2">
+                <Label>{t("agentPreset")}</Label>
+                <Select value={agentPresetId} onValueChange={setAgentPresetId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("agentPresetPlaceholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agentPresets.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        {preset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="card-working-dir" className="flex items-center gap-2">
+                <FolderIcon className="size-3.5 text-muted-foreground" />
+                {t("workingDir")}
+                <span className="font-normal text-muted-foreground">({t("optional")})</span>
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="card-working-dir"
+                  value={workingDir}
+                  onChange={(event) => setWorkingDir(event.target.value)}
+                  placeholder={t("workingDirPlaceholder")}
+                  className="font-mono text-xs"
+                />
+                {mode === "edit" && card && onOpenWorkingDir && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title={t("openWorkingDir")}
+                    onClick={() => onOpenWorkingDir(card.id)}
+                  >
+                    <FolderIcon className="size-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="card-prompt" className="flex items-center gap-2">
+                <Badge className="border-orange-500/20 bg-orange-500/10 text-[10px] text-orange-600">
+                  <ZapIcon className="size-2.5" />
+                  {t("agent")}
+                </Badge>
+                {t("prompt")}
+                <span className="font-normal text-muted-foreground">({t("optional")})</span>
+              </Label>
+              <Textarea
+                id="card-prompt"
+                value={agentPrompt}
+                onChange={(event) => setAgentPrompt(event.target.value)}
+                placeholder={t("promptPlaceholder")}
+                rows={4}
+                className="font-mono text-xs"
+              />
+            </div>
+
+            {onSaveTemplate && (
+              <div className="rounded-lg border bg-muted/40 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={templateName}
+                    onChange={(event) => setTemplateName(event.target.value)}
+                    placeholder={t("templateNamePlaceholder")}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSaveTemplate}
+                    disabled={!templateName.trim()}
+                  >
+                    {t("saveTemplate")}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {mode === "edit" && card?.revisionNotes && card.revisionNotes.length > 0 && (
+              <div className="space-y-2">
+                <Label>{t("revisionNotes", { count: card.revisionNotes.length })}</Label>
+                <div className="max-h-32 space-y-1 overflow-y-auto">
+                  {card.revisionNotes.map((note, index) => (
+                    <div
+                      key={`${index}-${note}`}
+                      className="rounded bg-muted px-2 py-1.5 text-muted-foreground text-xs"
+                    >
+                      <span className="mr-1 font-semibold text-foreground">v{index + 1}:</span>
+                      {note}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {mode === "edit" && runStats.count > 0 && (
+              <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/40 p-3 text-center">
+                <Stat label={t("stats.runs")} value={String(runStats.count)} />
+                <Stat label={t("stats.totalTime")} value={formatDuration(runStats.totalMs)} />
+                <Stat
+                  label={t("stats.totalCost")}
+                  value={
+                    runStats.totalCost > 0
+                      ? `$${runStats.totalCost.toFixed(2)}`
+                      : runStats.totalTokens > 0
+                        ? `${runStats.totalTokens.toLocaleString()} tok`
+                        : "—"
+                  }
+                />
               </div>
             )}
           </div>
 
-          {agentPresets.length > 0 && (
-            <div className="space-y-2">
-              <Label>{t("agentPreset")}</Label>
-              <Select value={agentPresetId} onValueChange={setAgentPresetId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("agentPresetPlaceholder")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {agentPresets.map((preset) => (
-                    <SelectItem key={preset.id} value={preset.id}>
-                      {preset.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="card-working-dir" className="flex items-center gap-2">
-              <FolderIcon className="size-3.5 text-muted-foreground" />
-              {t("workingDir")}
-              <span className="font-normal text-muted-foreground">({t("optional")})</span>
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="card-working-dir"
-                value={workingDir}
-                onChange={(event) => setWorkingDir(event.target.value)}
-                placeholder={t("workingDirPlaceholder")}
-                className="font-mono text-xs"
-              />
-              {mode === "edit" && card && onOpenWorkingDir && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  title={t("openWorkingDir")}
-                  onClick={() => onOpenWorkingDir(card.id)}
-                >
-                  <FolderIcon className="size-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="card-prompt" className="flex items-center gap-2">
-              <Badge className="border-orange-500/20 bg-orange-500/10 text-[10px] text-orange-600">
-                <ZapIcon className="size-2.5" />
-                {t("agent")}
-              </Badge>
-              {t("prompt")}
-              <span className="font-normal text-muted-foreground">({t("optional")})</span>
-            </Label>
-            <Textarea
-              id="card-prompt"
-              value={agentPrompt}
-              onChange={(event) => setAgentPrompt(event.target.value)}
-              placeholder={t("promptPlaceholder")}
-              rows={4}
-              className="font-mono text-xs"
-            />
-          </div>
-
-          {onSaveTemplate && (
-            <div className="rounded-lg border bg-muted/40 p-3">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  value={templateName}
-                  onChange={(event) => setTemplateName(event.target.value)}
-                  placeholder={t("templateNamePlaceholder")}
-                />
-                <Button type="button" variant="secondary" onClick={handleSaveTemplate} disabled={!templateName.trim()}>
-                  {t("saveTemplate")}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {mode === "edit" && card?.revisionNotes && card.revisionNotes.length > 0 && (
-            <div className="space-y-2">
-              <Label>{t("revisionNotes", { count: card.revisionNotes.length })}</Label>
-              <div className="max-h-32 space-y-1 overflow-y-auto">
-                {card.revisionNotes.map((note, index) => (
-                  <div key={`${index}-${note}`} className="rounded bg-muted px-2 py-1.5 text-muted-foreground text-xs">
-                    <span className="mr-1 font-semibold text-foreground">v{index + 1}:</span>
-                    {note}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {mode === "edit" && runStats.count > 0 && (
-            <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/40 p-3 text-center">
-              <Stat label={t("stats.runs")} value={String(runStats.count)} />
-              <Stat label={t("stats.totalTime")} value={formatDuration(runStats.totalMs)} />
-              <Stat
-                label={t("stats.totalCost")}
-                value={
-                  runStats.totalCost > 0
-                    ? `$${runStats.totalCost.toFixed(2)}`
-                    : runStats.totalTokens > 0
-                      ? `${runStats.totalTokens.toLocaleString()} tok`
-                      : "—"
-                }
-              />
-            </div>
-          )}
-
-          <DialogFooter>
+          <DialogFooter className="mx-0 mb-0 shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>
               {t("cancel")}
             </Button>

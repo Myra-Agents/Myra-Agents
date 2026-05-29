@@ -15,6 +15,7 @@
     "version": "Version"
   },
   "nav": {
+    "newCard": "New Card",
     "workspace": "Workspace",
     "configuration": "Configuration",
     "kanban": "Kanban",

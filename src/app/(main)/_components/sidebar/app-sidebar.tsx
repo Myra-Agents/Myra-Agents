@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
+import { Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useShallow } from "zustand/react/shallow";
 
 import {
@@ -16,11 +19,21 @@ import {
 import { APP_CONFIG } from "@/config/app-config";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
+import { useShortcutStore } from "@/stores/shortcut-store";
 
 import { MacSidebarControls } from "../window-controls";
 import { NavMain } from "./nav-main";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const t = useTranslations("nav");
+  const router = useRouter();
+  const requestNewCard = useShortcutStore((s) => s.requestNewCard);
+
+  const handleNewCard = () => {
+    router.push("/kanban");
+    requestNewCard();
+  };
+
   const { sidebarVariant, sidebarCollapsible, isSynced } = usePreferencesStore(
     useShallow((s) => ({
       sidebarVariant: s.sidebarVariant,
@@ -48,18 +61,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:[&_img]:!size-6"
             >
               <Link prefetch={false} href="/kanban">
-                <img
-                  src="/light-theme.png"
-                  alt=""
-                  aria-hidden
-                  className="size-5 object-contain dark:hidden"
-                />
-                <img
-                  src="/dark-theme.png"
-                  alt=""
-                  aria-hidden
-                  className="hidden size-5 object-contain dark:block"
-                />
+                <img src="/light-theme.png" alt="" aria-hidden className="size-5 object-contain dark:hidden" />
+                <img src="/dark-theme.png" alt="" aria-hidden className="hidden size-5 object-contain dark:block" />
                 <span className="font-semibold text-base">{APP_CONFIG.name}</span>
               </Link>
             </SidebarMenuButton>
@@ -67,12 +70,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarMenu className="px-2 pt-2">
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={handleNewCard}
+              tooltip={t("newCard")}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center"
+            >
+              <Plus />
+              <span>{t("newCard")}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavMain items={sidebarItems} />
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-3 py-2 text-xs text-muted-foreground">
-          v{APP_CONFIG.version}
-        </div>
+        <div className="px-3 py-2 text-xs text-muted-foreground">v{APP_CONFIG.version}</div>
       </SidebarFooter>
     </Sidebar>
   );
