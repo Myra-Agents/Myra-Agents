@@ -35,6 +35,12 @@ pub struct AgentRun {
     pub status: AgentRunStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
+    /// Optional token count, if the agent reports it via the result protocol.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens: Option<i64>,
+    /// Optional cost in USD, if the agent reports it via the result protocol.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +56,9 @@ pub struct KanbanCard {
     pub agent_prompt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_preset_id: Option<String>,
+    /// Per-card working directory for the agent run (overrides the preset's).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub linked_task_id: Option<String>,
     pub tags: Vec<String>,
@@ -75,6 +84,9 @@ pub struct KanbanCard {
     pub revision_notes: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_history: Vec<AgentRun>,
+    /// True while the card is waiting in the run queue (concurrency limit hit).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub agent_queued: bool,
 
     // ── Trash state ──
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -52,7 +52,8 @@
       "review": "Review",
       "running": "Running",
       "waitingForOutput": "Waiting for output…",
-      "agent": "Agent"
+      "agent": "Agent",
+      "queued": "Queued"
     },
     "empty": {
       "draft": "Draft your ideas…",
@@ -118,7 +119,17 @@
       "cancel": "Cancel",
       "saving": "Saving…",
       "create": "Create",
-      "save": "Save"
+      "save": "Save",
+      "workingDir": "Working directory",
+      "workingDirPlaceholder": "e.g. C:\\Users\\me\\project",
+      "openWorkingDir": "Open working directory",
+      "relaunch": "Relaunch",
+      "relaunching": "Relaunching…",
+      "stats": {
+        "runs": "Runs",
+        "totalTime": "Total time",
+        "totalCost": "Total cost"
+      }
     },
     "bulk": {
       "selected": "{count} selected",
@@ -144,6 +155,9 @@
       "labelPlaceholder": "{column} label",
       "attentionProtected": "Columns with cards needing attention stay visible.",
       "reset": "Reset columns"
+    },
+    "toast": {
+      "queued": "Agent queued — waiting for a free slot."
     }
   },
   "schedules": {
@@ -245,7 +259,11 @@
       "prompt": "Prompt",
       "loadingLog": "Loading log…",
       "noOutput": "(no output)",
-      "errorLoading": "[Error loading log: {error}]"
+      "errorLoading": "[Error loading log: {error}]",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "openWorkingDir": "Open working dir",
+      "artifacts": "Artifacts"
     },
     "loading": "Loading…",
     "back": "Back"
@@ -268,7 +286,10 @@
       },
       "add": "Add",
       "name": "Name",
-      "customAgent": "Custom Agent"
+      "customAgent": "Custom Agent",
+      "workingDirPlaceholder": "Default directory (optional)",
+      "maxConcurrent": "Max concurrent agents",
+      "maxConcurrentHint": "How many agents may run at once. 0 = unlimited; extra launches are queued."
     },
     "preferences": {
       "title": "Preferences",

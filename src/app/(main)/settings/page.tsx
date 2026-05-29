@@ -276,6 +276,18 @@ export default function SettingsPage() {
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label>{t("agents.maxConcurrent")}</Label>
+            <Input
+              type="number"
+              min={0}
+              value={current.maxConcurrentAgents}
+              onChange={(event) => update({ maxConcurrentAgents: Math.max(0, Number(event.target.value) || 0) })}
+              className="h-8 w-28"
+            />
+            <p className="text-muted-foreground text-xs">{t("agents.maxConcurrentHint")}</p>
+          </div>
+
           <Separator />
 
           {current.agents.map((preset, idx) => (
@@ -312,6 +324,15 @@ export default function SettingsPage() {
                   value={preset.argsTemplate}
                   onChange={(event) => updatePreset(idx, { argsTemplate: event.target.value })}
                   placeholder="{prompt}"
+                  className="h-7 font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("agents.workingDir")}</Label>
+                <Input
+                  value={preset.workingDir ?? ""}
+                  onChange={(event) => updatePreset(idx, { workingDir: event.target.value || undefined })}
+                  placeholder={t("agents.workingDirPlaceholder")}
                   className="h-7 font-mono text-xs"
                 />
               </div>

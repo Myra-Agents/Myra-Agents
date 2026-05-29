@@ -122,6 +122,7 @@ function addCard(args: CommandArgs): KanbanCard {
     tags: input.tags,
     position: nextPositionFor(cards, input.status),
     agentPresetId: input.agentPresetId,
+    workingDir: input.workingDir,
     revisionNotes: [],
     runHistory: [],
   };
@@ -142,6 +143,7 @@ function updateCard(args: CommandArgs): KanbanCard | null {
     description: input.description ?? "",
     agentPrompt: input.agentPrompt,
     agentPresetId: input.agentPresetId,
+    workingDir: input.workingDir,
     tags: input.tags,
     updatedAt: new Date().toISOString(),
   };

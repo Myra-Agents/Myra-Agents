@@ -1,62 +1,98 @@
-# Myra Agents Claude Code Instructions
+# Myra Agents — Claude Code Instructions
 
-Myra Agents is a Windows-only WinForms tray app (.NET 8, `net8.0-windows`) that schedules and runs user-defined tasks: PowerShell commands, scripts, executables, built-in cleanups, and Copilot prompts. No test project exists for this WinForms app; treat this file as the source of truth for project behavior and conventions.
+Myra Agents is a desktop app: a **Kanban board that runs CLI coding agents**. Each card carries a prompt; launching it spawns a configured agent binary (opencode / copilot / claude / custom) in headless mode and streams its output back to the board. Cards flow Draft → Todo → In Progress → Waiting Feedback → Awaiting Review → Done, with a Trash lane. Schedules can auto-materialize cards and launch them on a cron/daily/weekly/interval/once basis.
+
+Stack: **Next.js 16 (App Router, React 19, TypeScript) frontend + Tauri v2 (Rust) desktop backend**. Package manager is **bun**; lint/format is **biome**. There is no unit-test project — verification is type-check + cargo check + a manual run.
 
 ## Build And Run
 
-```powershell
-dotnet build Myra Agents.sln
-Start-Process .\Myra Agents\bin\Debug\net8.0-windows\Myra Agents.exe
+```bash
+bun install
+bun run tauri:dev      # Tauri shell + Next dev server (port 1420)
+bun run tauri:demo     # same, with DEMO=1 (isolated demo data + seed)
+bun run tauri:build    # production bundle (targets: msi, nsis)
 ```
 
-The app uses a single-instance mutex named `Myra Agents_SingleInstance`. Before rebuilding, kill any running instance with `Stop-Process -Id <pid>`; otherwise `Myra Agents.exe` is locked and the build can fail with `MSB3027`. In that failure mode, the C# compile may have succeeded and only the copy step failed.
+Frontend-only (no Rust backend, browser dev backend kicks in):
 
-Use `--minimized` to start directly to the tray.
+```bash
+bun run dev            # next dev -p 1420
+```
 
-There is no test suite, linter, or CI for this WinForms app. Verification is a successful build plus a manual run.
+Verification gates (run before declaring done):
+
+```bash
+npx tsc --noEmit                 # frontend types
+cd src-tauri && cargo check      # Rust backend
+npx biome check                  # lint/format (use --write to fix)
+```
+
+`next.config` does a static export to `out/`, which Tauri loads as `frontendDist`. App identifier `com.myra-agents.app`, product name "Myra Agents". The window is frameless (`decorations: false`, `transparent: true`) — window controls live in `src/app/(main)/_components/window-controls.tsx`. Closing the window hides to the tray instead of quitting (see `on_window_event` in `lib.rs`).
 
 ## Architecture
 
-Entry flow: `Program.cs` -> `Myra AgentsContext`. `Myra AgentsContext` is the `ApplicationContext` that keeps the tray process alive, owns the singleton services, and creates `MainForm` on demand.
+### Backend (`src-tauri/src/`)
 
-Services live in `Myra Agents/Services/`:
+Entry: `main.rs` → `lib.rs::run()`. `lib.rs` builds the Tauri app, manages singleton state (`AgentProcesses`, `TrayState`), inits the tray, the filesystem watcher, and the scheduler, and registers every `#[tauri::command]` in one `generate_handler!` block. **Any new command must be added there.**
 
-- `TaskStorageService` loads and saves the `TaskItem` list to `%APPDATA%\Myra Agents\tasks.json`.
-- `TaskLogService` loads and saves run history to `%APPDATA%\Myra Agents\logs.json`. Logs are capped to `MaxLogsPerTask = 50` per task. Streaming append methods `AppendOutput` and `AppendError` use throttled saves, at most once per second, so live output is not lost on crash. During `Load()`, any leftover `Running` entry from a previous process is auto-recovered as `Failed (orphaned)`.
-- `TaskSchedulerService` bridges to Windows Task Scheduler via `Microsoft.Win32.TaskScheduler`.
+- `commands/kanban.rs` — card CRUD, ordering (fractional `position` f64), trash/restore, revision notes, feedback answers. Owns `myra_agents_dir()` and `load_cards`/`save_cards`.
+- `commands/agent.rs` — spawns agents, streams stdout/stderr to per-run log files, the **run queue** (concurrency limit), cancel, run-log + artifact reads. Holds `AgentProcesses { pids, queue }`.
+- `commands/schedule.rs` — schedule CRUD, `trigger_schedule_now`, `materialize_card_for_schedule`, history purge.
+- `commands/planner.rs` — `plan_day` (day planning helper).
+- `settings.rs` — `Settings { default_agent, agents: Vec<AgentPreset>, max_concurrent_agents }`, load/save, `resolve_agent_preset`.
+- `watcher.rs` — debounced FS watcher on `agent-results/`; parses agent result files and transitions cards (see protocol below).
+- `scheduler.rs` — 30s tick loop; fires due schedules via `request_launch` (respects the queue).
+- `tray.rs`, `demo.rs`, `schedule_store.rs`, `models/` (`kanban_card.rs`, `scheduled_task.rs`).
 
-Scheduling split:
+### Frontend (`src/`)
 
-- `ScheduleType.Interval`, `ScheduleType.Daily`, and `ScheduleType.Weekly` are registered as real Windows Scheduled Tasks named `Myra Agents_<id>`.
-- `ScheduleType.AtLogon` and `ScheduleType.Manual` are never registered in Windows Task Scheduler. They are managed in-process. `AtLogon` tasks are spawned by `LaunchAtLogonTasks()` when Myra Agents starts. `Manual` tasks only run through `Run Now`.
-- `RunNow()` and `RunWithLogging()` must stream stdout and stderr asynchronously with `BeginOutputReadLine` and `OutputDataReceived` into the live `TaskRunLog`. Do not use `ReadToEnd()` here because it blocks until process exit and breaks live logs.
+- `app/(main)/` routes: `kanban`, `schedules`, `planner`, `logs`, `settings` (plus `_components/` for sidebar + window controls).
+- `hooks/` — one hook per concern: `use-kanban`, `use-schedules`, `use-settings`, `use-card-templates`, `use-column-preferences`, `use-agent-events`, `use-agent-logs`, `use-planner`, `use-theme`.
+- `components/kanban/` — board, column, card, card-modal, feedback-modal, trash-zone.
+- `components/ui/` — shadcn-style primitives. `lib/`, `types/`, `i18n/`, `stores/`, `config/`.
+- Drag-and-drop via `@dnd-kit`. State is local React + hooks (plus a zustand preferences store). Toasts via `sonner`.
 
-Models live in `Myra Agents/Models/`:
+### Frontend ↔ backend bridge
 
-- `TaskItem` is the main entity. `SchedulerTaskName` is derived as `Myra Agents_<id>` and marked with `[JsonIgnore]`.
-- `BuiltInAction.All` is the static array of canned PowerShell snippets, such as clean downloads and flush DNS, referenced by `BuiltInActionId`.
-- `TaskRunLog` represents one execution. `Output` and `Error` may grow while live. `Status` transitions from `Running` to `Success` or `Failed`.
+- All backend calls go through `src/lib/tauri.ts` `invoke()`/`listen()` wrappers. In a plain browser (no Tauri) `invoke` throws `[Dev Mode]…`; `src/lib/browser-backend.ts` provides a localStorage-backed stand-in for the kanban/schedule/settings commands so the UI is usable in `bun run dev`. **When you add or change a Tauri command's shape, update `browser-backend.ts` to match.**
+- Live updates are push-based Tauri events, not polling:
+  - `agent-log-appended` — one stdout/stderr line (consumed by `use-agent-logs` into a `Map<cardId, string[]>`).
+  - `agent-result-changed` — a full updated card (consumed by `use-agent-events`, fed to `upsertCard`).
+  - `schedules-updated` — schedules changed on disk.
 
-Forms live in `Myra Agents/Forms/`:
+## Agent Run Lifecycle
 
-- `MainForm` owns task list and CRUD actions, and opens `TaskLogForm` per task.
-- `TaskEditForm` is the editor. The visible UI depends on `ActionType` and `ScheduleType`.
-- `TaskLogForm` is the log viewer. It has a 1-second `_liveTimer` that re-renders only while a `Running` entry exists or to refresh the selected log. Output renders as Markdown in a WebView2 by default, with a dark theme injected through `WrapHtml`, plus a Raw/Rendered toggle. Re-renders are skipped when the markdown body is unchanged to preserve user scroll. When the body changes, capture `scrollY` with `ExecuteScriptAsync`, navigate the page, then restore scroll, or pin to bottom if the user was already at the bottom.
+1. `launch_agent` (or the scheduler / `trigger_schedule_now`) calls `request_launch`. If running agents < `max_concurrent_agents` (0 = unlimited) it spawns immediately; otherwise the card id is pushed to `AgentProcesses.queue` and the card is marked `agent_queued`.
+2. `spawn_agent_for_card` resolves the preset, builds the prompt (revision notes prepended + result-protocol footer), resolves the working directory (**priority: explicit arg → card `working_dir` → preset `working_dir` → home**), validates it exists, then spawns `binary args_template` with `{prompt}` substituted. stdout/stderr stream line-by-line to `agent-runs/{runId}.log` and emit `agent-log-appended`.
+3. The agent signals completion by writing `agent-results/{cardId}.json`. `watcher.rs` parses it and moves the card:
+   - `awaiting_review` → Awaiting Review (with `result`)
+   - `waiting_feedback` → Waiting Feedback (with `question`)
+   - `failed` → back to Todo (with `error`)
+   - Optional `tokens` (int) and `cost` (USD float) are recorded on the `AgentRun`.
+   The result file is then archived into `agent-runs/`.
+4. When the process exits, the waiter thread frees the PID slot and `dequeue_and_spawn` starts the next queued card.
+
+## Data & Storage
+
+All persisted under `~/.myra-agents/` (or `~/.myra-agents-demo/` when `DEMO=1`):
+
+- `board.json` — cards (`Vec<KanbanCard>`).
+- `schedules.json` — scheduled tasks.
+- `settings.json` — agent presets, default agent, max concurrency.
+- `agent-runs/{runId}.log` — streamed run output + archived result files.
+- `agent-results/{cardId}.json` — transient agent→app result handoff (watched, then archived).
 
 ## Repo Conventions
 
-- Persistence path is always `%APPDATA%\Myra Agents\` for `tasks.json` and `logs.json`.
-- WebView2 user data belongs under `%LOCALAPPDATA%\Myra Agents\WebView2`.
-- JSON must use `WriteIndented = true`, camelCase property naming, and `JsonStringEnumConverter` for all enums. Keep using each service's shared `JsonOptions`.
-- `TaskItem` has two scheduling backends in one model. Any new code touching scheduling must branch on `ScheduleType.AtLogon` or `ScheduleType.Manual` before calling into `TaskScheduler`; those schedule types must be no-ops there. Follow the existing guards in `TaskSchedulerService`.
-- Process launching is dispatched by `ActionType` in `BuildProcessStartInfo`. PowerShell commands are always passed as `-NoProfile -WindowStyle Hidden -EncodedCommand <base64-utf16>` through `EncodeCommand()`. Mirror this when adding a new `ActionType`.
-- Single-instance enforcement uses the named mutex in `Program.cs`; do not replace it with a duplicate process check.
-- To add a built-in action, append to `BuiltInAction.All` only. The UI dropdown and execution pipeline pick it up through `BuiltInActionId`.
-- Auto-start with Windows is implemented in `AutoStartService` through an `HKCU\...\Run` registry value, not a scheduled task.
-- Use file-scoped namespaces, nullable enabled, implicit usings, target-typed `new()`, and collection expressions (`[]`).
+- TypeScript: file-scoped modules, `@/` path alias, server/client component split (`"use client"` where needed). shadcn-style UI in `components/ui/`. Format & lint with biome (`bun run check:fix`); `lint-staged` + husky enforce on commit.
+- i18n: every user-facing string goes through `next-intl`; add keys to **both** `src/messages/en.json` and `src/messages/fr.json`. Don't hard-code copy.
+- Rust↔TS payloads: Rust structs use `#[serde(rename_all = "camelCase")]`; mirror field names exactly in `src/types/`. Adding a field to a model requires updating every struct literal (`add_card`, `demo.rs`, `materialize_card_for_schedule`).
+  - **Known mismatch:** TS `AppSettings` has `defaultAgentId` plus `theme`/`locale`/`defaultHomePage`, but Rust `Settings` only reads `defaultAgent` + `agents` + `maxConcurrentAgents`. The extra fields don't round-trip through `save_settings`. Don't "fix" silently — confirm intent first.
+- Agent presets: configured in Settings (`binary`, `argsTemplate`, optional `workingDir`). `argsTemplate` **must contain `{prompt}`**. New default presets go in both `settings.rs::default_agent_presets()` and `src/types/settings.ts::DEFAULT_AGENT_PRESETS`.
+- Concurrency: route every agent launch through `request_launch` (not `spawn_agent_for_card` directly) so the queue is respected — the one intentional exception is `trigger_schedule_now` (explicit immediate run).
+- Streaming: read agent stdout/stderr line-by-line on threads. Never block on full process output — it breaks live logs.
+- The browser dev backend (`browser-backend.ts`) only implements a subset; agent/process commands (`launch_agent`, `get_run_log`, …) are desktop-only and throw in the browser.
 
-## Dependencies
+## TODO / backlog
 
-- `TaskSchedulerEditor` wraps the Windows Task Scheduler API.
-- `Markdig` renders log markdown to HTML.
-- `Microsoft.Web.WebView2` renders the log view. If the WebView2 Runtime is missing, the app falls back to a raw `TextBox`; see `InitializeWebViewAsync`.
+`TODO.md` is the living feature backlog (kanban-style: `[ ]` todo, `[~]` in progress, `[x]` done). Update item statuses there when you complete backlog work.

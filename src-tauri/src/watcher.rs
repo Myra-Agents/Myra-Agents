@@ -23,6 +23,12 @@ struct AgentResultFile {
     question: Option<String>,
     #[serde(default)]
     error: Option<String>,
+    /// Optional token usage reported by the agent.
+    #[serde(default)]
+    tokens: Option<i64>,
+    /// Optional cost in USD reported by the agent.
+    #[serde(default)]
+    cost: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -103,6 +109,8 @@ fn handle_result_file(app: &AppHandle, path: &std::path::Path) {
         if let Some(run) = card.run_history.iter_mut().find(|r| r.id == run_id) {
             run.ended_at = Some(now.clone());
             run.result = parsed.result.clone().or_else(|| parsed.question.clone());
+            run.tokens = parsed.tokens;
+            run.cost = parsed.cost;
             run.status = match parsed.status.as_str() {
                 "awaiting_review" => AgentRunStatus::AwaitingReview,
                 "waiting_feedback" => AgentRunStatus::NeedsFeedback,

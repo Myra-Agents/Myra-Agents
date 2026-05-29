@@ -2,8 +2,9 @@
 
 import { useCallback, useState } from "react";
 
-import { ChevronLeftIcon, ScrollTextIcon } from "lucide-react";
+import { ChevronLeftIcon, ExternalLinkIcon, FileIcon, FolderIcon, ScrollTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,20 @@ import { useKanban } from "@/hooks/use-kanban";
 import { invoke } from "@/lib/tauri";
 import type { AgentRun, KanbanCard } from "@/types/kanban";
 
+interface RunArtifact {
+  name: string;
+  path: string;
+  size: number;
+  modified?: string;
+}
+
 export default function LogsPage() {
   const t = useTranslations("logs");
   const { cards, loading } = useKanban();
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
   const [logContent, setLogContent] = useState<string | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
+  const [artifacts, setArtifacts] = useState<RunArtifact[]>([]);
 
   const allRuns = cards
     .filter((c) => c.runHistory && c.runHistory.length > 0)
@@ -29,6 +38,7 @@ export default function LogsPage() {
     async (card: KanbanCard, run: AgentRun) => {
       setSelectedRun({ card, run });
       setLoadingLog(true);
+      setArtifacts([]);
       try {
         const log = await invoke<string>("get_run_log", { cardId: card.id, runId: run.id });
         setLogContent(log);
@@ -37,9 +47,31 @@ export default function LogsPage() {
       } finally {
         setLoadingLog(false);
       }
+      try {
+        const list = await invoke<RunArtifact[]>("list_run_artifacts", { cardId: card.id });
+        setArtifacts(list);
+      } catch {
+        setArtifacts([]);
+      }
     },
     [t],
   );
+
+  const openPath = useCallback(async (path: string) => {
+    try {
+      await invoke("open_path", { path });
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }, []);
+
+  const openWorkingDir = useCallback(async (cardId: string) => {
+    try {
+      await invoke("open_card_working_dir", { cardId });
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -75,6 +107,43 @@ export default function LogsPage() {
               {t("details.exitCode")}: {selectedRun.run.exitCode}
             </span>
           )}
+          {selectedRun.run.endedAt && (
+            <span>
+              {t("details.duration")}: {formatDuration(selectedRun.run.startedAt, selectedRun.run.endedAt)}
+            </span>
+          )}
+          {typeof selectedRun.run.tokens === "number" && (
+            <span>
+              {t("details.tokens")}: {selectedRun.run.tokens.toLocaleString()}
+            </span>
+          )}
+          {typeof selectedRun.run.cost === "number" && (
+            <span>
+              {t("details.cost")}: ${selectedRun.run.cost.toFixed(2)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => openWorkingDir(selectedRun.card.id)}>
+            <FolderIcon className="size-3.5" />
+            {t("details.openWorkingDir")}
+          </Button>
+          {artifacts.length > 0 && <span className="text-muted-foreground text-xs">{t("details.artifacts")}:</span>}
+          {artifacts.map((artifact) => (
+            <Button
+              key={artifact.path}
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 font-mono text-xs"
+              onClick={() => openPath(artifact.path)}
+              title={artifact.path}
+            >
+              <FileIcon className="size-3" />
+              {artifact.name}
+              <ExternalLinkIcon className="size-3 opacity-60" />
+            </Button>
+          ))}
         </div>
 
         {selectedRun.run.prompt && (

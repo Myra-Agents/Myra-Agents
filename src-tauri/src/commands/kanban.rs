@@ -101,6 +101,7 @@ pub struct CreateCardInput {
     pub status: KanbanStatus,
     pub agent_prompt: Option<String>,
     pub agent_preset_id: Option<String>,
+    pub working_dir: Option<String>,
     pub linked_task_id: Option<String>,
     pub tags: Vec<String>,
 }
@@ -119,6 +120,7 @@ pub fn add_card(_app: AppHandle, input: CreateCardInput) -> KanbanCard {
         updated_at: now,
         agent_prompt: input.agent_prompt,
         agent_preset_id: input.agent_preset_id,
+        working_dir: input.working_dir,
         linked_task_id: input.linked_task_id,
         tags: input.tags,
         position,
@@ -129,6 +131,7 @@ pub fn add_card(_app: AppHandle, input: CreateCardInput) -> KanbanCard {
         agent_run_ended_at: None,
         revision_notes: Vec::new(),
         run_history: Vec::new(),
+        agent_queued: false,
         deleted_at: None,
         previous_status: None,
     };
@@ -145,6 +148,7 @@ pub struct UpdateCardInput {
     pub description: String,
     pub agent_prompt: Option<String>,
     pub agent_preset_id: Option<String>,
+    pub working_dir: Option<String>,
     pub tags: Vec<String>,
 }
 
@@ -157,6 +161,7 @@ pub fn update_card(_app: AppHandle, input: UpdateCardInput) -> Option<KanbanCard
         card.description = input.description;
         card.agent_prompt = input.agent_prompt;
         card.agent_preset_id = input.agent_preset_id;
+        card.working_dir = input.working_dir;
         card.tags = input.tags;
         card.updated_at = now;
         let updated = card.clone();

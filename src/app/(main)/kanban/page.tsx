@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { CardModal } from "@/components/kanban/card-modal";
 import { FeedbackModal, ReviewModal } from "@/components/kanban/feedback-modal";
@@ -15,6 +16,7 @@ import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { normalizeTag, parseTags } from "@/lib/kanban-tags";
+import { invoke } from "@/lib/tauri";
 import type { CardFormData, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 export default function KanbanPage() {
@@ -89,6 +91,7 @@ export default function KanbanPage() {
           description: data.description || undefined,
           agentPrompt: data.agentPrompt || undefined,
           agentPresetId,
+          workingDir: data.workingDir,
           tags: parsedTags,
           status,
         });
@@ -99,12 +102,29 @@ export default function KanbanPage() {
           description: data.description || undefined,
           agentPrompt: data.agentPrompt || undefined,
           agentPresetId,
+          workingDir: data.workingDir,
           tags: parsedTags,
         });
       }
     },
     [addCard, cardModalMode, editingCard, settings.defaultAgentId, updateCard],
   );
+
+  const handleLaunchFromModal = useCallback(
+    async (cardId: string) => {
+      const result = await launchAgent(cardId);
+      if (result?.queued) toast.info(t("toast.queued"));
+    },
+    [launchAgent, t],
+  );
+
+  const handleOpenWorkingDir = useCallback(async (cardId: string) => {
+    try {
+      await invoke("open_card_working_dir", { cardId });
+    } catch (e) {
+      toast.error(String(e));
+    }
+  }, []);
 
   const handleBulkAddTag = useCallback(
     async (card: KanbanCard, tag: string) => {
@@ -115,6 +135,7 @@ export default function KanbanPage() {
         description: card.description,
         agentPrompt: card.agentPrompt,
         agentPresetId: card.agentPresetId ?? settings.defaultAgentId,
+        workingDir: card.workingDir,
         tags,
       });
     },
@@ -201,6 +222,8 @@ export default function KanbanPage() {
         defaultAgentId={settings.defaultAgentId}
         onSave={handleSaveCard}
         onSaveTemplate={saveTemplate}
+        onLaunch={handleLaunchFromModal}
+        onOpenWorkingDir={handleOpenWorkingDir}
         onClose={() => setCardModalOpen(false)}
       />
 

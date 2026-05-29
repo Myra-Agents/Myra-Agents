@@ -3,7 +3,7 @@ use std::time::Duration as StdDuration;
 use chrono::Local;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::commands::agent::{spawn_agent_for_card, AgentProcesses};
+use crate::commands::agent::{request_launch, AgentProcesses};
 use crate::commands::kanban::{load_cards, save_cards};
 use crate::commands::schedule::materialize_card_for_schedule;
 use crate::schedule_store::{compute_next_run, load_schedules, save_schedules};
@@ -77,11 +77,17 @@ async fn tick(app: &AppHandle) -> Result<(), String> {
         // Spawn the agent. If it fails, log and move on — the schedule still
         // advances so we don't loop on a broken card forever.
         let state = app.state::<AgentProcesses>();
-        match spawn_agent_for_card(app, &state, &card_id, None) {
-            Ok(run_id) => {
+        match request_launch(app, &state, &card_id, None) {
+            Ok(result) => {
                 eprintln!(
-                    "[scheduler] fired schedule {} → card {} (run {})",
-                    task.id, card_id, run_id
+                    "[scheduler] fired schedule {} → card {} ({})",
+                    task.id,
+                    card_id,
+                    result
+                        .run_id
+                        .clone()
+                        .map(|r| format!("run {r}"))
+                        .unwrap_or_else(|| "queued".to_string())
                 );
                 // Notify frontend the new card exists
                 let _ = app.emit(
