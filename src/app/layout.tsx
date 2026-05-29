@@ -14,6 +14,9 @@ import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provi
 
 import "./globals.css";
 import "../styles/presets/tangerine.css";
+import "../styles/presets/caffeine.css";
+import "../styles/presets/claude.css";
+import "../styles/presets/supabase.css";
 
 export const metadata: Metadata = {
   title: APP_CONFIG.meta.title,
