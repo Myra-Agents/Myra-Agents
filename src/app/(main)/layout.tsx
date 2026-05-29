@@ -21,9 +21,13 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
   return (
     <SidebarProvider
       defaultOpen={defaultOpen}
+      className="min-h-[calc(100svh_-_var(--titlebar-h,0px))] pt-[var(--titlebar-h,0px)]"
       style={
         {
           "--sidebar-width": "calc(var(--spacing) * 68)",
+          // Wide enough for the macOS traffic lights to sit inside the rail
+          // when the sidebar is collapsed (WhatsApp-style).
+          "--sidebar-width-icon": "4.5rem",
         } as React.CSSProperties
       }
     >

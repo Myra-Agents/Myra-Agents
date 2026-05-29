@@ -17,6 +17,7 @@ import { APP_CONFIG } from "@/config/app-config";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
+import { MacSidebarControls } from "../window-controls";
 import { NavMain } from "./nav-main";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -32,11 +33,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const collapsible = isSynced ? sidebarCollapsible : props.collapsible;
 
   return (
-    <Sidebar {...props} variant={variant} collapsible={collapsible}>
+    <Sidebar
+      {...props}
+      variant={variant}
+      collapsible={collapsible}
+      className="md:!top-[var(--titlebar-h,0px)] md:!h-[calc(100svh_-_var(--titlebar-h,0px))]"
+    >
       <SidebarHeader>
+        <MacSidebarControls />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <SidebarMenuButton
+              asChild
+              className="group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:[&_img]:!size-6"
+            >
               <Link prefetch={false} href="/kanban">
                 <img
                   src="/light-theme.png"

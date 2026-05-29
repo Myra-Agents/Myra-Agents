@@ -30,6 +30,10 @@ interface NavMainProps {
   readonly items: readonly NavGroup[];
 }
 
+// Bigger, centered icons when the rail is collapsed (the wider WhatsApp-style rail).
+const collapsedIconClass =
+  "group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:[&>svg]:!size-5";
+
 const IsComingSoon = () => (
   <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">Soon</span>
 );
@@ -110,6 +114,7 @@ const NavItemCollapsed = ({
             disabled={item.comingSoon}
             tooltip={item.title}
             isActive={isActive(item.url, item.subItems)}
+            className={collapsedIconClass}
           >
             {item.icon && <item.icon />}
             <span>{item.title}</span>
@@ -173,6 +178,7 @@ export function NavMain({ items }: NavMainProps) {
                           aria-disabled={item.comingSoon}
                           tooltip={item.title}
                           isActive={isItemActive(item.url)}
+                          className={collapsedIconClass}
                         >
                           <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
                             {item.icon && <item.icon />}

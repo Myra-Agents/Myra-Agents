@@ -5,11 +5,12 @@
   "identifier": "com.myra-agents.app",
   "build": {
     "frontendDist": "../out",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "Myra Agents",
@@ -18,6 +19,7 @@
         "minWidth": 1024,
         "minHeight": 700,
         "decorations": false,
+        "transparent": true,
         "resizable": true,
         "fullscreen": false
       }

@@ -671,7 +671,7 @@ export function KanbanBoard({
 
         <div
           ref={scrollRef}
-          className={`flex h-full min-h-0 items-start gap-3 overflow-auto px-4 py-4 ${canPan ? "cursor-grab" : ""}`}
+          className={`flex h-full min-h-0 items-start gap-3 overflow-x-auto overflow-y-hidden px-4 py-4 ${canPan ? "cursor-grab" : ""}`}
         >
           {visibleColumns.map((status) => (
             <KanbanColumn
