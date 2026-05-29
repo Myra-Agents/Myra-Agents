@@ -209,6 +209,7 @@ pub fn materialize_card_for_schedule(task: &ScheduledTask) -> KanbanCard {
         updated_at: now,
         agent_prompt: Some(task.agent_prompt.clone()),
         agent_preset_id: None,
+        working_dir: None,
         linked_task_id: Some(task.id.clone()),
         tags,
         position: 0.0,
@@ -219,6 +220,7 @@ pub fn materialize_card_for_schedule(task: &ScheduledTask) -> KanbanCard {
         agent_run_ended_at: None,
         revision_notes: Vec::new(),
         run_history: Vec::new(),
+        agent_queued: false,
         deleted_at: None,
         previous_status: None,
     }

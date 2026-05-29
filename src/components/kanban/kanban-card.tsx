@@ -134,6 +134,14 @@ export function KanbanCardComponent({
         {/* Description */}
         {card.description && <p className="text-xs text-muted-foreground line-clamp-2 pl-4">{card.description}</p>}
 
+        {/* Queued: waiting for a free concurrency slot */}
+        {!isOverlay && card.agentQueued && card.status !== "in_progress" && (
+          <div className="flex items-center gap-1.5 pl-4 pt-2 border-t">
+            <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">{t("queued")}</span>
+          </div>
+        )}
+
         {/* In progress: live timer + logs */}
         {!isOverlay && card.status === "in_progress" && (
           <InProgressBlock card={card} logLines={logLines} onViewLogs={onViewLogs} stop={stop} />

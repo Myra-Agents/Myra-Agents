@@ -13,6 +13,8 @@ export interface AgentPreset {
 export interface AppSettings {
   defaultAgentId: string;
   agents: AgentPreset[];
+  /** Maximum agents allowed to run concurrently. 0 = unlimited. */
+  maxConcurrentAgents: number;
   defaultHomePage: "kanban" | "schedules" | "planner" | "logs";
   locale: "auto" | "en" | "fr";
   theme: "light" | "dark" | "system";
@@ -42,6 +44,7 @@ export const DEFAULT_AGENT_PRESETS: AgentPreset[] = [
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultAgentId: "opencode",
   agents: DEFAULT_AGENT_PRESETS,
+  maxConcurrentAgents: 2,
   defaultHomePage: "kanban",
   locale: "auto",
   theme: "system",

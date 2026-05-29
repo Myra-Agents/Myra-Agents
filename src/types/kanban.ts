@@ -16,6 +16,10 @@ export interface AgentRun {
   result?: string;
   status: "running" | "needs_feedback" | "awaiting_review" | "failed" | "completed";
   exitCode?: number;
+  /** Tokens used, if the agent reported it via the result protocol. */
+  tokens?: number;
+  /** Cost in USD, if the agent reported it via the result protocol. */
+  cost?: number;
 }
 
 export interface KanbanCard {
@@ -34,9 +38,13 @@ export interface KanbanCard {
 
   /** Which agent preset to use (falls back to app default) */
   agentPresetId?: string;
+  /** Per-card working directory for the agent run (overrides the preset's). */
+  workingDir?: string;
 
   // Agent runtime state
   agentRunId?: string;
+  /** True while the card waits in the run queue (concurrency limit hit). */
+  agentQueued?: boolean;
   agentResult?: string;
   agentQuestion?: string;
   agentRunStartedAt?: string;
@@ -57,6 +65,7 @@ export interface CreateCardInput {
   linkedTaskId?: string;
   tags: string[];
   agentPresetId?: string;
+  workingDir?: string;
 }
 
 export interface UpdateCardInput {
@@ -66,6 +75,7 @@ export interface UpdateCardInput {
   agentPrompt?: string;
   tags: string[];
   agentPresetId?: string;
+  workingDir?: string;
 }
 
 export interface CardFormData {
@@ -74,6 +84,13 @@ export interface CardFormData {
   agentPrompt: string;
   tags: string; // comma-separated
   agentPresetId?: string;
+  workingDir?: string;
+}
+
+/** Result of a launch_agent invocation. */
+export interface LaunchResult {
+  runId?: string;
+  queued: boolean;
 }
 
 export interface CardTemplate {

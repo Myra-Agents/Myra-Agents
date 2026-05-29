@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { invoke, isDevModeError } from "@/lib/tauri";
-import type { CreateCardInput, KanbanCard, KanbanStatus, UpdateCardInput } from "@/types/kanban";
+import type { CreateCardInput, KanbanCard, KanbanStatus, LaunchResult, UpdateCardInput } from "@/types/kanban";
 
 export function useKanban() {
   const [cards, setCards] = useState<KanbanCard[]>([]);
@@ -140,7 +140,7 @@ export function useKanban() {
   const launchAgent = useCallback(
     async (cardId: string, workingDir?: string) => {
       try {
-        const runId = await invoke<string>("launch_agent", {
+        const result = await invoke<LaunchResult>("launch_agent", {
           input: {
             cardId,
             workingDir: workingDir ?? null,
@@ -150,20 +150,23 @@ export function useKanban() {
         setCards((prev) =>
           prev.map((card) =>
             card.id === cardId
-              ? {
-                  ...card,
-                  status: "in_progress",
-                  agentRunId: runId,
-                  agentRunStartedAt: now,
-                  agentRunEndedAt: undefined,
-                  agentResult: undefined,
-                  agentQuestion: undefined,
-                  updatedAt: now,
-                }
+              ? result.queued
+                ? { ...card, agentQueued: true, updatedAt: now }
+                : {
+                    ...card,
+                    status: "in_progress",
+                    agentQueued: false,
+                    agentRunId: result.runId,
+                    agentRunStartedAt: now,
+                    agentRunEndedAt: undefined,
+                    agentResult: undefined,
+                    agentQuestion: undefined,
+                    updatedAt: now,
+                  }
               : card,
           ),
         );
-        return runId;
+        return result;
       } catch (e) {
         await loadCards();
         throw e;

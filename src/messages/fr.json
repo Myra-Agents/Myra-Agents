@@ -52,7 +52,8 @@
       "review": "Vérifier",
       "running": "En cours",
       "waitingForOutput": "En attente de sortie…",
-      "agent": "Agent"
+      "agent": "Agent",
+      "queued": "En file"
     },
     "empty": {
       "draft": "Posez vos idées…",
@@ -118,7 +119,17 @@
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "create": "Créer",
-      "save": "Enregistrer"
+      "save": "Enregistrer",
+      "workingDir": "Répertoire de travail",
+      "workingDirPlaceholder": "ex. C:\\Users\\moi\\projet",
+      "openWorkingDir": "Ouvrir le répertoire de travail",
+      "relaunch": "Relancer",
+      "relaunching": "Relancement…",
+      "stats": {
+        "runs": "Exéc.",
+        "totalTime": "Temps total",
+        "totalCost": "Coût total"
+      }
     },
     "bulk": {
       "selected": "{count} sélectionnée(s)",
@@ -144,6 +155,9 @@
       "labelPlaceholder": "Libellé {column}",
       "attentionProtected": "Les colonnes avec des cartes nécessitant une attention restent visibles.",
       "reset": "Réinitialiser les colonnes"
+    },
+    "toast": {
+      "queued": "Agent mis en file — en attente d’un créneau libre."
     }
   },
   "schedules": {
@@ -245,7 +259,11 @@
       "prompt": "Prompt",
       "loadingLog": "Chargement du journal…",
       "noOutput": "(aucune sortie)",
-      "errorLoading": "[Erreur lors du chargement du journal : {error}]"
+      "errorLoading": "[Erreur lors du chargement du journal : {error}]",
+      "tokens": "Jetons",
+      "cost": "Coût",
+      "openWorkingDir": "Ouvrir le répertoire",
+      "artifacts": "Fichiers"
     },
     "loading": "Chargement…",
     "back": "Retour"
@@ -268,7 +286,10 @@
       },
       "add": "Ajouter",
       "name": "Nom",
-      "customAgent": "Agent personnalisé"
+      "customAgent": "Agent personnalisé",
+      "workingDirPlaceholder": "Répertoire par défaut (optionnel)",
+      "maxConcurrent": "Agents simultanés max",
+      "maxConcurrentHint": "Nombre d’agents pouvant s’exécuter en même temps. 0 = illimité ; les lancements en trop sont mis en file."
     },
     "preferences": {
       "title": "Préférences",

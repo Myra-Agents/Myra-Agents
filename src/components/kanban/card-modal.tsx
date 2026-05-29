@@ -2,7 +2,7 @@
 
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { XIcon, ZapIcon } from "lucide-react";
+import { FolderIcon, RotateCcwIcon, XIcon, ZapIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,8 @@ interface CardModalProps {
   defaultAgentId?: string;
   onSave: (data: CardFormData, status: KanbanStatus) => Promise<void>;
   onSaveTemplate?: (template: Omit<CardTemplate, "id" | "createdAt">) => void;
+  onLaunch?: (cardId: string) => Promise<void>;
+  onOpenWorkingDir?: (cardId: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -52,12 +54,16 @@ export function CardModal({
   defaultAgentId,
   onSave,
   onSaveTemplate,
+  onLaunch,
+  onOpenWorkingDir,
   onClose,
 }: CardModalProps) {
   const t = useTranslations("kanban.cardModal");
   const [title, setTitle] = useState(card?.title ?? "");
   const [description, setDescription] = useState(card?.description ?? "");
   const [agentPrompt, setAgentPrompt] = useState(card?.agentPrompt ?? "");
+  const [workingDir, setWorkingDir] = useState(card?.workingDir ?? "");
+  const [launching, setLaunching] = useState(false);
   const [tagList, setTagList] = useState<string[]>(card?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
   const [status, setStatus] = useState<KanbanStatus>(card?.status ?? initialStatus);
@@ -74,6 +80,7 @@ export function CardModal({
       setTitle(card?.title ?? "");
       setDescription(card?.description ?? "");
       setAgentPrompt(card?.agentPrompt ?? "");
+      setWorkingDir(card?.workingDir ?? "");
       setTagList(dedupeTags(card?.tags ?? []));
       setTagInput("");
       setStatus(card?.status ?? initialStatus);
@@ -150,6 +157,7 @@ export function CardModal({
           agentPrompt,
           tags: tagList.join(", "),
           agentPresetId: agentPresetId || undefined,
+          workingDir: workingDir.trim() || undefined,
         },
         status,
       );
@@ -158,6 +166,32 @@ export function CardModal({
       setSaving(false);
     }
   };
+
+  const handleRelaunch = async () => {
+    if (!card || !onLaunch) return;
+    setLaunching(true);
+    try {
+      // Persist any edits first so the agent picks up the latest prompt/dir.
+      await onSave(
+        {
+          title: title.trim(),
+          description,
+          agentPrompt,
+          tags: tagList.join(", "),
+          agentPresetId: agentPresetId || undefined,
+          workingDir: workingDir.trim() || undefined,
+        },
+        status,
+      );
+      await onLaunch(card.id);
+      onClose();
+    } finally {
+      setLaunching(false);
+    }
+  };
+
+  const runStats = useMemo(() => summarizeRuns(card?.runHistory ?? []), [card?.runHistory]);
+  const canRelaunch = mode === "edit" && card && onLaunch && card.status !== "in_progress" && !card.agentQueued;
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
@@ -295,6 +329,34 @@ export function CardModal({
           )}
 
           <div className="space-y-2">
+            <Label htmlFor="card-working-dir" className="flex items-center gap-2">
+              <FolderIcon className="size-3.5 text-muted-foreground" />
+              {t("workingDir")}
+              <span className="font-normal text-muted-foreground">({t("optional")})</span>
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="card-working-dir"
+                value={workingDir}
+                onChange={(event) => setWorkingDir(event.target.value)}
+                placeholder={t("workingDirPlaceholder")}
+                className="font-mono text-xs"
+              />
+              {mode === "edit" && card && onOpenWorkingDir && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title={t("openWorkingDir")}
+                  onClick={() => onOpenWorkingDir(card.id)}
+                >
+                  <FolderIcon className="size-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="card-prompt" className="flex items-center gap-2">
               <Badge className="border-orange-500/20 bg-orange-500/10 text-[10px] text-orange-600">
                 <ZapIcon className="size-2.5" />
@@ -342,10 +404,33 @@ export function CardModal({
             </div>
           )}
 
+          {mode === "edit" && runStats.count > 0 && (
+            <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/40 p-3 text-center">
+              <Stat label={t("stats.runs")} value={String(runStats.count)} />
+              <Stat label={t("stats.totalTime")} value={formatDuration(runStats.totalMs)} />
+              <Stat
+                label={t("stats.totalCost")}
+                value={
+                  runStats.totalCost > 0
+                    ? `$${runStats.totalCost.toFixed(2)}`
+                    : runStats.totalTokens > 0
+                      ? `${runStats.totalTokens.toLocaleString()} tok`
+                      : "—"
+                }
+              />
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               {t("cancel")}
             </Button>
+            {canRelaunch && (
+              <Button type="button" variant="secondary" onClick={handleRelaunch} disabled={launching || saving}>
+                <RotateCcwIcon className="size-3.5" />
+                {launching ? t("relaunching") : t("relaunch")}
+              </Button>
+            )}
             <Button type="submit" disabled={!title.trim() || saving}>
               {saving ? t("saving") : mode === "add" ? t("create") : t("save")}
             </Button>
@@ -358,4 +443,45 @@ export function CardModal({
 
 function dedupeTags(tags: string[]): string[] {
   return [...new Set(tags.map(normalizeTag).filter(Boolean))];
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="font-semibold text-sm tabular-nums">{value}</p>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+    </div>
+  );
+}
+
+interface RunStats {
+  count: number;
+  totalMs: number;
+  totalTokens: number;
+  totalCost: number;
+}
+
+function summarizeRuns(runs: { startedAt: string; endedAt?: string; tokens?: number; cost?: number }[]): RunStats {
+  let totalMs = 0;
+  let totalTokens = 0;
+  let totalCost = 0;
+  for (const run of runs) {
+    if (run.endedAt) {
+      const ms = Date.parse(run.endedAt) - Date.parse(run.startedAt);
+      if (!Number.isNaN(ms) && ms > 0) totalMs += ms;
+    }
+    if (run.tokens) totalTokens += run.tokens;
+    if (run.cost) totalCost += run.cost;
+  }
+  return { count: runs.length, totalMs, totalTokens, totalCost };
+}
+
+function formatDuration(ms: number): string {
+  if (ms <= 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
 }

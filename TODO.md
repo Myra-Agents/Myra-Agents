@@ -20,13 +20,13 @@ Inspired by [mobslide](https://github.com/thewh1teagle/mobslide): scan a QR, no 
 
 ## Agents & runs
 
-- [ ] **Per-task agent selection** — Pick which agent to run on each card (and schedule): named preset, CLI binary, model/profile, or extra args. Store on the card; show a badge in the board; fall back to app default when unset.
-- [ ] **Configurable agent command** — Settings for binary, args, default `working_dir`, model/profile (not hard-coded `opencode`); define presets used by per-task selection.
-- [ ] **Per-card working directory** — Persist and show in card modal; validate path exists before launch.
-- [ ] **Run queue** — Max concurrent agents; queue Todo cards when limit reached.
-- [ ] **Retry / resume** — One-click relaunch with same or edited prompt; optional “continue from last result”.
-- [ ] **Run artifacts** — Link files written under `~/.myra-agents/agent-results/` from card detail.
-- [ ] **Cost / duration stats** — Per run and per card: elapsed time, token/cost if agent reports it.
+- [x] **Per-task agent selection** — Pick which agent to run on each card (and schedule): named preset, CLI binary, model/profile, or extra args. Store on the card; show a badge in the board; fall back to app default when unset.
+- [x] **Configurable agent command** — Settings for binary, args, default `working_dir`, model/profile (not hard-coded `opencode`); define presets used by per-task selection.
+- [x] **Per-card working directory** — Persist and show in card modal; validate path exists before launch.
+- [x] **Run queue** — Max concurrent agents (`maxConcurrentAgents` setting, 0 = unlimited); queues launches when limit reached, dequeues on agent exit.
+- [x] **Retry / resume** — One-click relaunch from card modal; revision notes are carried into the new run (continue-from-last).
+- [x] **Run artifacts** — Run logs + archived results listed in the logs detail view; open file / working dir buttons.
+- [x] **Cost / duration stats** — Per run: duration, tokens, cost (`tokens`/`cost` in result protocol). Per card: aggregate runs/time/cost in the card modal.
 
 ---
 

@@ -23,10 +23,17 @@ pub struct Settings {
     pub default_agent: String,
     #[serde(default = "default_agent_presets")]
     pub agents: Vec<AgentPreset>,
+    /// Maximum number of agents allowed to run concurrently. 0 = unlimited.
+    #[serde(default = "default_max_concurrent")]
+    pub max_concurrent_agents: u32,
 }
 
 fn default_agent_id() -> String {
     "opencode".to_string()
+}
+
+fn default_max_concurrent() -> u32 {
+    2
 }
 
 fn default_agent_presets() -> Vec<AgentPreset> {
@@ -60,6 +67,7 @@ impl Default for Settings {
         Self {
             default_agent: default_agent_id(),
             agents: default_agent_presets(),
+            max_concurrent_agents: default_max_concurrent(),
         }
     }
 }

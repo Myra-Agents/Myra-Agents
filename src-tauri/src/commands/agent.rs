@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -12,13 +12,15 @@ use uuid::Uuid;
 
 use crate::commands::kanban::{load_cards, save_cards, myra_agents_dir};
 use crate::models::kanban_card::{AgentRun, AgentRunStatus, KanbanStatus};
-use crate::settings::resolve_agent_preset;
+use crate::settings::{load_settings, resolve_agent_preset};
 
 /// Per-card spawned process tracking. We keep the PID so we can kill it
-/// (the actual `Child` is owned by the streaming thread).
+/// (the actual `Child` is owned by the streaming thread). `queue` holds card
+/// ids waiting for a free concurrency slot, in FIFO order.
 #[derive(Default)]
 pub struct AgentProcesses {
     pub pids: Mutex<HashMap<String, u32>>,
+    pub queue: Mutex<VecDeque<String>>,
 }
 
 /// Payload emitted whenever a new log line is appended.
@@ -170,6 +172,9 @@ The file must contain one of these shapes:\n\
   {{\"cardId\": \"{card_id}\", \"status\": \"waiting_feedback\", \"question\": \"<your question>\"}}\n\
   {{\"cardId\": \"{card_id}\", \"status\": \"failed\", \"error\": \"<reason>\"}}\n\
 \n\
+You may also include optional \"tokens\" (integer) and \"cost\" (USD number) fields\n\
+to report usage, e.g. {{..., \"tokens\": 12345, \"cost\": 0.12}}.\n\
+\n\
 After writing the file, you may exit. Myra Agents is watching this path."
     ));
 
@@ -183,16 +188,104 @@ pub struct LaunchAgentInput {
     pub working_dir: Option<String>,
 }
 
+/// Result of a launch request: either the agent was spawned (`run_id` set) or
+/// it was queued because the concurrency limit was reached (`queued = true`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchResult {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+    pub queued: bool,
+}
+
+/// Number of agents currently running.
+fn running_count(state: &AgentProcesses) -> usize {
+    state.pids.lock().map(|p| p.len()).unwrap_or(0)
+}
+
+/// Mark a card as queued (waiting for a free slot) and persist + notify the UI.
+fn mark_card_queued(app: &AppHandle, card_id: &str) {
+    let mut cards = load_cards();
+    if let Some(card) = cards.iter_mut().find(|c| c.id == card_id) {
+        card.agent_queued = true;
+        card.updated_at = Utc::now().to_rfc3339();
+        let updated = card.clone();
+        save_cards(&cards);
+        let _ = app.emit(
+            "agent-result-changed",
+            serde_json::json!({ "card": updated }),
+        );
+    }
+}
+
 /// Spawn the configured agent preset in headless mode, capturing stdout/stderr.
 /// Each line is appended to `~/.myra-agents/agent-runs/{runId}.log` and emitted
-/// as an `agent-log-appended` Tauri event.
+/// as an `agent-log-appended` Tauri event. Respects the configured concurrency
+/// limit: if all slots are busy the card is queued instead.
 #[tauri::command]
 pub fn launch_agent(
     app: AppHandle,
     state: State<'_, AgentProcesses>,
     input: LaunchAgentInput,
-) -> Result<String, String> {
-    spawn_agent_for_card(&app, &state, &input.card_id, input.working_dir.as_deref())
+) -> Result<LaunchResult, String> {
+    request_launch(&app, &state, &input.card_id, input.working_dir.as_deref())
+}
+
+/// Concurrency-aware launch entry point. Spawns immediately when a slot is
+/// free, otherwise enqueues the card. `max_concurrent_agents == 0` = unlimited.
+pub fn request_launch(
+    app: &AppHandle,
+    state: &AgentProcesses,
+    card_id: &str,
+    working_dir: Option<&str>,
+) -> Result<LaunchResult, String> {
+    let max = load_settings().max_concurrent_agents as usize;
+    let at_limit = max != 0 && running_count(state) >= max;
+
+    if at_limit {
+        if let Ok(mut q) = state.queue.lock() {
+            if !q.iter().any(|id| id == card_id) {
+                q.push_back(card_id.to_string());
+            }
+        }
+        mark_card_queued(app, card_id);
+        return Ok(LaunchResult {
+            run_id: None,
+            queued: true,
+        });
+    }
+
+    let run_id = spawn_agent_for_card(app, state, card_id, working_dir)?;
+    Ok(LaunchResult {
+        run_id: Some(run_id),
+        queued: false,
+    })
+}
+
+/// Pull the next queued card (if any) and spawn it. Called when a slot frees up
+/// (agent process exits or is cancelled).
+fn dequeue_and_spawn(app: &AppHandle) {
+    let state = app.state::<AgentProcesses>();
+    let max = load_settings().max_concurrent_agents as usize;
+    if max != 0 && running_count(&state) >= max {
+        return;
+    }
+    let next = state.queue.lock().ok().and_then(|mut q| q.pop_front());
+    if let Some(card_id) = next {
+        // Skip cards that vanished or are no longer queued (e.g. trashed).
+        let still_queued = load_cards()
+            .iter()
+            .any(|c| c.id == card_id && c.agent_queued);
+        if !still_queued {
+            // Try the following queued card instead.
+            dequeue_and_spawn(app);
+            return;
+        }
+        if let Err(e) = spawn_agent_for_card(app, &state, &card_id, None) {
+            eprintln!("[agent] failed to spawn queued card {card_id}: {e}");
+            dequeue_and_spawn(app);
+        }
+    }
 }
 
 /// Internal entry point — same logic as `launch_agent` but callable from
@@ -230,10 +323,18 @@ pub fn spawn_agent_for_card(
     );
 
     let preset = resolve_agent_preset(card.agent_preset_id.as_deref())?;
+    // Working directory priority: explicit arg → per-card → preset default → home.
     let working_dir = working_dir
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(str::to_string)
+        .or_else(|| {
+            card.working_dir
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        })
         .or_else(|| {
             preset
                 .working_dir
@@ -247,6 +348,12 @@ pub fn spawn_agent_for_card(
                 .or_else(|_| std::env::var("HOME"))
                 .unwrap_or_else(|_| ".".to_string())
         });
+
+    // Validate the working directory exists before spawning — a missing path
+    // otherwise fails opaquely deep inside the OS spawn call.
+    if !std::path::Path::new(&working_dir).is_dir() {
+        return Err(format!("Working directory does not exist: {working_dir}"));
+    }
 
     let run_id = Uuid::new_v4().to_string();
     let log_path: PathBuf = dir.join("agent-runs").join(format!("{run_id}.log"));
@@ -338,12 +445,16 @@ pub fn spawn_agent_for_card(
                 pids.remove(&card_id);
             }
             let _ = crate::tray::update_tray_status(&app_for_wait);
+
+            // A slot just freed up — start the next queued card, if any.
+            dequeue_and_spawn(&app_for_wait);
         });
     }
 
     // Update the card
     let now = Utc::now().to_rfc3339();
     card.status = KanbanStatus::InProgress;
+    card.agent_queued = false;
     card.agent_preset_id = Some(preset.id.clone());
     card.agent_run_id = Some(run_id.clone());
     card.agent_run_started_at = Some(now.clone());
@@ -359,6 +470,8 @@ pub fn spawn_agent_for_card(
         result: None,
         status: AgentRunStatus::Running,
         exit_code: None,
+        tokens: None,
+        cost: None,
     });
 
     save_cards(&cards);
@@ -420,6 +533,11 @@ pub fn cancel_agent(
         .map_err(|e| format!("PID lock poisoned: {e}"))?
         .remove(&card_id);
 
+    // Drop it from the wait queue too (it may have been queued, not running).
+    if let Ok(mut q) = state.queue.lock() {
+        q.retain(|id| id != &card_id);
+    }
+
     if let Some(pid) = pid_opt {
         let _ = Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
@@ -433,6 +551,7 @@ pub fn cancel_agent(
     let now = Utc::now().to_rfc3339();
     let mut changed = false;
     if let Some(card) = cards.iter_mut().find(|c| c.id == card_id) {
+        card.agent_queued = false;
         if let Some(run_id) = card.agent_run_id.clone() {
             if let Some(run) = card.run_history.iter_mut().find(|r| r.id == run_id) {
                 if matches!(run.status, AgentRunStatus::Running) {
@@ -463,4 +582,107 @@ pub fn get_run_log(_app: AppHandle, run_id: String) -> Result<String, String> {
         return Ok(String::new());
     }
     std::fs::read_to_string(&path).map_err(|e| format!("Failed to read log {path:?}: {e}"))
+}
+
+/// One file produced by (or related to) an agent run.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunArtifact {
+    pub name: String,
+    pub path: String,
+    pub size: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modified: Option<String>,
+}
+
+/// List artifacts for a card: its run logs plus any archived result files.
+/// These live under `~/.myra-agents/agent-runs/`.
+#[tauri::command]
+pub fn list_run_artifacts(_app: AppHandle, card_id: String) -> Result<Vec<RunArtifact>, String> {
+    let cards = load_cards();
+    let card = cards
+        .iter()
+        .find(|c| c.id == card_id)
+        .ok_or_else(|| format!("Card not found: {card_id}"))?;
+
+    // Run ids belonging to this card, used to match log filenames.
+    let run_ids: Vec<String> = card.run_history.iter().map(|r| r.id.clone()).collect();
+
+    let runs_dir = myra_agents_dir().join("agent-runs");
+    let mut artifacts = Vec::new();
+
+    let entries = match std::fs::read_dir(&runs_dir) {
+        Ok(e) => e,
+        Err(_) => return Ok(artifacts),
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        // Match either a known run-id log, or an archived result file for this card.
+        let matches = run_ids.iter().any(|rid| name.contains(rid))
+            || name.ends_with(&format!("{card_id}.json"));
+        if !matches {
+            continue;
+        }
+        let meta = entry.metadata().ok();
+        let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+        let modified = meta
+            .and_then(|m| m.modified().ok())
+            .map(|t| chrono::DateTime::<Utc>::from(t).to_rfc3339());
+        artifacts.push(RunArtifact {
+            name,
+            path: path.to_string_lossy().to_string(),
+            size,
+            modified,
+        });
+    }
+
+    // Newest first.
+    artifacts.sort_by(|a, b| b.modified.cmp(&a.modified));
+    Ok(artifacts)
+}
+
+/// Reveal/open a path (file or directory) in the OS file manager / default app.
+#[tauri::command]
+pub fn open_path(app: AppHandle, path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_path(path, None::<&str>)
+        .map_err(|e| format!("Failed to open path: {e}"))
+}
+
+/// Open the resolved working directory for a card (per-card → preset → home).
+#[tauri::command]
+pub fn open_card_working_dir(app: AppHandle, card_id: String) -> Result<String, String> {
+    let cards = load_cards();
+    let card = cards
+        .iter()
+        .find(|c| c.id == card_id)
+        .ok_or_else(|| format!("Card not found: {card_id}"))?;
+
+    let preset = resolve_agent_preset(card.agent_preset_id.as_deref()).ok();
+    let dir = card
+        .working_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            preset
+                .and_then(|p| p.working_dir)
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        })
+        .unwrap_or_else(|| {
+            std::env::var("USERPROFILE")
+                .or_else(|_| std::env::var("HOME"))
+                .unwrap_or_else(|_| ".".to_string())
+        });
+
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_path(dir.clone(), None::<&str>)
+        .map_err(|e| format!("Failed to open working dir: {e}"))?;
+    Ok(dir)
 }

@@ -58,6 +58,7 @@ fn card(
         updated_at: created_at.to_string(),
         agent_prompt: None,
         agent_preset_id: None,
+        working_dir: None,
         linked_task_id: None,
         tags: tags.iter().map(|t| t.to_string()).collect(),
         position,
@@ -68,6 +69,7 @@ fn card(
         agent_run_ended_at: None,
         revision_notes: Vec::new(),
         run_history: Vec::new(),
+        agent_queued: false,
         deleted_at: None,
         previous_status: None,
     }
@@ -230,6 +232,8 @@ fn demo_cards(now: &str, schedules: &[ScheduledTask]) -> Vec<KanbanCard> {
         result: None,
         status: AgentRunStatus::Running,
         exit_code: None,
+        tokens: None,
+        cost: None,
     }];
     cards.push(in_progress);
 
@@ -279,6 +283,8 @@ fn demo_cards(now: &str, schedules: &[ScheduledTask]) -> Vec<KanbanCard> {
         result: Some("Updated transition to 180ms ease-out.".to_string()),
         status: AgentRunStatus::AwaitingReview,
         exit_code: Some(0),
+        tokens: Some(48_200),
+        cost: Some(0.21),
     }];
     cards.push(review);
 
@@ -303,6 +309,8 @@ fn demo_cards(now: &str, schedules: &[ScheduledTask]) -> Vec<KanbanCard> {
         result: Some("Added caffeine, claude, and supabase presets.".to_string()),
         status: AgentRunStatus::Completed,
         exit_code: Some(0),
+        tokens: Some(112_500),
+        cost: Some(0.58),
     }];
     cards.push(done);
 

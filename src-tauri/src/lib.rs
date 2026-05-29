@@ -7,7 +7,10 @@ mod settings;
 mod tray;
 mod watcher;
 
-use commands::agent::{cancel_agent, get_run_log, launch_agent, AgentProcesses};
+use commands::agent::{
+    cancel_agent, get_run_log, launch_agent, list_run_artifacts, open_card_working_dir, open_path,
+    AgentProcesses,
+};
 use commands::kanban::{
     add_card, add_revision_note, answer_feedback, delete_card, get_cards, move_card,
     reorder_card, restore_card, trash_card, update_card,
@@ -54,6 +57,9 @@ pub fn run() {
             launch_agent,
             cancel_agent,
             get_run_log,
+            list_run_artifacts,
+            open_path,
+            open_card_working_dir,
             list_schedules,
             create_schedule,
             update_schedule,
