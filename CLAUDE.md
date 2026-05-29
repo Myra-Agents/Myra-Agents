@@ -29,6 +29,10 @@ npx biome check                  # lint/format (use --write to fix)
 
 `next.config` does a static export to `out/`, which Tauri loads as `frontendDist`. App identifier `com.myra-agents.app`, product name "Myra Agents". The window is frameless (`decorations: false`, `transparent: true`) — window controls live in `src/app/(main)/_components/window-controls.tsx`. Closing the window hides to the tray instead of quitting (see `on_window_event` in `lib.rs`).
 
+## Onboarding new developers
+
+There is an **`onboard` skill** at `.claude/skills/onboard/SKILL.md`. When a new dev says "onboard me", "/onboard", "help me get set up", or "walk me through the project", invoke it — it runs an interactive guided setup: prerequisites (bun, Rust, Tauri OS deps), install, running the app (`tauri:dev` / `tauri:demo` / browser-only `dev`), an architecture tour, the conventions that bite, the three verification gates, and the first-contribution loop. Keep the skill in sync with this file; this file is the reference, the skill is the guided path.
+
 ## Architecture
 
 ### Backend (`src-tauri/src/`)

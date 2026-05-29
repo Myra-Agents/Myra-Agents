@@ -1,175 +1,113 @@
 # Myra Agents
 
-Based on dashboard template > [studio admin](https://next-shadcn-admin-dashboard.vercel.app)
+> UI based on the [studio admin](https://next-shadcn-admin-dashboard.vercel.app) dashboard template.
 
-A Windows tray app that lets you schedule and run anything — PowerShell snippets, scripts, executables, built-in cleanups, or GitHub Copilot CLI prompts — with a friendly UI on top of the Windows Task Scheduler, plus live, persistent run logs.
+A desktop **Kanban board that runs CLI coding agents**. Each card carries a prompt; launch it and Myra Agents spawns a configured agent (OpenCode / GitHub Copilot CLI / Claude / your own binary) in headless mode, streams its output live onto the card, and moves the card through the workflow as the agent reports progress. Schedules can auto-create and launch cards on a cron/daily/weekly/interval/once cadence.
 
-> **Platform:** Windows only · **Runtime:** .NET 8 (`net8.0-windows`, WinForms) · **License:** see repo
+> **Stack:** Next.js 16 (App Router, React 19, TypeScript) + Tauri v2 (Rust) · **Package manager:** bun · **Lint/format:** biome
 
 ---
 
 ## Why Myra Agents?
 
-The built-in Windows Task Scheduler is powerful but clunky: cryptic UI, no run history beyond a status code, no live output, no way to schedule "run an LLM prompt on this folder every morning". Myra Agents wraps it with:
+Coding agents are powerful but awkward to operate at scale: you babysit a terminal per run, lose history, and can't easily schedule "run this prompt on this repo every morning". Myra Agents wraps that with:
 
-- A clean WinForms UI and system tray presence.
-- A unified concept of a *task* that can be a shell command, a script, an `.exe`, a canned cleanup action, or a **Copilot CLI prompt**.
-- Real Windows Scheduled Tasks under the hood for `Interval` / `Daily` / `Weekly` schedules (so they fire even when the GUI is closed), and lightweight in-process management for `AtLogon` / `Manual` tasks.
-- A persistent, per-task **run log** with live streaming stdout/stderr, rendered as Markdown.
+- A **Kanban board** where each card is a unit of agent work (prompt + tags + target agent + working dir).
+- A lifecycle: **Draft → To Do → In Progress → Waiting Feedback → Awaiting Review → Done** (plus Trash), driven by what the agent reports.
+- **Live, streamed logs** per run, plus a logs/history view with duration and (when reported) token/cost stats.
+- **Schedules** that materialize cards and launch them automatically, even via the system tray.
+- A **run queue** so you cap how many agents run at once.
 
 ---
 
 ## Features
 
-### Action types
+- **Per-card agent + working directory** — pick which agent preset runs each card and where; falls back to the app default.
+- **Configurable agent presets** — name, binary, args template (`{prompt}` placeholder), default working dir. Configured in Settings; not hard-coded.
+- **Run queue** — `maxConcurrentAgents` limit (0 = unlimited); launches over the limit are queued and dequeued as agents finish.
+- **One-click relaunch** — re-run a card; prior revision notes are carried into the new run.
+- **Run artifacts & logs** — per-run log files and archived results, openable from the logs view; live tail on in-progress cards.
+- **Cost / duration stats** — per run and aggregated per card.
+- **Schedules** — once / daily / weekly / interval / cron, with a planner view.
+- **Tray app** — close-to-tray, runs schedules in the background.
+- **i18n** — English + French.
 
-| Type | What it runs | How |
-|---|---|---|
-| **ShellCommand** | A PowerShell one-liner / multi-liner | `powershell.exe -NoProfile -WindowStyle Hidden -EncodedCommand <base64>` |
-| **Script** | `.ps1`, `.bat`/`.cmd`, `.py`, or any other file | Dispatched to PowerShell / `cmd.exe` / `python` / direct exec by extension |
-| **Executable** | Any `.exe` with arguments | Direct `Process.Start` |
-| **BuiltIn** | A canned PowerShell snippet from a small library | See [Built-in actions](#built-in-actions) |
-| **CopilotPrompt** | A GitHub Copilot CLI prompt | `copilot -p "<prompt>" --yolo` in the configured working directory |
+---
 
-Every action can optionally specify a **working directory** and a **"Run as admin"** flag (which is honored by mapping to `TaskRunLevel.Highest` for scheduled tasks).
+## Getting started (developers)
 
-### Schedule types
+> The fastest path is the in-repo **`onboard` skill**: if you use Claude Code, just say **"onboard me"** (or `/onboard`) and it walks you through everything below interactively — prerequisites, install, running, an architecture tour, conventions, the verification gates, and your first PR. See `.claude/skills/onboard/SKILL.md`.
 
-| Type | Behavior | Backed by |
-|---|---|---|
-| **Interval** | Every *N* minutes/hours starting at a chosen time | Windows Task Scheduler (`TimeTrigger` with repetition) |
-| **Daily** | Once a day at a chosen time | Windows Task Scheduler (`DailyTrigger`) |
-| **Weekly** | On selected weekdays at a chosen time | Windows Task Scheduler (`WeeklyTrigger`) |
-| **AtLogon** | Launched in-process when Myra Agents starts | Myra Agents itself (no Windows scheduled task created) |
-| **Manual** | Only runs when you click **Run Now** | Myra Agents itself |
+### Prerequisites
 
-> Scheduled tasks are registered under the name `Myra Agents_<id>` and always invoke `Myra Agents.exe --run <id>` as their action, so even when fired by Windows while the GUI is closed the execution is logged the same way as a manual run.
+- [**bun**](https://bun.sh) ≥ 1.3
+- [**Rust**](https://rustup.rs) (stable toolchain) + [**Tauri OS prerequisites**](https://tauri.app/start/prerequisites/) (macOS: Xcode CLT; Linux: webkit2gtk + build tools; Windows: WebView2 + MSVC)
+- **Node** (for `npx tsc` and some tooling)
 
-### Built-in actions
+### Install & run
 
-A short library of common housekeeping snippets — no scripting required:
+```bash
+bun install
 
-- **Clean Downloads Folder** — deletes files older than 30 days in `%USERPROFILE%\Downloads`.
-- **Empty Recycle Bin** — `Clear-RecycleBin -Force`.
-- **Clear Temp Files** — removes files older than 7 days from `%TEMP%`.
-- **Flush DNS Cache** — `Clear-DnsClientCache`.
+bun run tauri:dev     # full desktop app: Tauri (Rust) + Next dev server on :1420
+bun run tauri:demo    # same, DEMO=1 → isolated ~/.myra-agents-demo data, pre-seeded board
+bun run dev           # frontend ONLY in a browser (localStorage dev backend; no agents)
+bun run tauri:build   # production bundle
+```
 
-Adding a new one is one entry in `BuiltInAction.All`.
+First `tauri:dev` build is slow (it compiles Tauri/Rust). `tauri:demo` is the best first look — it seeds a card in every column and one schedule of each kind.
 
-### Live, persistent run logs
+### Verification gates
 
-- Every execution creates a `TaskRunLog` (id, started/finished timestamps, status, exit code, full stdout, full stderr).
-- stdout/stderr is streamed asynchronously into the log (`BeginOutputReadLine` + `OutputDataReceived`), so you can watch long-running tasks in real time.
-- Logs are saved to disk, throttled to ≤ 1 write/second, so nothing is lost on crash.
-- Each task keeps its last **50** runs.
-- If Myra Agents is killed mid-run, any `Running` entry left over is auto-recovered as **Failed (orphaned)** on next start.
-- The log viewer renders output as **Markdown in a WebView2** (dark theme) with a Raw/Rendered toggle and tail-follow (auto-scroll-to-bottom when you're already at the bottom). Falls back to a plain `TextBox` if the WebView2 Runtime is missing.
+No unit-test suite — verify with all three plus a manual run (husky + lint-staged also run biome on commit):
 
-### Tray app niceties
-
-- **Single instance** — enforced by a named mutex (`Myra Agents_SingleInstance`).
-- **`--minimized`** — start straight to the tray, no main window.
-- **Tray tooltip** shows the number of active tasks and the next run time.
-- **Start with Windows** — toggle in the tray menu; writes `HKCU\…\Run\Myra Agents` pointing at `Myra Agents.exe --minimized`.
-- **Left-click** the tray icon to open the main window.
+```bash
+npx tsc --noEmit                 # frontend types
+cd src-tauri && cargo check      # Rust backend
+npx biome check                  # lint/format (--write to autofix)
+```
 
 ---
 
 ## Architecture (one-paragraph version)
 
-`Program.Main` either runs the **helper mode** (`--run <taskId>`, invoked by Windows Task Scheduler — executes one task, logs it, exits) or starts the WinForms `ApplicationContext` (`Myra AgentsContext`). The context owns three singleton services — `TaskStorageService` (tasks, JSON in `%APPDATA%\Myra Agents\tasks.json`), `TaskLogService` (run history, `%APPDATA%\Myra Agents\logs.json`, capped at 50 entries/task), and `TaskSchedulerService` (the bridge to the Windows Task Scheduler API via the `TaskSchedulerEditor` NuGet, and the in-process runner for `AtLogon` / `Manual` tasks). The GUI (`MainForm`, `TaskEditForm`, `TaskLogForm`) is created on demand and disposed when closed — Myra Agents keeps living in the tray.
-
-### Project layout
-
-```
-Myra Agents/
-├── Program.cs               # Entry point + --run helper mode
-├── Myra AgentsContext.cs      # ApplicationContext: tray icon, services, AtLogon launcher
-├── Models/
-│   ├── TaskItem.cs          # The main entity (ActionType + ScheduleType + options)
-│   ├── BuiltInAction.cs     # Static library of canned PS snippets
-│   └── TaskRunLog.cs        # One execution record (live-updated)
-├── Services/
-│   ├── TaskStorageService.cs    # tasks.json load/save
-│   ├── TaskLogService.cs        # logs.json load/save + streaming append + orphan recovery
-│   ├── TaskSchedulerService.cs  # Windows Task Scheduler bridge + in-process runner
-│   └── AutoStartService.cs      # HKCU\…\Run registry toggle
-├── Forms/
-│   ├── MainForm.cs          # Task list, CRUD, Run Now, Open Logs
-│   ├── TaskEditForm.cs      # Editor (UI adapts to ActionType / ScheduleType)
-│   └── TaskLogForm.cs       # Markdown log viewer (WebView2, live timer, tail-follow)
-└── Resources/app.ico
-```
+The **Tauri (Rust) backend** in `src-tauri/src/` keeps a tray process alive, owns singleton state, and exposes every feature as a `#[tauri::command]` registered in `lib.rs`. `commands/agent.rs` spawns agents, enforces the run queue, and streams stdout/stderr to per-run log files; `commands/kanban.rs` owns card CRUD and the `board.json` store; `watcher.rs` watches `agent-results/` and turns an agent's result file into a card status change; `scheduler.rs` ticks every 30s and fires due schedules. The **Next.js frontend** in `src/` renders the board (`components/kanban/`, `@dnd-kit` drag-and-drop), with one hook per concern in `hooks/` and routes in `app/(main)/`. All backend calls go through `src/lib/tauri.ts` (`invoke`/`listen`); live updates are push events (`agent-log-appended`, `agent-result-changed`, `schedules-updated`). In a plain browser, `src/lib/browser-backend.ts` stands in for the desktop backend. The full reference lives in [`CLAUDE.md`](./CLAUDE.md).
 
 ### Where things are stored
 
+All under `~/.myra-agents/` (or `~/.myra-agents-demo/` when `DEMO=1`):
+
 | Path | What |
 |---|---|
-| `%APPDATA%\Myra Agents\tasks.json` | All task definitions |
-| `%APPDATA%\Myra Agents\logs.json` | Run history (last 50 per task) |
-| `%LOCALAPPDATA%\Myra Agents\WebView2` | WebView2 user-data folder |
-| `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Myra Agents` | Auto-start entry (when enabled) |
-| Windows Task Scheduler: `Myra Agents_<id>` | One per `Interval`/`Daily`/`Weekly` task |
+| `board.json` | All cards |
+| `schedules.json` | Scheduled tasks |
+| `settings.json` | Agent presets, default agent, max concurrency |
+| `agent-runs/{runId}.log` | Streamed run output + archived results |
+| `agent-results/{cardId}.json` | Transient agent→app result handoff (watched, then archived) |
 
-JSON is human-readable: `WriteIndented`, `CamelCase`, enums serialized as strings.
+### Agent result protocol
 
----
+When an agent finishes it writes `~/.myra-agents/agent-results/{cardId}.json`:
 
-## Build & run
-
-```powershell
-dotnet build Myra Agents.sln
-Start-Process .\Myra Agents\bin\Debug\net8.0-windows\Myra Agents.exe
+```json
+{ "cardId": "…", "status": "awaiting_review", "result": "summary" }
+{ "cardId": "…", "status": "waiting_feedback", "question": "…" }
+{ "cardId": "…", "status": "failed", "error": "…" }
 ```
 
-Optional flags:
-
-- `--minimized` — start to tray with no window.
-- `--run <taskId>` — internal helper mode used by Windows Task Scheduler. Not meant to be called by hand, but it works: it runs one task and writes a log entry, then exits with the task's exit code.
-
-> ⚠️ Before rebuilding, **kill any running instance** (`Stop-Process -Id <pid>`). The single-instance mutex doesn't lock the file, but the running `Myra Agents.exe` does, so the build copy step will fail with **MSB3027** otherwise.
-
-### Dependencies
-
-- [`TaskSchedulerEditor`](https://www.nuget.org/packages/TaskSchedulerEditor) — managed wrapper around the Windows Task Scheduler 2.0 API.
-- [`Markdig`](https://www.nuget.org/packages/Markdig) — renders log output to HTML.
-- [`Microsoft.Web.WebView2`](https://www.nuget.org/packages/Microsoft.Web.WebView2) — embedded Chromium for the log viewer. If the **WebView2 Runtime** isn't installed, the log viewer falls back to a raw `TextBox`.
-
-There is **no test suite, no linter, no CI** — verification is `dotnet build` + a manual smoke test.
+Optional `"tokens"` (int) and `"cost"` (USD float) are recorded on the run. The watcher transitions the card accordingly.
 
 ---
 
-## Usage
+## Contributing
 
-1. Launch `Myra Agents.exe`. The main window opens (or, with `--minimized`, just the tray icon).
-2. **Add task** → pick an action type, fill in the command/script/prompt, pick a schedule.
-3. Click **Run Now** to test it. Open **Logs** to watch live stdout/stderr rendered as Markdown.
-4. Close the window — the app stays in the tray. Right-click the tray icon for **Open**, **Start with Windows**, and **Exit**.
+- Branch off **`develop`** (the integration branch; `main` is release). Open PRs against `develop`.
+- Check **`TODO.md`** for the backlog (`[ ]` todo · `[~]` in progress · `[x]` done) for starter tasks.
+- Conventions that bite (full list in `CLAUDE.md`):
+  - **i18n**: add every user-facing string to **both** `src/messages/en.json` and `src/messages/fr.json` via `next-intl`.
+  - **Rust↔TS payloads**: Rust uses `#[serde(rename_all = "camelCase")]`; mirror field names in `src/types/`. Adding a model field means updating every struct literal.
+  - **Browser dev backend**: changing a Tauri command's shape? Update `src/lib/browser-backend.ts` too.
+  - **Concurrency**: launch agents via `request_launch`, not `spawn_agent_for_card`, so the queue is respected.
+- Run the three verification gates + a manual smoke test before opening a PR.
 
-### Example: a daily Copilot CLI summary
-
-- **Action**: CopilotPrompt
-- **Prompt**: `Summarize today's changes in this repo as a short markdown bullet list.`
-- **Working directory**: `C:\Users\you\code\my-repo`
-- **Schedule**: Daily at 18:30
-
-Myra Agents will register a Windows scheduled task `Myra Agents_<id>` that fires `Myra Agents.exe --run <id>` every day at 18:30. The helper mode invokes `copilot -p "…" --yolo` in your repo, streams the output into a log entry, and you can read the rendered Markdown summary in the log viewer.
-
----
-
-## Caveats & sharp edges
-
-- **Windows-only.** Hard dependency on the Windows Task Scheduler API and WinForms.
-- **CopilotPrompt** requires the [GitHub Copilot CLI](https://github.com/github/copilot-cli) (`copilot` on `PATH`).
-- **"Run as admin"** only takes effect for scheduled tasks (`Interval`/`Daily`/`Weekly`). `AtLogon` and `Manual` tasks always run with whatever privileges Myra Agents itself has.
-- The 30-minute hard timeout (`process.WaitForExit(30 min)`) and the 1-hour `ExecutionTimeLimit` on the scheduled task are not currently user-configurable.
-- Logs are kept in a single JSON file per app — fine for personal use, not designed for thousands of runs/day.
-
----
-
-## Contributing tips
-
-- Anything touching `TaskItem` must **branch on `ScheduleType.AtLogon || Manual`** before calling into the Windows Task Scheduler — those types are no-ops there.
-- New `ActionType`? Extend `BuildProcessStartInfo` in `TaskSchedulerService` and the UI in `TaskEditForm`. PowerShell commands should always go through `EncodeCommand()` (base64-UTF16) to survive quoting.
-- New built-in action? One entry in `BuiltInAction.All` — the dropdown and execution pick it up via `BuiltInActionId`.
-- House style: file-scoped namespaces, nullable enabled, implicit usings, target-typed `new()`, collection expressions (`[]`).
+New here? Run the **`onboard`** skill (`/onboard` in Claude Code) for a guided walkthrough.
