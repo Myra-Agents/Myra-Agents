@@ -157,7 +157,10 @@
       "reset": "Reset columns"
     },
     "toast": {
-      "queued": "Agent queued — waiting for a free slot."
+      "queued": "Agent queued — waiting for a free slot.",
+      "canceled": "Agent canceled.",
+      "trashed": "Card moved to trash.",
+      "undo": "Undo"
     }
   },
   "schedules": {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { normalizeTag, parseTags } from "@/lib/kanban-tags";
 import { invoke } from "@/lib/tauri";
+import { useShortcutStore } from "@/stores/shortcut-store";
 import type { CardFormData, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 export default function KanbanPage() {
@@ -73,6 +74,26 @@ export default function KanbanPage() {
     setEditingCard(undefined);
     setCardModalOpen(true);
   }, []);
+
+  const handleTrashCard = useCallback(
+    async (id: string) => {
+      await trashCard(id);
+      toast.success(t("toast.trashed"), {
+        action: { label: t("toast.undo"), onClick: () => void restoreCard(id) },
+      });
+    },
+    [trashCard, restoreCard, t],
+  );
+
+  const handleBulkTrash = useCallback(
+    async (ids: string[]) => {
+      await Promise.all(ids.map((id) => trashCard(id)));
+      toast.success(t("bulk.trashed", { count: ids.length }), {
+        action: { label: t("toast.undo"), onClick: () => ids.forEach((id) => void restoreCard(id)) },
+      });
+    },
+    [trashCard, restoreCard, t],
+  );
 
   const handleEditCard = useCallback((card: KanbanCard) => {
     setCardModalMode("edit");
@@ -171,6 +192,38 @@ export default function KanbanPage() {
     [addRevisionNote],
   );
 
+  // --- Global keyboard shortcut intents (detected in the (main) layout) ---
+  const newCardNonce = useShortcutStore((s) => s.newCardNonce);
+  const focusSearchNonce = useShortcutStore((s) => s.focusSearchNonce);
+  const cancelNonce = useShortcutStore((s) => s.cancelNonce);
+  // Seed refs with the nonce at mount so the effects don't fire on first render.
+  const lastNewCard = useRef(newCardNonce);
+  const lastFocusSearch = useRef(focusSearchNonce);
+  const lastCancel = useRef(cancelNonce);
+
+  useEffect(() => {
+    if (lastNewCard.current === newCardNonce) return;
+    lastNewCard.current = newCardNonce;
+    handleAddCard("draft");
+  }, [newCardNonce, handleAddCard]);
+
+  useEffect(() => {
+    if (lastFocusSearch.current === focusSearchNonce) return;
+    lastFocusSearch.current = focusSearchNonce;
+    document.getElementById("card-search")?.focus();
+  }, [focusSearchNonce]);
+
+  useEffect(() => {
+    if (lastCancel.current === cancelNonce) return;
+    lastCancel.current = cancelNonce;
+    if (!cardModalOpen || !editingCard) return;
+    const card = cards.find((c) => c.id === editingCard.id);
+    if (!card || (!card.agentRunId && !card.agentQueued)) return;
+    void invoke("cancel_agent", { cardId: card.id })
+      .then(() => toast.success(t("toast.canceled")))
+      .catch((e) => toast.error(String(e)));
+  }, [cancelNonce, cardModalOpen, editingCard, cards, t]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -193,7 +246,8 @@ export default function KanbanPage() {
         cards={cards}
         onAddCard={handleAddCard}
         onEditCard={handleEditCard}
-        onTrashCard={trashCard}
+        onTrashCard={handleTrashCard}
+        onBulkTrash={handleBulkTrash}
         onRestoreCard={restoreCard}
         onPurgeCard={deleteCard}
         onMoveCard={moveCard}

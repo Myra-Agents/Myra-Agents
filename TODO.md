@@ -56,10 +56,10 @@ Inspired by [mobslide](https://github.com/thewh1teagle/mobslide): scan a QR, no 
 ## Desktop app & UX
 
 - [ ] **System tray** — Minimize to tray; badge when feedback/review needed.
-- [ ] **Global shortcuts** — New card, focus search, cancel active agent.
+- [x] **Global shortcuts** — New card (Mod+N), focus search (Mod+F), cancel open card's agent (Mod+.).
 - [ ] **Themes** — Light/dark/system; respect OS accent.
 - [ ] **Onboarding** — First-run: pick `~/.myra-agents` location, test agent CLI, sample card.
-- [ ] **Undo trash** — Toast with “Undo” after soft delete.
+- [x] **Undo trash** — Toast with “Undo” after soft delete (single + bulk; restores to previous status).
 - [ ] **Accessibility** — Keyboard drag-and-drop alternative, focus traps in modals.
 
 ---

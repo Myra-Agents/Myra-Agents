@@ -157,7 +157,10 @@
       "reset": "Réinitialiser les colonnes"
     },
     "toast": {
-      "queued": "Agent mis en file — en attente d’un créneau libre."
+      "queued": "Agent mis en file — en attente d’un créneau libre.",
+      "canceled": "Agent annulé.",
+      "trashed": "Carte mise à la corbeille.",
+      "undo": "Annuler"
     }
   },
   "schedules": {

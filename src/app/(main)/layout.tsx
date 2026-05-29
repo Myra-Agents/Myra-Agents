@@ -6,10 +6,11 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
 
-import { WindowControls, WindowDragRegion } from "./_components/window-controls";
+import { GlobalShortcuts } from "./_components/global-shortcuts";
 import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { WindowControls, WindowDragRegion } from "./_components/window-controls";
 
 // Static export (Tauri desktop) build: no server-side cookies. Use defaults;
 // client-side PreferencesStoreProvider hydrates from document.cookie afterwards.
@@ -31,6 +32,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
         } as React.CSSProperties
       }
     >
+      <GlobalShortcuts />
       <AppSidebar variant={variant} collapsible={collapsible} />
       <SidebarInset
         className={cn(

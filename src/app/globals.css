@@ -132,6 +132,16 @@ These serve as the fallback; there is no separate default.css file. */
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans), system-ui, sans-serif;
+    /* App-wide: text is not selectable/copyable (desktop-app feel). */
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* Keep editable fields selectable so typing/editing still works. */
+  input,
+  textarea,
+  [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
   }
   html {
     @apply font-sans;

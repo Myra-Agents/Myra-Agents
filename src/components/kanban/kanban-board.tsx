@@ -38,6 +38,7 @@ interface KanbanBoardProps {
   onAddCard: (status: KanbanStatus) => void;
   onEditCard: (card: KanbanCard) => void;
   onTrashCard: (id: string) => void | Promise<unknown>;
+  onBulkTrash: (ids: string[]) => void | Promise<unknown>;
   onRestoreCard: (id: string, status?: KanbanStatus) => void;
   onPurgeCard: (id: string) => void;
   onMoveCard: (id: string, status: KanbanStatus) => void | Promise<unknown>;
@@ -75,6 +76,7 @@ export function KanbanBoard({
   onAddCard,
   onEditCard,
   onTrashCard,
+  onBulkTrash,
   onMoveCard,
   onReorderCard,
   onReviewCard,
@@ -149,8 +151,8 @@ export function KanbanBoard({
       // should NOT trigger panning.
       return Boolean(
         target.closest(
-          "[data-kanban-card], [data-dnd-kit-draggable], button, a, input, textarea, select, [role='button'], [contenteditable='true']"
-        )
+          "[data-kanban-card], [data-dnd-kit-draggable], button, a, input, textarea, select, [role='button'], [contenteditable='true']",
+        ),
       );
     };
 
@@ -382,10 +384,7 @@ export function KanbanBoard({
 
   const handleBulkTrash = () =>
     runBulkAction(async () => {
-      for (const card of selectedCards) {
-        await onTrashCard(card.id);
-      }
-      toast.success(t("bulk.trashed", { count: selectedCards.length }));
+      await onBulkTrash(selectedCards.map((card) => card.id));
       setSelectedIds(new Set());
     });
 
@@ -495,6 +494,7 @@ export function KanbanBoard({
         <div className="space-y-3 px-4 pt-4">
           <div className="grid gap-2 md:grid-cols-[minmax(16rem,1fr)_10rem_10rem_10rem_auto_auto]">
             <Input
+              id="card-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("filters.searchPlaceholder")}
