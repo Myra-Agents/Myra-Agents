@@ -13,9 +13,6 @@ import { ThemeBootScript } from "@/scripts/theme-boot";
 import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
 
 import "./globals.css";
-import "../styles/presets/brutalist.css";
-import "../styles/presets/claude.css";
-import "../styles/presets/soft-pop.css";
 import "../styles/presets/tangerine.css";
 
 export const metadata: Metadata = {

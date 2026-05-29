@@ -20,30 +20,6 @@ export const THEME_PRESET_OPTIONS = [
     },
   },
   {
-    label: "Brutalist",
-    value: "brutalist",
-    primary: {
-      light: "oklch(0.6489 0.237 26.9728)",
-      dark: "oklch(0.7044 0.1872 23.1858)",
-    },
-  },
-  {
-    label: "Claude",
-    value: "claude",
-    primary: {
-      light: "#cc785c",
-      dark: "#cc785c",
-    },
-  },
-  {
-    label: "Soft Pop",
-    value: "soft-pop",
-    primary: {
-      light: "oklch(0.5106 0.2301 276.9656)",
-      dark: "oklch(0.6801 0.1583 276.9349)",
-    },
-  },
-  {
     label: "Tangerine",
     value: "tangerine",
     primary: {
