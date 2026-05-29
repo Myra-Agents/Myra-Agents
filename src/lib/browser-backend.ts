@@ -482,7 +482,7 @@ export async function browserInvoke<T>(cmd: string, args?: Record<string, unknow
       case "clear_logs":
         return true;
       default:
-        throw commandError(cmd, "this command requires the Tauri desktop backend");
+        throw new Error(`[Dev Mode] Tauri backend not available — "${cmd}" skipped`);
     }
   })();
 

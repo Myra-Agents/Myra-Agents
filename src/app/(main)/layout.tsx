@@ -40,6 +40,9 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
           "[html[data-content-layout=centered]_&>*]:w-full",
           "[html[data-content-layout=centered]_&>*]:max-w-screen-2xl",
           "peer-data-[variant=inset]:border",
+          // Bound the inset height so vertical overflow scrolls *inside* the
+          // inset (scrollbar within the rounded border) instead of the body.
+          "h-[calc(100svh_-_var(--titlebar-h,0px))] overflow-hidden peer-data-[variant=inset]:h-[calc(100svh_-_var(--titlebar-h,0px)_-_--spacing(4))]",
         )}
       >
         <header
@@ -65,7 +68,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
             </div>
           </div>
         </header>
-        <div className="h-full min-w-0 overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
           {children}
         </div>
       </SidebarInset>
