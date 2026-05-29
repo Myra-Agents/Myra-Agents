@@ -14,6 +14,7 @@
     "generate:presets": "ts-node -P tsconfig.scripts.json src/scripts/generate-theme-presets.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
+    "tauri:demo": "cross-env DEMO=1 tauri dev",
     "tauri:build": "tauri build"
   },
   "lint-staged": {
@@ -67,6 +68,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/topojson-client": "^3.1.5",
     "babel-plugin-react-compiler": "^1.0.0",
+    "cross-env": "^7.0.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "postcss": "^8.5.15",

@@ -8,14 +8,28 @@ use uuid::Uuid;
 
 use crate::models::kanban_card::{KanbanCard, KanbanStatus};
 
+/// Returns true when the app runs in demo mode (`DEMO=1|true`).
+/// Demo mode isolates all data under `~/.myra-agents-demo` and prevents the
+/// scheduler from spawning real agents.
+pub fn demo_mode() -> bool {
+    matches!(
+        std::env::var("DEMO").ok().as_deref(),
+        Some("1" | "true" | "TRUE")
+    )
+}
+
 /// Returns the Myra Agents data directory: `~/.myra-agents/`
-/// Creates it if it doesn't exist.
+/// (or `~/.myra-agents-demo/` in demo mode). Creates it if it doesn't exist.
 pub fn myra_agents_dir() -> PathBuf {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."));
-    let dir = home.join(".myra-agents");
+    let dir = home.join(if demo_mode() {
+        ".myra-agents-demo"
+    } else {
+        ".myra-agents"
+    });
     fs::create_dir_all(&dir).ok();
     fs::create_dir_all(dir.join("agent-runs")).ok();
     fs::create_dir_all(dir.join("agent-results")).ok();

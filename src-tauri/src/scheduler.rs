@@ -57,6 +57,15 @@ async fn tick(app: &AppHandle) -> Result<(), String> {
             continue;
         }
 
+        // Demo mode: keep next_run_at populated for the UI, but never spawn a
+        // real agent or auto-create cards.
+        if crate::commands::kanban::demo_mode() {
+            task.last_triggered_at = Some(now.to_rfc3339());
+            task.next_run_at = compute_next_run(task, now).map(|dt| dt.to_rfc3339());
+            any_changed = true;
+            continue;
+        }
+
         // Materialize a card + spawn the agent.
         let card = materialize_card_for_schedule(task);
         let card_id = card.id.clone();

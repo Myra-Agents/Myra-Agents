@@ -1,4 +1,5 @@
 mod commands;
+mod demo;
 mod models;
 mod schedule_store;
 mod scheduler;
@@ -26,6 +27,7 @@ pub fn run() {
         .manage(AgentProcesses::default())
         .manage(TrayState::default())
         .setup(|app| {
+            demo::seed_demo_if_needed();
             tray::setup_tray(app.handle())?;
             watcher::spawn_watcher(app.handle().clone());
             scheduler::spawn_scheduler(app.handle().clone());
