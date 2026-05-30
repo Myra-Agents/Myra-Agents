@@ -16,7 +16,8 @@ import {
 
 import type { EventBus } from "../realtime/bus";
 import { resolveDataDir } from "../store/file-store";
-import { type AgentExecutor, LocalProcessExecutor, type RunHandle } from "./executor";
+import type { AgentExecutor, RunHandle } from "./executor";
+import { selectExecutor } from "./select-executor";
 import { existsSync, statSync } from "node:fs";
 import { appendFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -72,7 +73,7 @@ export class AgentRunner {
   constructor(store: Store, bus: EventBus, opts: { dataDir?: string; executor?: AgentExecutor } = {}) {
     this.store = store;
     this.bus = bus;
-    this.executor = opts.executor ?? new LocalProcessExecutor();
+    this.executor = opts.executor ?? selectExecutor();
     this.dataDir = opts.dataDir ?? resolveDataDir();
   }
 

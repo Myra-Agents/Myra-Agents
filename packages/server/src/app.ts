@@ -1,6 +1,6 @@
-import { dispatchData, UnknownCommandError } from "@myra/shared";
+import { dispatchData, type Store, UnknownCommandError } from "@myra/shared";
 import { Hono } from "hono";
-import { createBunWebSocket } from "hono/bun";
+import { createBunWebSocket, serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 
 import { EventBus } from "./realtime/bus";
@@ -10,7 +10,7 @@ import { dispatchOs } from "./runner/os";
 import { FileStore, isDemoMode, resolveDataDir } from "./store/file-store";
 
 export interface AppDeps {
-  store?: FileStore;
+  store?: Store;
   bus?: EventBus;
   runner?: AgentRunner;
 }
@@ -102,6 +102,14 @@ export function createApp(deps: AppDeps = {}) {
       return c.json({ ok: false, error: message }, 500);
     }
   });
+
+  // Optional single-process self-host: serve the static client export from the
+  // same server. Off by default; `MYRA_SERVE_STATIC=1` uses `./out`, or set it
+  // to a custom directory. Registered last so the API routes above win.
+  const staticRoot = process.env.MYRA_SERVE_STATIC;
+  if (staticRoot) {
+    app.use("/*", serveStatic({ root: staticRoot === "1" ? "./out" : staticRoot }));
+  }
 
   return { app, bus, runner, store, websocket };
 }
