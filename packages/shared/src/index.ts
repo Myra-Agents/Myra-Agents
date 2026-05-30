@@ -1,4 +1,5 @@
 export * from "./contract";
+export * from "./dispatch";
 export * from "./domain/cards";
 export * from "./domain/ids";
 export * from "./domain/schedules";

@@ -1,0 +1,15 @@
+{
+  "name": "@myra/server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@myra/shared": "workspace:*",
+    "hono": "^4.6.14"
+  }
+}
