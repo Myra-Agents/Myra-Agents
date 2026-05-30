@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useConnections } from "@/hooks/use-connections";
+import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { tagClassName } from "@/lib/kanban-tags";
 import { cn } from "@/lib/utils";
 import type { KanbanCard } from "@/types/kanban";
@@ -59,9 +61,18 @@ export function KanbanCardComponent({
     transition,
   };
 
+  const { connections } = useConnections();
   const config = COLUMN_CONFIG[card.status];
   const isTrashed = card.status === "trashed";
-  const hasFooter = [card.tags.length > 0, Boolean(card.agentPrompt), schedule !== undefined].some(Boolean);
+  // Only tag cards by origin server once more than one connection is active.
+  const originLabel =
+    connections.length > 1 ? connections.find((c) => c.id === parseGlobalId(card.id).connId)?.label : undefined;
+  const hasFooter = [
+    card.tags.length > 0,
+    Boolean(card.agentPrompt),
+    schedule !== undefined,
+    Boolean(originLabel),
+  ].some(Boolean);
 
   const stop = (fn: () => void) => (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -189,6 +200,11 @@ export function KanbanCardComponent({
         {/* Footer: tags + agent badge */}
         {hasFooter && (
           <div className="flex flex-wrap items-center gap-1 pl-4 pt-2 border-t">
+            {originLabel && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                {originLabel}
+              </Badge>
+            )}
             {card.tags.map((tag) => (
               <Badge key={tag} variant="outline" className={tagClassName(tag, "px-1.5 py-0 text-[10px]")}>
                 {tag}

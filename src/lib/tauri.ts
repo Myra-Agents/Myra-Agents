@@ -4,10 +4,11 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { connectionManager } from "@/lib/connections/manager";
 
 /**
- * Client seam. Public surface is unchanged (`invoke`/`listen`/`isTauri`/
- * `isDevModeError`), but calls now route through the ConnectionManager's
- * primary connection instead of branching on `isTauri()` inline. Phase 4
- * turns this single-connection routing into fan-out/merge across N servers.
+ * Client seam. Public surface (`invoke`/`listen`/`isTauri`/`isDevModeError`)
+ * routes through the ConnectionManager's primary connection. Phase 4 adds
+ * `invokeOn` for routing a command at a specific connection (split out of a
+ * card's GlobalId) — aggregation-aware hooks fan out / route / demux via the
+ * manager directly.
  */
 
 /**
@@ -20,7 +21,7 @@ export function isTauri(): boolean {
 
 /** Check if an error is the dev-mode "not in Tauri" message. */
 export function isDevModeError(e: unknown): boolean {
-  return e instanceof Error && e.message.startsWith("[Dev Mode]");
+  return e instanceof Error && e.message.includes("[Dev Mode]");
 }
 
 /**
@@ -30,6 +31,11 @@ export function isDevModeError(e: unknown): boolean {
  */
 export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   return connectionManager.primary().transport.invoke<T>(cmd, args);
+}
+
+/** Invoke a backend command on a specific connection (routed by GlobalId). */
+export async function invokeOn<T>(connId: string, cmd: string, args?: Record<string, unknown>): Promise<T> {
+  return connectionManager.invokeOne<T>(connId, cmd, args);
 }
 
 /**

@@ -15,6 +15,7 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -188,6 +189,8 @@ export default function SettingsPage() {
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
+
+      <ConnectionsPanel />
 
       <Card>
         <CardHeader>

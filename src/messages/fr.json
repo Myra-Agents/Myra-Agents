@@ -110,6 +110,7 @@
       "tagInputPlaceholder": "Ajouter une étiquette",
       "agentPreset": "Préréglage d'agent",
       "agentPresetPlaceholder": "Sélectionner un agent",
+      "targetServer": "Serveur",
       "agent": "Agent",
       "prompt": "Prompt",
       "optional": "facultatif",
@@ -275,6 +276,30 @@
   "settings": {
     "title": "Paramètres",
     "description": "Configurez les agents, préférences et comportement de l'application",
+    "connections": {
+      "title": "Connexions",
+      "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les cartes de chacun portent une étiquette d'origine. La connexion locale est permanente.",
+      "primary": "Principal",
+      "inProcess": "En interne",
+      "labelField": "Libellé",
+      "labelPlaceholder": "Mon serveur",
+      "urlField": "URL du serveur",
+      "add": "Ajouter",
+      "added": "Connexion ajoutée.",
+      "remove": "Supprimer",
+      "makePrimary": "Définir comme principal",
+      "invalidUrl": "Saisissez une URL complète (http:// ou https://).",
+      "visible": "Visible",
+      "hidden": "Masqué",
+      "show": "Afficher sur le tableau",
+      "hide": "Masquer du tableau",
+      "status": {
+        "connected": "Connecté",
+        "connecting": "Connexion…",
+        "error": "Injoignable",
+        "disabled": "Désactivé"
+      }
+    },
     "agents": {
       "title": "Préréglages d'agent",
       "description": "Configurez les agents IA pour vos tâches",

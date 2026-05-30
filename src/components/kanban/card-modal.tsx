@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useConnections } from "@/hooks/use-connections";
 import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
 import { cn } from "@/lib/utils";
 import type { CardFormData, CardTemplate, KanbanCard, KanbanStatus } from "@/types/kanban";
@@ -36,7 +37,7 @@ interface CardModalProps {
   templates?: CardTemplate[];
   agentPresets?: AgentPreset[];
   defaultAgentId?: string;
-  onSave: (data: CardFormData, status: KanbanStatus) => Promise<void>;
+  onSave: (data: CardFormData, status: KanbanStatus, targetConnId?: string) => Promise<void>;
   onSaveTemplate?: (template: Omit<CardTemplate, "id" | "createdAt">) => void;
   onLaunch?: (cardId: string) => Promise<void>;
   onOpenWorkingDir?: (cardId: string) => Promise<void>;
@@ -75,6 +76,9 @@ export function CardModal({
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
+  const { connections, primaryId } = useConnections();
+  const [targetConnId, setTargetConnId] = useState(primaryId);
+
   useEffect(() => {
     if (open) {
       setTitle(card?.title ?? "");
@@ -87,9 +91,10 @@ export function CardModal({
       setAgentPresetId(card?.agentPresetId ?? defaultAgentId ?? agentPresets[0]?.id ?? "");
       setSelectedTemplateId(NO_TEMPLATE);
       setTemplateName("");
+      setTargetConnId(primaryId);
       setTimeout(() => titleRef.current?.focus(), 100);
     }
-  }, [open, card, initialStatus, defaultAgentId, agentPresets]);
+  }, [open, card, initialStatus, defaultAgentId, agentPresets, primaryId]);
 
   const tagSuggestions = useMemo(() => {
     const needle = normalizeTag(tagInput);
@@ -160,6 +165,7 @@ export function CardModal({
           workingDir: workingDir.trim() || undefined,
         },
         status,
+        mode === "add" ? targetConnId : undefined,
       );
       onClose();
     } finally {
@@ -242,6 +248,24 @@ export function CardModal({
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {mode === "add" && connections.length > 1 && (
+              <div className="space-y-2">
+                <Label>{t("targetServer")}</Label>
+                <Select value={targetConnId} onValueChange={setTargetConnId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {connections.map((conn) => (
+                      <SelectItem key={conn.id} value={conn.id}>
+                        {conn.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 

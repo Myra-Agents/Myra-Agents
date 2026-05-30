@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useKanban } from "@/hooks/use-kanban";
-import { invoke } from "@/lib/tauri";
+import { parseGlobalId } from "@/lib/aggregate/global-id";
+import { connectionManager } from "@/lib/connections/manager";
+import { invokeOn } from "@/lib/tauri";
 import type { AgentRun, KanbanCard } from "@/types/kanban";
 
 interface RunArtifact {
@@ -39,8 +41,9 @@ export default function LogsPage() {
       setSelectedRun({ card, run });
       setLoadingLog(true);
       setArtifacts([]);
+      const { connId, entityId } = parseGlobalId(card.id);
       try {
-        const log = await invoke<string>("get_run_log", { cardId: card.id, runId: run.id });
+        const log = await invokeOn<string>(connId, "get_run_log", { cardId: entityId, runId: run.id });
         setLogContent(log);
       } catch (e) {
         setLogContent(t("details.errorLoading", { error: String(e) }));
@@ -48,7 +51,7 @@ export default function LogsPage() {
         setLoadingLog(false);
       }
       try {
-        const list = await invoke<RunArtifact[]>("list_run_artifacts", { cardId: card.id });
+        const list = await invokeOn<RunArtifact[]>(connId, "list_run_artifacts", { cardId: entityId });
         setArtifacts(list);
       } catch {
         setArtifacts([]);
@@ -57,17 +60,23 @@ export default function LogsPage() {
     [t],
   );
 
-  const openPath = useCallback(async (path: string) => {
-    try {
-      await invoke("open_path", { path });
-    } catch (e) {
-      toast.error(String(e));
-    }
-  }, []);
+  const openPath = useCallback(
+    async (path: string) => {
+      // Artifact paths live on the run's owning server — route open there.
+      const connId = selectedRun ? parseGlobalId(selectedRun.card.id).connId : connectionManager.primaryId();
+      try {
+        await invokeOn(connId, "open_path", { path });
+      } catch (e) {
+        toast.error(String(e));
+      }
+    },
+    [selectedRun],
+  );
 
   const openWorkingDir = useCallback(async (cardId: string) => {
+    const { connId, entityId } = parseGlobalId(cardId);
     try {
-      await invoke("open_card_working_dir", { cardId });
+      await invokeOn(connId, "open_card_working_dir", { cardId: entityId });
     } catch (e) {
       toast.error(String(e));
     }

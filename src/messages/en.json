@@ -110,6 +110,7 @@
       "tagInputPlaceholder": "Add tag",
       "agentPreset": "Agent preset",
       "agentPresetPlaceholder": "Select agent",
+      "targetServer": "Server",
       "agent": "Agent",
       "prompt": "Prompt",
       "optional": "optional",
@@ -275,6 +276,30 @@
   "settings": {
     "title": "Settings",
     "description": "Configure agents, preferences, and app behavior",
+    "connections": {
+      "title": "Connections",
+      "description": "Backends this board aggregates. Add remote servers; cards from each are tagged by origin. The local connection is permanent.",
+      "primary": "Primary",
+      "inProcess": "In-process",
+      "labelField": "Label",
+      "labelPlaceholder": "My server",
+      "urlField": "Server URL",
+      "add": "Add",
+      "added": "Connection added.",
+      "remove": "Remove",
+      "makePrimary": "Set as primary",
+      "invalidUrl": "Enter a full URL (http:// or https://).",
+      "visible": "Visible",
+      "hidden": "Hidden",
+      "show": "Show on board",
+      "hide": "Hide from board",
+      "status": {
+        "connected": "Connected",
+        "connecting": "Connecting…",
+        "error": "Unreachable",
+        "disabled": "Disabled"
+      }
+    },
     "agents": {
       "title": "Agent Presets",
       "description": "Configure which AI agents can run your tasks",

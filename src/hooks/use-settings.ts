@@ -1,21 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { invoke, isDevModeError } from "@/lib/tauri";
+import { connectionManager } from "@/lib/connections/manager";
+import { isDevModeError } from "@/lib/tauri";
 import type { AppSettings } from "@/types/settings";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 
 /**
- * Hook to load/save app settings from the Rust backend.
+ * Load/save settings for one connection. Settings (agent presets, concurrency)
+ * are **per-server**, never merged — pass the connection id to scope the
+ * settings UI to a specific server; defaults to the primary connection.
  */
-export function useSettings() {
+export function useSettings(connId?: string) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const targetId = connId ?? undefined;
+
   const load = useCallback(async () => {
+    const id = targetId ?? connectionManager.primaryId();
     try {
       setError(null);
-      const data = await invoke<Partial<AppSettings>>("get_settings");
+      const data = await connectionManager.invokeOne<Partial<AppSettings>>(id, "get_settings");
       setSettings({
         ...DEFAULT_SETTINGS,
         ...data,
@@ -29,23 +35,29 @@ export function useSettings() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [targetId]);
 
   useEffect(() => {
     void load();
+    const off = connectionManager.onTopologyChange(() => void load());
+    return off;
   }, [load]);
 
-  const save = useCallback(async (updated: AppSettings) => {
-    try {
-      setError(null);
-      await invoke("save_settings", { settings: updated });
-      setSettings(updated);
-    } catch (e) {
-      console.error("Failed to save settings:", e);
-      setError(String(e));
-      throw e;
-    }
-  }, []);
+  const save = useCallback(
+    async (updated: AppSettings) => {
+      const id = targetId ?? connectionManager.primaryId();
+      try {
+        setError(null);
+        await connectionManager.invokeOne(id, "save_settings", { settings: updated });
+        setSettings(updated);
+      } catch (e) {
+        console.error("Failed to save settings:", e);
+        setError(String(e));
+        throw e;
+      }
+    },
+    [targetId],
+  );
 
   return { settings, loading, error, save, reload: load };
 }
