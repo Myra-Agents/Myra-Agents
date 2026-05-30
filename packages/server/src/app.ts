@@ -1,28 +1,34 @@
-import { dispatchData, type EventName, UnknownCommandError } from "@myra/shared";
+import { dispatchData, UnknownCommandError } from "@myra/shared";
 import { Hono } from "hono";
 import { createBunWebSocket } from "hono/bun";
 import { cors } from "hono/cors";
 
 import { EventBus } from "./realtime/bus";
+import { AgentRunner } from "./runner/agent-runner";
+import { dispatchAgent } from "./runner/dispatch";
 import { FileStore, isDemoMode, resolveDataDir } from "./store/file-store";
 
 export interface AppDeps {
   store?: FileStore;
   bus?: EventBus;
+  runner?: AgentRunner;
 }
 
 /**
  * Build the Hono app for one backend instance. Generic RPC over
  * `POST /rpc/:cmd` (body = args) mirroring the client's `invoke(cmd, args)`,
  * a `GET /events` WebSocket carrying push frames, plus `GET /healthz`. Never
- * serves HTML. Agent/OS commands land in Phase 3c.
+ * serves HTML. Data commands go through `dispatchData`; agent commands
+ * (launch/cancel/logs/plan/trigger) fall back to `dispatchAgent` (the runner).
  *
- * Returns the `bus` (for in-process emitters) and the Bun `websocket` handler
- * that `index.ts` must export alongside `fetch` for the WS route to upgrade.
+ * Returns the `store`, `bus`, and `runner` (for the scheduler + watcher that
+ * `index.ts` wires up) and the Bun `websocket` handler that `index.ts` must
+ * export alongside `fetch` for the WS route to upgrade.
  */
 export function createApp(deps: AppDeps = {}) {
   const store = deps.store ?? new FileStore();
   const bus = deps.bus ?? new EventBus();
+  const runner = deps.runner ?? new AgentRunner(store, bus);
   const { upgradeWebSocket, websocket } = createBunWebSocket();
   const app = new Hono();
 
@@ -60,16 +66,6 @@ export function createApp(deps: AppDeps = {}) {
     }),
   );
 
-  // Temporary verification hook (Phase 3b): with MYRA_DEBUG=1, push a frame on
-  // demand so the WS pipe can be exercised before real emitters exist (3c).
-  if (process.env.MYRA_DEBUG === "1") {
-    app.post("/debug/emit", async (c) => {
-      const body = (await c.req.json().catch(() => ({}))) as { event?: EventName; payload?: unknown };
-      bus.emit(body.event ?? "schedules-updated", body.payload ?? null);
-      return c.json({ ok: true });
-    });
-  }
-
   app.post("/rpc/:cmd", async (c) => {
     const cmd = c.req.param("cmd");
     let args: Record<string, unknown> | undefined;
@@ -81,7 +77,18 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     try {
-      const data = await dispatchData(store, cmd, args);
+      // Data commands run against the store; agent commands (shell/filesystem)
+      // fall back to the runner. Either layer throws UnknownCommandError → 400.
+      let data: unknown;
+      try {
+        data = await dispatchData(store, cmd, args);
+      } catch (err) {
+        if (err instanceof UnknownCommandError) {
+          data = await dispatchAgent(runner, cmd, args);
+        } else {
+          throw err;
+        }
+      }
       return c.json({ ok: true, data });
     } catch (err) {
       if (err instanceof UnknownCommandError) {
@@ -92,5 +99,5 @@ export function createApp(deps: AppDeps = {}) {
     }
   });
 
-  return { app, bus, websocket };
+  return { app, bus, runner, store, websocket };
 }

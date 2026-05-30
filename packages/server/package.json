@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@myra/shared": "workspace:*",
+    "chokidar": "^4.0.3",
+    "croner": "^9.0.0",
     "hono": "^4.6.14"
   }
 }
