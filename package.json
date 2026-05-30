@@ -13,6 +13,7 @@
     "check": "biome check",
     "check:fix": "biome check --write",
     "generate:presets": "ts-node -P tsconfig.scripts.json src/scripts/generate-theme-presets.ts",
+    "sidecar:build": "node scripts/build-sidecar.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:demo": "cross-env DEMO=1 tauri dev",

@@ -1,4 +1,4 @@
-import { isTauri } from "@tauri-apps/api/core";
+import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 
 import { browserTransport } from "@/lib/transport/browser";
 import { createHttpTransport } from "@/lib/transport/http";
@@ -49,6 +49,7 @@ class ConnectionManager {
   private primaryConnId = LOCAL_ID;
   private topologyListeners = new Set<() => void>();
   private statusListeners = new Set<() => void>();
+  private sidecarReady?: Promise<void>;
 
   constructor() {
     this.loadRegistry();
@@ -238,6 +239,44 @@ class ConnectionManager {
     for (const cb of this.statusListeners) cb();
   }
 
+  // --- desktop sidecar ------------------------------------------------------
+
+  /**
+   * On the desktop, the local connection is backed by a Node sidecar Tauri
+   * spawns on a fresh port each launch. Resolve that port and re-point the
+   * local connection at `http://127.0.0.1:<port>` over HTTP. Memoized so it
+   * runs once; consumers `await ensureSidecar()` before the first fan-out.
+   *
+   * No-op when a build-time server URL is set (local already points at a real
+   * server) or in a plain browser (the offline transport stays in place).
+   */
+  ensureSidecar(): Promise<void> {
+    if (!this.sidecarReady) this.sidecarReady = this.initLocalSidecar();
+    return this.sidecarReady;
+  }
+
+  private async initLocalSidecar(): Promise<void> {
+    if (SERVER_URL || !isTauri()) return;
+    const entry = this.entries.get(LOCAL_ID);
+    if (!entry) return;
+    try {
+      const port = await tauriInvoke<number>("get_sidecar_port");
+      const baseUrl = `http://127.0.0.1:${port}`;
+      // Always override any persisted (stale) port — it changes per launch.
+      const connection: Connection = {
+        ...entry.connection,
+        baseUrl,
+        kind: "sidecar",
+        status: "connecting",
+      };
+      this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl) });
+      this.persist();
+      this.emitTopology();
+    } catch (e) {
+      console.error("[ConnectionManager] sidecar init failed:", e);
+    }
+  }
+
   // --- aggregation ----------------------------------------------------------
 
   /** The connections reads/events fan out across (everything not disabled). */
@@ -246,12 +285,14 @@ class ConnectionManager {
   }
 
   /** Route a single command to one connection. */
-  invokeOne<T>(connId: string, cmd: string, args?: Record<string, unknown>): Promise<T> {
+  async invokeOne<T>(connId: string, cmd: string, args?: Record<string, unknown>): Promise<T> {
+    await this.ensureSidecar();
     return this.transport(connId).invoke<T>(cmd, args);
   }
 
   /** Fan a read out to every active connection; never rejects — failures land per-entry. */
   async invokeAll<T>(cmd: string, args?: Record<string, unknown>): Promise<FanResult<T>[]> {
+    await this.ensureSidecar();
     const conns = this.activeConnections();
     const results = await Promise.all(
       conns.map(async (conn): Promise<FanResult<T>> => {
@@ -274,6 +315,7 @@ class ConnectionManager {
    * re-subscribe on topology change to pick up added/removed connections.
    */
   async listenAll<T>(event: string, cb: DemuxHandler<T>): Promise<UnlistenFn> {
+    await this.ensureSidecar();
     const conns = this.activeConnections();
     const unlistens = await Promise.all(
       conns.map((conn) =>
