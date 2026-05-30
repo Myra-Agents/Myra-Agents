@@ -9,15 +9,89 @@ interface RpcErr {
   error: string;
 }
 
+type Handler = (event: { payload: unknown }) => void;
+interface EventFrame {
+  event: string;
+  payload: unknown;
+}
+
 /**
  * HTTP transport — talks to a remote / self-hosted / sidecar Node server over
- * `POST {baseUrl}/rpc/:cmd` (body = args) plus a `{baseUrl}/events` WebSocket.
+ * `POST {baseUrl}/rpc/:cmd` (body = args) for commands and a single
+ * `{baseUrl}/events` WebSocket for push frames.
  *
- * Phase 3a: `invoke` is live. `listen` is still a no-op stub — the `/events`
- * WebSocket wiring lands in Phase 3b.
+ * One WebSocket is shared by all listeners on this connection. It opens lazily
+ * (first `listen`), reconnects with exponential backoff while any listener is
+ * registered, and closes when the last one unsubscribes. Frames are demuxed to
+ * handlers by event name.
  */
 export function createHttpTransport(baseUrl: string): Transport {
   const root = baseUrl.replace(/\/$/, "");
+  const wsUrl = `${root.replace(/^http/, "ws")}/events`;
+  const handlers = new Map<string, Set<Handler>>();
+
+  let socket: WebSocket | undefined;
+  let backoff = 500;
+  const MAX_BACKOFF = 10_000;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function dispatch(raw: string): void {
+    let frame: EventFrame;
+    try {
+      frame = JSON.parse(raw) as EventFrame;
+    } catch {
+      return;
+    }
+    const set = handlers.get(frame.event);
+    if (!set) return;
+    for (const handler of set) handler({ payload: frame.payload });
+  }
+
+  function openSocket(): void {
+    if (socket || handlers.size === 0 || typeof WebSocket === "undefined") return;
+    const ws = new WebSocket(wsUrl);
+    socket = ws;
+    ws.onopen = () => {
+      backoff = 500;
+    };
+    ws.onmessage = (ev) => dispatch(typeof ev.data === "string" ? ev.data : "");
+    ws.onclose = () => {
+      socket = undefined;
+      scheduleReconnect();
+    };
+    ws.onerror = () => {
+      try {
+        ws.close();
+      } catch {
+        // ignore — onclose drives the reconnect.
+      }
+    };
+  }
+
+  function scheduleReconnect(): void {
+    if (reconnectTimer || handlers.size === 0) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined;
+      backoff = Math.min(backoff * 2, MAX_BACKOFF);
+      openSocket();
+    }, backoff);
+  }
+
+  function closeSocket(): void {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
+    }
+    if (socket) {
+      const ws = socket;
+      socket = undefined;
+      try {
+        ws.close();
+      } catch {
+        // already closing.
+      }
+    }
+  }
 
   return {
     async invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -40,9 +114,24 @@ export function createHttpTransport(baseUrl: string): Transport {
       return payload.data;
     },
 
-    async listen<_T>(): Promise<UnlistenFn> {
-      // No live channel until Phase 3b wires the /events WebSocket.
-      return () => undefined;
+    async listen<T>(event: string, handler: (event: { payload: T }) => void): Promise<UnlistenFn> {
+      const typed = handler as Handler;
+      let set = handlers.get(event);
+      if (!set) {
+        set = new Set();
+        handlers.set(event, set);
+      }
+      set.add(typed);
+      openSocket();
+
+      return () => {
+        const current = handlers.get(event);
+        if (current) {
+          current.delete(typed);
+          if (current.size === 0) handlers.delete(event);
+        }
+        if (handlers.size === 0) closeSocket();
+      };
     },
   };
 }
