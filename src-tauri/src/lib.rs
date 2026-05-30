@@ -1,11 +1,4 @@
-mod commands;
-mod demo;
-mod models;
-mod schedule_store;
-mod scheduler;
-mod settings;
 mod tray;
-mod watcher;
 
 use std::net::{TcpListener, TcpStream};
 use std::sync::Mutex;
@@ -15,20 +8,6 @@ use tauri::{Manager, RunEvent};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
-use commands::agent::{
-    cancel_agent, get_run_log, launch_agent, list_run_artifacts, open_card_working_dir, open_path,
-    AgentProcesses,
-};
-use commands::kanban::{
-    add_card, add_revision_note, answer_feedback, delete_card, get_cards, move_card, reorder_card,
-    restore_card, trash_card, update_card,
-};
-use commands::planner::plan_day;
-use commands::schedule::{
-    create_schedule, delete_schedule, list_schedules, purge_schedule_history,
-    toggle_schedule_enabled, trigger_schedule_now, update_schedule,
-};
-use settings::{get_settings, save_settings};
 use tray::TrayState;
 
 /// The Node sidecar (the `@myra/server` Bun binary) that backs the desktop's
@@ -108,9 +87,7 @@ fn get_sidecar_port(state: tauri::State<'_, SidecarState>) -> u16 {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .manage(AgentProcesses::default())
         .manage(TrayState::default())
         .setup(|app| {
             tray::setup_tray(app.handle())?;
@@ -124,35 +101,7 @@ pub fn run() {
                 api.prevent_close();
             }
         })
-        .invoke_handler(tauri::generate_handler![
-            get_cards,
-            add_card,
-            update_card,
-            move_card,
-            reorder_card,
-            delete_card,
-            trash_card,
-            restore_card,
-            add_revision_note,
-            answer_feedback,
-            launch_agent,
-            cancel_agent,
-            get_run_log,
-            list_run_artifacts,
-            open_path,
-            open_card_working_dir,
-            list_schedules,
-            create_schedule,
-            update_schedule,
-            delete_schedule,
-            toggle_schedule_enabled,
-            trigger_schedule_now,
-            purge_schedule_history,
-            plan_day,
-            get_settings,
-            save_settings,
-            get_sidecar_port,
-        ])
+        .invoke_handler(tauri::generate_handler![get_sidecar_port])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

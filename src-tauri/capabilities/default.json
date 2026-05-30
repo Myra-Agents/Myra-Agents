@@ -12,7 +12,6 @@
     "core:window:allow-set-decorations",
     "core:window:allow-start-dragging",
     "core:window:allow-toggle-maximize",
-    "opener:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [{ "name": "binaries/myra-server", "sidecar": true, "args": true }]

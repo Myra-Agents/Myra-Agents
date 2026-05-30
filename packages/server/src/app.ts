@@ -6,6 +6,7 @@ import { cors } from "hono/cors";
 import { EventBus } from "./realtime/bus";
 import { AgentRunner } from "./runner/agent-runner";
 import { dispatchAgent } from "./runner/dispatch";
+import { dispatchOs } from "./runner/os";
 import { FileStore, isDemoMode, resolveDataDir } from "./store/file-store";
 
 export interface AppDeps {
@@ -77,16 +78,19 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     try {
-      // Data commands run against the store; agent commands (shell/filesystem)
-      // fall back to the runner. Either layer throws UnknownCommandError → 400.
+      // Three dispatch layers, tried in order: data CRUD against the store,
+      // OS file-open helpers, then the agent runner. Each rethrows
+      // UnknownCommandError so the next layer gets a try; the last → 400.
       let data: unknown;
       try {
         data = await dispatchData(store, cmd, args);
-      } catch (err) {
-        if (err instanceof UnknownCommandError) {
+      } catch (errData) {
+        if (!(errData instanceof UnknownCommandError)) throw errData;
+        try {
+          data = await dispatchOs(store, cmd, args);
+        } catch (errOs) {
+          if (!(errOs instanceof UnknownCommandError)) throw errOs;
           data = await dispatchAgent(runner, cmd, args);
-        } else {
-          throw err;
         }
       }
       return c.json({ ok: true, data });
