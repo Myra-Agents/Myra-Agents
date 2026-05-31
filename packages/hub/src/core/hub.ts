@@ -1,4 +1,11 @@
-import type { Capability, DashboardEventFrame, HubFrame, InstanceInfo, RpcResult } from "@myra/shared";
+import {
+  type Capability,
+  type DashboardEventFrame,
+  type HubFrame,
+  type InstanceInfo,
+  PRESENCE_EVENT,
+  type RpcResult,
+} from "@myra/shared";
 
 /**
  * Transport-agnostic relay core (the "dumb hub").
@@ -61,6 +68,7 @@ export class HubCore {
     const existing = state.instances.get(conn.instanceId);
     if (existing && existing.sink !== conn.sink) existing.sink.close(); // supersede a stale socket
     state.instances.set(conn.instanceId, conn);
+    this.broadcastPresence(userId, conn.instanceId, true);
   }
 
   /** Drop an instance; only if the current socket matches (ignore late closes of a superseded one). */
@@ -68,7 +76,10 @@ export class HubCore {
     const state = this.users.get(userId);
     if (!state) return;
     const conn = state.instances.get(instanceId);
-    if (conn && (!sink || conn.sink === sink)) state.instances.delete(instanceId);
+    if (conn && (!sink || conn.sink === sink)) {
+      state.instances.delete(instanceId);
+      this.broadcastPresence(userId, instanceId, false);
+    }
   }
 
   /** Forcibly close and drop an instance's tunnel — used when its credential is revoked. */
@@ -77,10 +88,25 @@ export class HubCore {
     const conn = state?.instances.get(instanceId);
     if (!conn) return;
     state?.instances.delete(instanceId);
+    this.broadcastPresence(userId, instanceId, false);
     try {
       conn.sink.close();
     } catch {
       // already gone.
+    }
+  }
+
+  /** Tell the user's dashboards an instance's presence flipped, so they refresh topology. */
+  private broadcastPresence(userId: string, instanceId: string, online: boolean): void {
+    const state = this.users.get(userId);
+    if (!state) return;
+    const frame: DashboardEventFrame = { instanceId, event: PRESENCE_EVENT, payload: { online } };
+    for (const dash of state.dashboards) {
+      try {
+        dash.send(frame);
+      } catch {
+        // a broken dashboard sink must not stop the others.
+      }
     }
   }
 

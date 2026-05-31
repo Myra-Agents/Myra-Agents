@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { connectionManager } from "@/lib/connections/manager";
-import type { Connection } from "@/lib/connections/types";
+import type { Connection, HubRegistration } from "@/lib/connections/types";
 
 const VISIBILITY_KEY = "myra.connection-visibility";
 
@@ -34,12 +34,14 @@ function writeHidden(hidden: Set<string>): void {
  */
 export function useConnections() {
   const [connections, setConnections] = useState<Connection[]>(() => connectionManager.list());
+  const [hubs, setHubs] = useState<HubRegistration[]>(() => connectionManager.listHubs());
   const [primaryId, setPrimaryIdState] = useState<string>(() => connectionManager.primaryId());
   const [hidden, setHidden] = useState<Set<string>>(readHidden);
 
   useEffect(() => {
     const sync = () => {
       setConnections(connectionManager.list());
+      setHubs(connectionManager.listHubs());
       setPrimaryIdState(connectionManager.primaryId());
     };
     const offTopology = connectionManager.onTopologyChange(sync);
@@ -53,6 +55,11 @@ export function useConnections() {
 
   const add = useCallback((input: { label: string; baseUrl: string }) => connectionManager.add(input), []);
   const remove = useCallback((id: string) => connectionManager.remove(id), []);
+  const addHub = useCallback(
+    (input: { label: string; baseUrl: string; token: string }) => connectionManager.addHub(input),
+    [],
+  );
+  const removeHub = useCallback((id: string) => connectionManager.removeHub(id), []);
   const update = useCallback(
     (id: string, patch: Partial<Pick<Connection, "label" | "baseUrl">>) => connectionManager.update(id, patch),
     [],
@@ -73,10 +80,13 @@ export function useConnections() {
 
   return {
     connections,
+    hubs,
     primaryId,
     hiddenIds: hidden,
     add,
     remove,
+    addHub,
+    removeHub,
     update,
     setPrimary,
     toggleVisible,

@@ -76,6 +76,12 @@ export interface DashboardEventFrame {
   payload: unknown;
 }
 
+/** Reserved dashboard event: an instance came online / went offline (drives client topology refresh). */
+export const PRESENCE_EVENT = "__presence";
+export interface PresencePayload {
+  online: boolean;
+}
+
 /** The envelope returned by an RPC — identical to a direct server's `/rpc/:cmd`. */
 export type RpcResult = { ok: true; data: unknown } | { ok: false; error: string };
 

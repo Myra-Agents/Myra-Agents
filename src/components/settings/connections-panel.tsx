@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { CheckCircle2Icon, CircleIcon, PlusIcon, ServerIcon, TrashIcon } from "lucide-react";
+import { CheckCircle2Icon, CircleIcon, NetworkIcon, PlusIcon, ServerIcon, TrashIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConnections } from "@/hooks/use-connections";
 import type { ConnectionStatus } from "@/lib/connections/types";
+import { hubLogin } from "@/lib/transport/hub";
 import { cn } from "@/lib/utils";
 
 const STATUS_COLOR: Record<ConnectionStatus, string> = {
@@ -28,9 +29,13 @@ const STATUS_COLOR: Record<ConnectionStatus, string> = {
  */
 export function ConnectionsPanel() {
   const t = useTranslations("settings.connections");
-  const { connections, primaryId, add, remove, setPrimary, toggleVisible, isVisible } = useConnections();
+  const { connections, hubs, primaryId, add, remove, addHub, removeHub, setPrimary, toggleVisible, isVisible } =
+    useConnections();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
+  const [hubUrl, setHubUrl] = useState("");
+  const [hubUser, setHubUser] = useState("");
+  const [hubBusy, setHubBusy] = useState(false);
 
   const handleAdd = () => {
     const trimmed = url.trim();
@@ -43,6 +48,28 @@ export function ConnectionsPanel() {
     setLabel("");
     setUrl("");
     toast.success(t("added"));
+  };
+
+  const handleAddHub = async () => {
+    const trimmed = hubUrl.trim();
+    const user = hubUser.trim();
+    if (!trimmed || !user) return;
+    if (!/^https?:\/\//.test(trimmed)) {
+      toast.error(t("invalidUrl"));
+      return;
+    }
+    setHubBusy(true);
+    try {
+      const token = await hubLogin(trimmed, user);
+      addHub({ label: `${user} @ ${trimmed.replace(/^https?:\/\//, "")}`, baseUrl: trimmed, token });
+      setHubUrl("");
+      setHubUser("");
+      toast.success(t("hub.added"));
+    } catch {
+      toast.error(t("hub.loginFailed"));
+    } finally {
+      setHubBusy(false);
+    }
   };
 
   return (
@@ -127,6 +154,57 @@ export function ConnectionsPanel() {
             <PlusIcon className="size-3" />
             {t("add")}
           </Button>
+        </div>
+
+        <div className="space-y-3 border-t pt-4">
+          <div className="flex items-center gap-2">
+            <NetworkIcon className="size-4 text-muted-foreground" />
+            <span className="font-medium text-sm">{t("hub.title")}</span>
+          </div>
+          <p className="text-muted-foreground text-sm">{t("hub.description")}</p>
+
+          {hubs.length > 0 && (
+            <div className="space-y-2">
+              {hubs.map((hub) => (
+                <div key={hub.id} className="flex items-center gap-2 rounded-md border p-3">
+                  <NetworkIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <span className="truncate font-medium text-sm">{hub.label}</span>
+                    <p className="truncate font-mono text-muted-foreground text-xs">{hub.baseUrl}</p>
+                  </div>
+                  <Button variant="ghost" size="icon-xs" onClick={() => removeHub(hub.id)} title={t("hub.remove")}>
+                    <TrashIcon />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-2 rounded-md border border-dashed p-3 sm:grid-cols-[1fr_1.5fr_auto] sm:items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("hub.userField")}</Label>
+              <Input
+                value={hubUser}
+                onChange={(e) => setHubUser(e.target.value)}
+                placeholder={t("hub.userPlaceholder")}
+                className="h-8"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("urlField")}</Label>
+              <Input
+                value={hubUrl}
+                onChange={(e) => setHubUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddHub()}
+                placeholder={t("hub.urlPlaceholder")}
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+            <Button size="sm" onClick={handleAddHub} disabled={hubBusy || !hubUrl.trim() || !hubUser.trim()}>
+              <PlusIcon className="size-3" />
+              {t("hub.add")}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

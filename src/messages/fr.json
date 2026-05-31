@@ -298,6 +298,17 @@
         "connecting": "Connexion…",
         "error": "Injoignable",
         "disabled": "Désactivé"
+      },
+      "hub": {
+        "title": "Hubs",
+        "description": "Connectez-vous à un hub pour réunir toutes vos instances distantes sous une seule connexion. Chaque instance apparaît comme une origine du tableau.",
+        "userField": "Utilisateur",
+        "userPlaceholder": "vous@exemple.com",
+        "urlPlaceholder": "https://hub.exemple.com",
+        "add": "Ajouter un hub",
+        "added": "Hub ajouté.",
+        "loginFailed": "Connexion au hub impossible.",
+        "remove": "Supprimer le hub"
       }
     },
     "agents": {

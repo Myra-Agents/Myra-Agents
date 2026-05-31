@@ -298,6 +298,17 @@
         "connecting": "Connecting…",
         "error": "Unreachable",
         "disabled": "Disabled"
+      },
+      "hub": {
+        "title": "Hubs",
+        "description": "Connect to a hub to gather all of your remote instances under one login. Each instance appears as its own board origin.",
+        "userField": "User",
+        "userPlaceholder": "you@example.com",
+        "urlPlaceholder": "https://hub.example.com",
+        "add": "Add hub",
+        "added": "Hub added.",
+        "loginFailed": "Could not sign in to the hub.",
+        "remove": "Remove hub"
       }
     },
     "agents": {

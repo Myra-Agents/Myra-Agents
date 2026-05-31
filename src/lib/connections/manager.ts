@@ -2,10 +2,11 @@ import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 
 import { browserTransport } from "@/lib/transport/browser";
 import { createHttpTransport } from "@/lib/transport/http";
+import { createHubClient, type HubClient } from "@/lib/transport/hub";
 import { tauriTransport } from "@/lib/transport/tauri";
 import type { Transport, UnlistenFn } from "@/lib/transport/types";
 
-import type { Connection, ConnectionEntry, ConnectionStatus } from "./types";
+import type { Connection, ConnectionEntry, ConnectionStatus, HubRegistration } from "./types";
 
 /** Optional server URL baked at build time — seeds the local connection at a real Node server. */
 const SERVER_URL = process.env.NEXT_PUBLIC_MYRA_SERVER_URL?.trim();
@@ -18,6 +19,7 @@ const LOCAL_ID = "local";
 interface PersistedRegistry {
   connections: Connection[];
   primaryId: string;
+  hubs?: HubRegistration[];
 }
 
 /** A fan-out result: one entry per queried connection, success or failure. */
@@ -46,10 +48,12 @@ export type DemuxHandler<T> = (e: { connId: string; payload: T }) => void;
  */
 class ConnectionManager {
   private entries = new Map<string, ConnectionEntry>();
+  private hubs = new Map<string, { reg: HubRegistration; client: HubClient; offPresence?: () => void }>();
   private primaryConnId = LOCAL_ID;
   private topologyListeners = new Set<() => void>();
   private statusListeners = new Set<() => void>();
   private sidecarReady?: Promise<void>;
+  private hubsReady?: Promise<void>;
 
   constructor() {
     this.loadRegistry();
@@ -61,7 +65,11 @@ class ConnectionManager {
     const persisted = this.readStorage();
     if (persisted && persisted.connections.length > 0) {
       for (const conn of persisted.connections) {
+        if (conn.kind === "hub-instance") continue; // rebuilt from hubs in ensureHubs
         this.entries.set(conn.id, { connection: conn, transport: this.buildTransport(conn) });
+      }
+      for (const reg of persisted.hubs ?? []) {
+        this.hubs.set(reg.id, { reg, client: createHubClient(reg.baseUrl, reg.token) });
       }
       this.primaryConnId = this.entries.has(persisted.primaryId)
         ? persisted.primaryId
@@ -90,8 +98,9 @@ class ConnectionManager {
   private persist(): void {
     if (typeof localStorage === "undefined") return;
     const payload: PersistedRegistry = {
-      connections: this.list(),
+      connections: this.list().filter((c) => c.kind !== "hub-instance"), // hub-instances are rebuilt from hubs
       primaryId: this.primaryConnId,
+      hubs: [...this.hubs.values()].map((h) => h.reg),
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -181,6 +190,7 @@ class ConnectionManager {
 
   remove(id: string): void {
     if (id === LOCAL_ID) return; // the local connection is permanent
+    if (this.entries.get(id)?.connection.kind === "hub-instance") return; // managed by its hub; use removeHub
     if (!this.entries.delete(id)) return;
     if (this.primaryConnId === id) {
       this.primaryConnId = this.entries.keys().next().value ?? LOCAL_ID;
@@ -277,7 +287,107 @@ class ConnectionManager {
     }
   }
 
+  // --- hubs -----------------------------------------------------------------
+
+  /** Registered hubs (one URL+token that expands into N instance connections). */
+  listHubs(): HubRegistration[] {
+    return [...this.hubs.values()].map((h) => h.reg);
+  }
+
+  /** Register a hub; its instances appear as `hub-instance` connections after expansion. */
+  addHub(input: { label: string; baseUrl: string; token: string }): HubRegistration {
+    const id = crypto.randomUUID();
+    const reg: HubRegistration = {
+      id,
+      label: input.label.trim() || input.baseUrl,
+      baseUrl: input.baseUrl.replace(/\/$/, ""),
+      token: input.token,
+    };
+    this.hubs.set(id, { reg, client: createHubClient(reg.baseUrl, reg.token) });
+    this.persist();
+    this.expandHub(id)
+      .then(() => this.emitTopology())
+      .catch((e) => console.error("[ConnectionManager] addHub expand failed:", e));
+    return reg;
+  }
+
+  /** Remove a hub and all of its instance connections. */
+  removeHub(hubId: string): void {
+    const entry = this.hubs.get(hubId);
+    if (!entry) return;
+    entry.offPresence?.();
+    entry.client.close();
+    this.hubs.delete(hubId);
+    for (const id of [...this.entries.keys()]) {
+      if (this.entries.get(id)?.connection.hubId === hubId) this.entries.delete(id);
+    }
+    this.persist();
+    this.emitTopology();
+  }
+
+  /** Resolve all registered hubs into their instance connections; memoized like the sidecar. */
+  ensureHubs(): Promise<void> {
+    if (!this.hubsReady)
+      this.hubsReady = Promise.all([...this.hubs.keys()].map((id) => this.expandHub(id))).then(() => undefined);
+    return this.hubsReady;
+  }
+
+  /** List one hub's online instances and reconcile them into the entries map. */
+  private async expandHub(hubId: string): Promise<void> {
+    const entry = this.hubs.get(hubId);
+    if (!entry) return;
+    const { reg, client } = entry;
+
+    let instances: Awaited<ReturnType<HubClient["listInstances"]>>;
+    try {
+      instances = await client.listInstances();
+    } catch (e) {
+      console.error(`[ConnectionManager] hub "${reg.label}" list failed:`, e);
+      this.pruneHubEntries(hubId, new Set());
+      return;
+    }
+
+    const seen = new Set<string>();
+    for (const inst of instances) {
+      const connId = `${hubId}:${inst.instanceId}`;
+      seen.add(connId);
+      const connection: Connection = {
+        id: connId,
+        label: `${reg.label} · ${inst.label}`,
+        baseUrl: reg.baseUrl,
+        kind: "hub-instance",
+        status: "connected",
+        hubId,
+        instanceId: inst.instanceId,
+      };
+      this.entries.set(connId, { connection, transport: client.transportFor(inst.instanceId) });
+    }
+    this.pruneHubEntries(hubId, seen);
+
+    // Re-expand whenever an instance connects/disconnects on this hub.
+    if (!entry.offPresence) {
+      entry.offPresence = client.onPresence(() => {
+        this.expandHub(hubId)
+          .then(() => this.emitTopology())
+          .catch(() => undefined);
+      });
+    }
+  }
+
+  /** Drop this hub's instance connections that aren't in `keep`. */
+  private pruneHubEntries(hubId: string, keep: Set<string>): void {
+    for (const id of [...this.entries.keys()]) {
+      const conn = this.entries.get(id)?.connection;
+      if (conn?.hubId === hubId && !keep.has(id)) this.entries.delete(id);
+    }
+  }
+
   // --- aggregation ----------------------------------------------------------
+
+  /** Everything the reads/events should wait on before fanning out. */
+  private ready(): Promise<unknown> {
+    return Promise.all([this.ensureSidecar(), this.ensureHubs()]);
+  }
 
   /** The connections reads/events fan out across (everything not disabled). */
   private activeConnections(): Connection[] {
@@ -286,13 +396,13 @@ class ConnectionManager {
 
   /** Route a single command to one connection. */
   async invokeOne<T>(connId: string, cmd: string, args?: Record<string, unknown>): Promise<T> {
-    await this.ensureSidecar();
+    await this.ready();
     return this.transport(connId).invoke<T>(cmd, args);
   }
 
   /** Fan a read out to every active connection; never rejects — failures land per-entry. */
   async invokeAll<T>(cmd: string, args?: Record<string, unknown>): Promise<FanResult<T>[]> {
-    await this.ensureSidecar();
+    await this.ready();
     const conns = this.activeConnections();
     const results = await Promise.all(
       conns.map(async (conn): Promise<FanResult<T>> => {
@@ -315,7 +425,7 @@ class ConnectionManager {
    * re-subscribe on topology change to pick up added/removed connections.
    */
   async listenAll<T>(event: string, cb: DemuxHandler<T>): Promise<UnlistenFn> {
-    await this.ensureSidecar();
+    await this.ready();
     const conns = this.activeConnections();
     const unlistens = await Promise.all(
       conns.map((conn) =>
