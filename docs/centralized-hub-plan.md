@@ -145,7 +145,7 @@ src-tauri/                   # unchanged shell; local stays direct to the sideca
 
 **Deliverables**
 - `packages/hub/src/cf/`: `UserHub` Durable Object implementing the same `Registry`/`Router` core; sockets accepted via `state.acceptWebSocket()` (hibernation); small bits in DO transactional storage (enrolled list, credential refs). Stateless **Worker** front door: verify JWT → `env.USER_HUB.idFromName(userId)` → forward upgrade.
-- `wrangler.toml`, deploy pipeline.
+- `wrangler.toml`, deploy pipeline. Install/deploy/operate runbook: [`hub-deploy.md`](hub-deploy.md).
 - The Node host stays as the self-hosted gateway; the DO host is the managed target. Core logic shared.
 
 **Verification:** deploy; enroll an instance against the deployed hub; confirm hibernation (idle DO evicted, frame rehydrates); reconnect-storm test with jittered backoff.
