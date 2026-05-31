@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Myra Agents — Centralized Dashboard Architecture (full docs)</title>
+<style>
+  :root{
+    --bg:#0d1117;--panel:#161b22;--panel2:#1c2230;--border:#2a3140;
+    --text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--accent2:#bc8cff;
+    --green:#3fb950;--amber:#d29922;--red:#f85149;--pink:#f778ba;--orange:#db6d28;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font-size:14px;line-height:1.6;display:grid;grid-template-columns:270px 1fr;height:100vh;overflow:hidden}
+  code,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.86em;color:#d6c7ff}
+
+  /* nav */
+  .nav{background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:18px 14px}
+  .nav h1{font-size:14px;margin:0 0 2px}
+  .nav .sub{color:var(--muted);font-size:11px;margin-bottom:14px}
+  .nav a{display:block;color:var(--muted);text-decoration:none;font-size:12.5px;padding:5px 9px;border-radius:6px;border-left:2px solid transparent}
+  .nav a:hover{color:var(--text);background:var(--panel2)}
+  .nav a.active{color:var(--text);background:#18324f;border-left-color:var(--accent)}
+  .nav a.sec{margin-top:10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:#5b6573;pointer-events:none;padding-left:4px}
+
+  /* main */
+  .wrap{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:11px 26px;border-bottom:1px solid var(--border);background:var(--panel)}
+  .topbar .t{font-size:13px;color:var(--muted)}
+  .btn{background:var(--accent);color:#0d1117;border:none;border-radius:6px;padding:7px 13px;font-weight:600;cursor:pointer;font-size:12px}
+  .btn:hover{filter:brightness(1.08)}
+  .copied{color:var(--green);font-size:11.5px;margin-right:8px;opacity:0;transition:.2s}.copied.show{opacity:1}
+
+  .main{overflow-y:auto;padding:0 0 120px}
+  section{padding:34px 48px 6px;max-width:1000px;border-bottom:1px solid #1b212b}
+  section h2{font-size:22px;margin:0 0 4px;scroll-margin-top:20px}
+  section h3{font-size:15px;margin:24px 0 6px;color:#cdd9e5}
+  section .lead{color:var(--muted);font-size:14px;margin:0 0 14px}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:4px 0}
+  .pill{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle}
+  .pill.p1{background:#10351c;color:#56d364;border:1px solid #1c5a30}
+  .pill.p2{background:#3a2208;color:#e3a13a;border:1px solid #6b4310}
+
+  .callout{border:1px solid var(--border);border-left:3px solid var(--accent);background:var(--panel);border-radius:8px;padding:12px 14px;margin:16px 0}
+  .callout.warn{border-left-color:var(--amber)}
+  .callout.key{border-left-color:var(--accent2);background:#1d1832}
+  .callout .h{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;color:var(--accent2)}
+  .callout.warn .h{color:var(--amber)}
+
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin:14px 0}
+  th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:var(--muted);font-weight:600}
+  td.k{color:#d6c7ff;font-family:ui-monospace,monospace;white-space:nowrap}
+
+  .diagram{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px;margin:16px 0;position:relative}
+  .diagram svg{width:100%;display:block}
+  .dcap{color:var(--muted);font-size:11.5px;text-align:center;margin-top:6px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:8px;font-size:11px;color:var(--muted)}
+  .legend .row{display:flex;align-items:center;gap:6px}
+  .legend .sw{width:20px;border-top-width:2px;border-top-style:solid}
+
+  pre{background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto;font-size:12px}
+  .ok{color:var(--green)}.bad{color:var(--red)}.warnc{color:var(--amber)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <h1>Centralized Dashboard</h1>
+  <div class="sub">Architecture reference · Myra Agents</div>
+  <a class="sec">Foundations</a>
+  <a href="#overview">1 · Overview</a>
+  <a href="#goal">2 · Goal &amp; constraints</a>
+  <a href="#why">3 · Why not direct fan-out</a>
+  <a class="sec">The design</a>
+  <a href="#glance">4 · Architecture at a glance</a>
+  <a href="#dumbhub">5 · The dumb-hub invariant</a>
+  <a href="#components">6 · Components</a>
+  <a class="sec">Mechanics</a>
+  <a href="#protocol">7 · Wire protocol</a>
+  <a href="#auth">8 · Auth &amp; enrollment</a>
+  <a href="#nat">9 · NAT &amp; corporate networks</a>
+  <a href="#hibernation">10 · Hibernation &amp; resources</a>
+  <a href="#cadence">11 · Adaptive log cadence</a>
+  <a class="sec">At scale &amp; beyond</a>
+  <a href="#scale">12 · Scaling to thousands</a>
+  <a href="#mesh">13 · Phase 2 — E2E P2P mesh</a>
+  <a class="sec">Building it</a>
+  <a href="#client">14 · Client integration</a>
+  <a href="#migration">15 · Migration phases</a>
+  <a href="#risks">16 · Risks &amp; mitigations</a>
+  <a href="#glossary">17 · Glossary</a>
+</nav>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="t">Self-contained design doc — every box, frame, and decision explained</div>
+    <div><span class="copied" id="copied">Copied!</span><button class="btn" onclick="copyDoc()">Copy as prompt</button></div>
+  </div>
+  <div class="main" id="main">
+
+  <!-- 1 -->
+  <section id="overview">
+    <h2>1 · Overview</h2>
+    <p class="lead">One authenticated dashboard that gathers every Claude agent instance you own — local desktop, remote computers, ephemeral sandboxes — into a single Kanban board.</p>
+    <p>Myra Agents is a Kanban board that launches CLI coding agents. Today's <code>feature/backend-refactor</code> branch already turned the backend into a standalone Node server and made the client connect to several servers at once (<b>client-side fan-out</b>): the browser/Tauri client holds N direct HTTP/WS connections and merges their boards into one view.</p>
+    <p>That works when every server is directly reachable. It breaks the moment you add a machine behind NAT, a corporate firewall, or an ephemeral sandbox — none of those can accept an inbound connection from your browser. This document describes the next step: a <b>centralized, authenticated relay</b> that those instances dial <i>out</i> to, so they appear on your board no matter where they run.</p>
+    <div class="callout key"><div class="h">The one-line version</div>A stateless relay — one Cloudflare Durable Object per user — that authenticates you, tracks which of your instances are online, and forwards frames between your dashboard and your instances. It stores no boards. Each instance remains the source of truth for its own data.</div>
+    <p>The rest of this doc walks the design top to bottom: the problem, the chosen shape, every component, the wire protocol, auth, the network reality (NAT and corporate firewalls), how it stays cheap at idle, how it scales to thousands of users, the optional peer-to-peer future, and how it maps onto the existing codebase.</p>
+  </section>
+
+  <!-- 2 -->
+  <section id="goal">
+    <h2>2 · Goal &amp; constraints</h2>
+    <h3>What the user wants</h3>
+    <ul>
+      <li><b>One login, one board.</b> Authenticate once; see all my agents merged.</li>
+      <li><b>Any location.</b> Local desktop, a remote build box, a throwaway cloud sandbox — all first-class.</li>
+      <li><b>Behind NAT / firewalls.</b> Remote and corporate machines that can't accept inbound connections must still join.</li>
+    </ul>
+    <h3>Engineering constraints</h3>
+    <ul>
+      <li><b>Reuse the branch.</b> The Node server (<code>@myra/server</code>), its dispatch, store, and event bus should survive untouched as the per-instance backend.</li>
+      <li><b>Keep aggregation.</b> The client's <code>GlobalId = ${connId}::${entityId}</code> namespacing and fan-out must keep working.</li>
+      <li><b>Scale to thousands of users</b> without a heavy stateful tier to operate.</li>
+      <li><b>Don't centralize data.</b> No multi-tenant board database to secure, back up, and leak.</li>
+    </ul>
+  </section>
+
+  <!-- 3 -->
+  <section id="why">
+    <h2>3 · Why not direct fan-out</h2>
+    <p class="lead">The current model asks the dashboard to reach each server. That's the wrong direction for the network.</p>
+    <p>Firewalls and NAT block <b>inbound</b> connections and allow <b>outbound</b> ones. A browser cannot open a connection to a laptop sitting behind a corporate firewall or a CGNAT home router — there's no reachable address and no open port. Tunnels (tailscale/cloudflared) can paper over this per machine, but that's N things to set up and there's still no shared identity.</p>
+    <div class="diagram"><div id="d-why"></div><div class="dcap">Fig 1 — Direct fan-out (left) needs each instance reachable; the relay (right) flips the arrows so instances dial out.</div></div>
+    <p>The fix is to invert the direction: instances <b>dial out</b> to a relay over <code>443</code>, which looks like ordinary HTTPS and sails through firewalls. The dashboard then talks to the relay, not to each machine. One reachable thing (the relay) instead of N.</p>
+    <p>Fan-out doesn't get deleted — it stays the LAN / self-host path. The relay is an additional, additive way in.</p>
+  </section>
+
+  <!-- 4 -->
+  <section id="glance">
+    <h2>4 · Architecture at a glance</h2>
+    <p class="lead">A stateless edge worker as the front door, one Durable Object per user as the relay, instances dialing out, and a direct shortcut for the local desktop.</p>
+    <div class="diagram"><div id="d-topo"></div>
+      <div class="legend" id="topo-legend"></div>
+      <div class="dcap">Fig 2 — Full topology. Blue = RPC/WS through the hub · green = NAT-friendly outbound dial · amber = direct local shortcut · pink dashed = optional phase-2 P2P.</div>
+    </div>
+    <p>Reading it: your <b>dashboard</b> (browser or desktop) authenticates through a stateless <b>Cloudflare Worker</b>, which routes the connection to <b>your</b> Durable Object. Your <b>instances</b> each dial out to that same object. The object forwards commands down and events up. The desktop app additionally talks to its <b>local sidecar directly</b>, bypassing the hub entirely for the machine it's running on.</p>
+  </section>
+
+  <!-- 5 -->
+  <section id="dumbhub">
+    <h2>5 · The dumb-hub invariant</h2>
+    <p class="lead">The hub authenticates, tracks presence, and forwards frames. Nothing else. It stores no boards.</p>
+    <p>This is the load-bearing decision of the whole design, so it gets its own section.</p>
+    <table>
+      <tr><th>Dumb hub <span class="pill p1">chosen</span></th><th>Smart hub <span class="pill p2">rejected</span></th></tr>
+      <tr>
+        <td>Holds no card data. Each instance owns its <code>board.json</code> and is the source of truth.</td>
+        <td>Owns a cloud database of everyone's cards.</td>
+      </tr>
+      <tr>
+        <td>Stateless → scales horizontally for free; nothing to back up; no cross-tenant data to leak.</td>
+        <td>Stateful, multi-tenant DB → isolation, backups, scaling, and a fat data-at-rest liability.</td>
+      </tr>
+      <tr>
+        <td>Tiny durable state: enrolled-instance list + credential references, per user.</td>
+        <td>All boards, schedules, settings, run history for all users.</td>
+      </tr>
+    </table>
+    <div class="callout"><div class="h">Why it matters</div>Because the hub holds no application data, its database load scales with <i>user count</i>, not activity, and a hub compromise leaks routing metadata — not everyone's work. Keep this invariant even under pressure to "just cache the board in the hub."</div>
+  </section>
+
+  <!-- 6 -->
+  <section id="components">
+    <h2>6 · Components</h2>
+
+    <h3>Cloudflare Worker — front door <span class="pill p1">phase 1</span></h3>
+    <p>A stateless edge function. On each incoming WebSocket upgrade it: (1) verifies the session JWT, (2) derives <code>userId</code>, (3) forwards the upgrade to <code>env.USER_HUB.idFromName(userId)</code> — that user's Durable Object. It holds no state and makes no routing decisions beyond "which user." Horizontally trivial: it's just a function on Cloudflare's edge.</p>
+
+    <h3>UserHub Durable Object — the relay <span class="pill p1">phase 1</span></h3>
+    <p>A <b>Durable Object</b> is a single, globally-addressable, single-threaded object with its own small transactional storage. Cloudflare guarantees every connection addressed to a given id lands on the <i>same</i> object instance, wherever it physically lives. We allocate <b>one per user</b>. That single fact removes an entire distributed-systems tier (see §12). Inside it:</p>
+    <table>
+      <tr><th>Field</th><th>What</th></tr>
+      <tr><td class="k">instances: Map&lt;id,WS&gt;</td><td>The user's online instance reverse-sockets, keyed by <code>instanceId</code>. Used to route an RPC to the right machine.</td></tr>
+      <tr><td class="k">dashboards: Set&lt;WS&gt;</td><td>The user's currently open dashboard sockets. Events are fanned out to all of them, tagged with <code>instanceId</code>.</td></tr>
+      <tr><td class="k">storage (KV)</td><td>Small durable facts: enrolled instances, credential references. Survives eviction. <b>Never boards.</b></td></tr>
+      <tr><td class="k">hibernation</td><td>Sockets accepted via <code>state.acceptWebSocket()</code> so the object can be evicted from memory while sockets stay open. See §10.</td></tr>
+    </table>
+
+    <h3>Instance connector <span class="pill p1">phase 1</span></h3>
+    <p>A small new module inside <code>@myra/server</code>. Behind a <code>MYRA_HUB_URL</code> env var, it dials out to the hub over a persistent WebSocket, registers, and serves RPC/events from that reverse channel by calling the <b>same dispatch</b> the HTTP route already uses (<code>dispatchData → dispatchOs → dispatchAgent</code>). An instance is therefore just <i>today's server + this connector</i>. The server itself is unchanged.</p>
+
+    <h3>Dashboards</h3>
+    <p>The same Next.js frontend, in two homes. In a <b>browser</b> it opens one WebSocket to the hub and sees every instance merged. In the <b>Tauri desktop app</b> it does the same for remote instances, but reaches its <b>own local sidecar directly over 127.0.0.1</b> — lower latency, no hub round-trip, and it keeps working with no internet.</p>
+
+    <h3>TURN / STUN <span class="pill p2">phase 2 only</span></h3>
+    <p>Not used in phase 1. They belong to the optional peer-to-peer mesh (§13).</p>
+  </section>
+
+  <!-- 7 -->
+  <section id="protocol">
+    <h2>7 · Wire protocol</h2>
+    <p class="lead">Two channels meet at the hub: the instance reverse tunnel and the dashboard channel. They share the same <code>{ok,data}</code> envelope the existing HTTP transport already parses.</p>
+
+    <h3>Instance ↔ hub (reverse tunnel)</h3>
+    <p>The instance opens <code>wss://hub/agent/connect</code> with <code>Authorization: Bearer &lt;instance-credential&gt;</code>. After auth it's a persistent duplex stream of JSON frames:</p>
+    <table>
+      <tr><th>Direction</th><th>Frame</th><th>Meaning</th></tr>
+      <tr><td>instance → hub</td><td class="k">{ type:"hello", instanceId, label, capabilities }</td><td>Register on connect / reconnect.</td></tr>
+      <tr><td>hub → instance</td><td class="k">{ type:"rpc", id, cmd, args }</td><td>A command forwarded from a dashboard.</td></tr>
+      <tr><td>instance → hub</td><td class="k">{ type:"rpc-result", id, ok, data | error }</td><td>The reply, correlated by <code>id</code>.</td></tr>
+      <tr><td>instance → hub</td><td class="k">{ type:"event", event, payload }</td><td>Unsolicited push (log line, result, schedule change).</td></tr>
+      <tr><td>both</td><td class="k">{ type:"ping" } / { type:"pong" }</td><td>Heartbeat → drives presence and keeps middleboxes from idle-killing the socket.</td></tr>
+    </table>
+
+    <h3>Dashboard ↔ hub</h3>
+    <ul>
+      <li><code>GET /api/instances</code> → the user's online instances <code>[{instanceId, label, status, capabilities}]</code>.</li>
+      <li><code>POST /api/i/:instanceId/rpc/:cmd</code> (body = args) → hub forwards to that instance, awaits its <code>rpc-result</code>, returns the same <code>{ok,data}</code> envelope.</li>
+      <li><code>wss://hub/api/events</code> → <b>one</b> socket; the hub multiplexes events from all the user's instances, each frame tagged with <code>instanceId</code>.</li>
+    </ul>
+    <div class="callout"><div class="h">The payoff of symmetry</div>Dashboard→hub RPC returns the identical <code>{ok,data}</code> shape as a direct server today (<code>http.ts</code>). So the new <code>hubTransport</code> is a thin variant of the existing <code>httpTransport</code> — the URLs carry an <code>instanceId</code> and one shared WebSocket demuxes by it. Roughly one new file on the client.</div>
+
+    <h3>A command's round trip</h3>
+    <div class="diagram"><div id="d-rpc"></div><div class="dcap">Fig 3 — One RPC: dashboard → worker → DO → instance → back. The DO correlates the reply by <code>id</code>.</div></div>
+  </section>
+
+  <!-- 8 -->
+  <section id="auth">
+    <h2>8 · Auth &amp; enrollment</h2>
+    <p class="lead">Users log in once and get a session token. Machines enroll once with a pairing code and get a long-lived, revocable, per-instance credential.</p>
+
+    <h3>User session</h3>
+    <p>OIDC or email magic-link → the hub issues a short-lived session JWT (plus a refresh token). The dashboard sends it as a Bearer token on the WS upgrade and on each REST call. The Worker verifies it and derives <code>userId</code> — the only routing key it needs.</p>
+
+    <h3>Instance enrollment (pairing)</h3>
+    <div class="diagram"><div id="d-enroll"></div><div class="dcap">Fig 4 — Pairing: a short-lived code minted by the dashboard is exchanged on the machine for a durable per-instance credential.</div></div>
+    <ol>
+      <li>In the dashboard (already authenticated) you click <b>Add instance</b>. The hub mints a one-time <b>pairing code</b> with a short TTL, bound to your <code>userId</code>.</li>
+      <li>On the target machine you run the server with <code>MYRA_HUB_URL</code> set and <code>myra enroll &lt;code&gt;</code>.</li>
+      <li>The hub validates the code and returns a long-lived <b>instance credential</b> (a per-instance JWT or device cert) bound to <code>(userId, instanceId)</code>. The connector stores it and uses it to dial the tunnel.</li>
+      <li>You can <b>revoke</b> any instance from the dashboard; its credential is invalidated and its tunnel dropped.</li>
+    </ol>
+
+    <h3>Tenant isolation</h3>
+    <p>Every hub route filters by the session's <code>userId</code>, and the registry is the per-user Durable Object — so one user's connections are physically separate from another's. The per-instance server stays single-tenant; <b>the hub is the only multi-tenant boundary</b>, and it holds no data to leak across it.</p>
+  </section>
+
+  <!-- 9 -->
+  <section id="nat">
+    <h2>9 · NAT &amp; corporate networks</h2>
+    <p class="lead">Outbound WebSocket over 443 is exactly what survives strict firewalls — it's why the design dials out.</p>
+    <p>Corporate firewalls block inbound and allow outbound, especially HTTPS on <code>443</code>. The connector's dial-out to <code>wss://hub</code> looks like ordinary HTTPS to a well-known host (Cloudflare's edge), with no inbound port, no public IP, and no NAT config on the machine. That's the best-case path for a locked-down network.</p>
+    <h3>Where it can still fail — and the fix</h3>
+    <table>
+      <tr><th>Obstacle</th><th>What happens</th><th>Mitigation</th></tr>
+      <tr><td>TLS-inspecting proxy (DPI/MITM)</td><td>Network decrypts all TLS via a corporate CA.</td><td>Use the <b>system trust store</b> (the corporate root CA is already there). <b>Do not pin certificates.</b></td></tr>
+      <tr><td>Forced egress proxy</td><td>Direct outbound blocked; an authenticated proxy is required.</td><td>Honor <code>HTTPS_PROXY</code> + proxy auth; do the WS upgrade via HTTP <code>CONNECT</code>.</td></tr>
+      <tr><td>Idle-killing middlebox</td><td>Long-lived idle sockets get dropped.</td><td>App-level <code>ping/pong</code> heartbeat; reconnect with jittered backoff.</td></tr>
+      <tr><td>Allowlist-only egress</td><td>Outbound permitted only to approved domains.</td><td><b>No architecture solves this</b> — IT must allowlist the hub domain. A policy exception, not a code change.</td></tr>
+    </table>
+    <div class="callout warn"><div class="h">The mesh is no better here</div>Corporate NAT is usually symmetric, so phase-2 P2P hole-punching fails and WebRTC falls back to TURN — itself an outbound connection to a relay on 443. The reverse-WS hub is the <i>most</i> firewall-friendly path; the mesh buys latency when direct works, never reachability in a locked-down office.</div>
+  </section>
+
+  <!-- 10 -->
+  <section id="hibernation">
+    <h2>10 · Hibernation &amp; resources</h2>
+    <p class="lead">The cost of this design is holding tens of thousands of mostly-idle sockets open. Hibernation makes idle ≈ free.</p>
+    <p>You can't just close an idle instance's socket — a NAT'd machine that's disconnected can't be reached to wake it. The trick is to keep the <b>socket</b> open at the platform's edge while freeing the <b>application object</b> in memory.</p>
+    <div class="diagram"><div id="d-hib"></div><div class="dcap">Fig 5 — Active vs hibernated. Sockets stay open at the edge; the object is evicted from memory and rehydrated by the next frame.</div></div>
+    <p>With Cloudflare's <b>WebSocket Hibernation API</b> (<code>state.acceptWebSocket()</code>), an idle user's Durable Object is evicted from memory entirely — <b>~0 RAM, ~0 compute, ~0 cost</b> — while its sockets remain connected. An incoming frame rehydrates the object, which rebuilds its in-memory maps from storage + live reconnects. This is the main reason to target Durable Objects rather than a hand-run node pool, where ~30–50KB of kernel buffer per idle socket is unavoidable.</p>
+    <div class="callout"><div class="h">Billing follows activity, not connections</div>Hibernation means you pay for messages processed, not sockets held. That makes §11 (cutting idle chatter) a direct cost lever, not just a bandwidth nicety.</div>
+  </section>
+
+  <!-- 11 -->
+  <section id="cadence">
+    <h2>11 · Adaptive log cadence</h2>
+    <p class="lead">Stream live only when a human is watching. Everything else batches or stays on disk.</p>
+    <p>Line-by-line streaming is only worth its frames when someone has a run open. Agents are bursty and sparse — launch, watch for a few minutes, idle for hours — so most runs don't need live frames at all.</p>
+    <table>
+      <tr><th>Situation</th><th>What the hub carries</th></tr>
+      <tr><td>Interactive run, card modal open</td><td>Live, line-by-line (as today).</td></tr>
+      <tr><td>Scheduled / headless run</td><td>Nothing per line. Buffer to the instance's run-log file; push a coalesced <code>progress</code> every few seconds, or just <code>started</code>/<code>done</code>. Full log fetched on demand via <code>get_run_log</code>.</td></tr>
+      <tr><td>Nobody watching</td><td>Only the terminal <code>agent-result-changed</code>. The log already lives on the instance's disk — the stream was only ever a convenience.</td></tr>
+    </table>
+    <p>Because every pushed frame wakes the hibernating Durable Object (§10), trimming idle chatter directly reduces RAM and cost — not just network.</p>
+  </section>
+
+  <!-- 12 -->
+  <section id="scale">
+    <h2>12 · Scaling to thousands</h2>
+    <p class="lead">It works at thousands of users — and the DO-per-user model deletes the distributed tier you'd otherwise have to build.</p>
+    <h3>The load model</h3>
+    <p>Say 5,000 users × ~2–4 instances = ~10k–20k always-open sockets, plus a few thousand dashboards → order ~15k–25k concurrent WebSockets. The defining cost is <i>holding</i> them, not data: throughput is low except live log streaming, and §11 trims that.</p>
+    <h3>The trap a naive hub hits</h3>
+    <p>With a hand-run node pool you need ≥2 nodes for availability before you ever need them for load. The moment you cross one node, a dashboard's RPC must reach the <i>specific</i> node holding that instance's socket — forcing a shared presence store (Redis), an inter-node bus (pub/sub), and reconnect-storm handling. That's the real cost behind "operate the hub."</p>
+    <div class="diagram"><div id="d-scale"></div><div class="dcap">Fig 6 — DO-per-user: all of a user's connections colocate in one object, so there is nothing to route <i>between</i>. No Redis, no bus, no sticky sessions.</div></div>
+    <p>Durable Objects make that whole tier vanish: every connection for a user is colocated in one object by construction. Cloudflare runs millions of tiny DOs; per-user routing and isolation are the platform's job, not yours.</p>
+    <h3>What still needs care</h3>
+    <ul>
+      <li><b>Whale tenants.</b> A single user with thousands of instances bottlenecks their one single-threaded DO. Shard such a user across multiple DOs by instance-group. Normal users never feel it.</li>
+      <li><b>Reconnect storms.</b> A deploy drops every tunnel; they all redial at once. Jittered backoff on the connector; connection draining on rollout.</li>
+      <li><b>Sandbox churn.</b> Ephemeral instances connect/disconnect rapidly. Keep presence ephemeral (TTL), no DB row per session.</li>
+      <li><b>Message cap.</b> DO frames cap at ~1MB — fine for log lines and RPC; fetch large artifacts on demand, never ship them over the channel.</li>
+    </ul>
+    <div class="callout warn"><div class="h">Trade-off: vendor lock-in</div>This is a Cloudflare-shaped design. Keep the wire protocol (§7) transport-agnostic so a self-hosted NATS/Redis hub remains buildable from the same connector — that's your portability hedge.</div>
+  </section>
+
+  <!-- 13 -->
+  <section id="mesh">
+    <h2>13 · Phase 2 — E2E P2P mesh <span class="pill p2">optional</span></h2>
+    <p class="lead">Move the data plane peer-to-peer so the hub carries only signaling — lower latency and the hub goes blind to your data.</p>
+    <p>In phase 1 all traffic flows through the hub (<code>trust: hub-trusted</code>). The optional mesh keeps the hub for identity, discovery, and <b>signaling</b> only; actual command/log traffic goes <b>directly</b> dashboard↔instance over WebRTC, encrypted end-to-end.</p>
+    <div class="diagram"><div id="d-mesh"></div><div class="dcap">Fig 7 — Mesh: the hub brokers the handshake (signaling); data goes direct via STUN, or relays through TURN when direct fails.</div></div>
+    <table>
+      <tr><td class="k">STUN</td><td>Cheap. Tells each peer its public <code>ip:port</code> so they can hole-punch a <b>direct</b> path. No data passes through it.</td></tr>
+      <tr><td class="k">TURN</td><td>The fallback relay when hole-punching fails (symmetric NAT — common for sandboxes and corporate networks). It forwards the packets. <b>You run and pay for it</b> (bandwidth).</td></tr>
+      <tr><td class="k">E2E (DTLS)</td><td>Encryption is end-to-end regardless of path. Even relayed through TURN, the relay sees only ciphertext. TURN costs bandwidth, never privacy.</td></tr>
+    </table>
+    <p>Why it's deferred: it adds a full WebRTC/ICE stack on both ends, it's hard to debug, and symmetric-NAT cases fall back to TURN anyway — so it doesn't improve <i>reachability</i> over the phase-1 hub, only latency and privacy when direct connections succeed. Build it as a data-plane layer over the same control plane, not as a starting point.</p>
+  </section>
+
+  <!-- 14 -->
+  <section id="client">
+    <h2>14 · Client integration</h2>
+    <p class="lead">The existing aggregation layer barely changes: one new transport, and each instance becomes a connection.</p>
+    <ul>
+      <li><b><code>connId = instanceId</code>.</b> Each instance the hub reports becomes its own client <code>Connection</code>. The existing <code>GlobalId = ${connId}::${entityId}</code> namespacing (<code>aggregate/global-id.ts</code>) is untouched — ids never collide and "which instance owns this" stays answerable.</li>
+      <li><b>New <code>hubTransport</code>.</b> A thin variant of <code>http.ts</code>: RPC URLs carry the <code>instanceId</code>; one shared WebSocket per hub demuxes events by <code>instanceId</code>. Slots into the existing <code>Transport</code> interface, so <code>ConnectionManager.invokeAll / invokeOne / listenAll</code> (<code>manager.ts</code>) keep working.</li>
+      <li><b>Mixed transports per board.</b> <code>ConnectionManager</code> already pairs each connection with its own transport (<code>buildTransport</code>). The desktop keeps its <code>local</code> connection on <code>tauriTransport</code>/127.0.0.1 (direct) and adds hub-instance connections on <code>hubTransport</code> — local-direct + hub-for-the-rest falls out for free.</li>
+      <li><b>One WS, many connections.</b> Where fan-out opens N WebSockets today (<code>listenAll</code>), hub-instances share one hub socket; the transport demuxes frames by <code>instanceId</code> to the right connection's listeners.</li>
+    </ul>
+  </section>
+
+  <!-- 15 -->
+  <section id="migration">
+    <h2>15 · Migration phases</h2>
+    <p class="lead">Additive throughout — direct fan-out never gets ripped out; it becomes the self-host / LAN path.</p>
+    <table>
+      <tr><th>Phase</th><th>What ships</th><th>Direct connections still work?</th></tr>
+      <tr><td>A</td><td><code>@myra/hub</code> skeleton + user auth + instance connector behind <code>MYRA_HUB_URL</code> (opt-in). Server otherwise untouched.</td><td class="ok">✓ untouched</td></tr>
+      <tr><td>B</td><td><code>hubTransport</code> + <code>ConnectionManager</code> expands a hub into N <code>connId=instanceId</code> entries over one shared WS.</td><td class="ok">✓ in parallel</td></tr>
+      <tr><td>C</td><td>Tauri wiring: <code>local</code> stays direct, hub serves the rest; pairing UX in Settings → Connections.</td><td class="ok">✓</td></tr>
+      <tr><td>D</td><td>Lock down: require a token on the direct server too; default to hub in cloud, keep raw-URL connections for self-host / LAN.</td><td class="ok">✓ for self-host</td></tr>
+    </table>
+  </section>
+
+  <!-- 16 -->
+  <section id="risks">
+    <h2>16 · Risks &amp; mitigations</h2>
+    <table>
+      <tr><th>Risk</th><th>Mitigation</th></tr>
+      <tr><td><b>Blast radius.</b> The hub holds live reverse tunnels into machines that can spawn shell commands; a compromise approaches RCE on every connected box.</td><td>Per-instance credentials (never a shared secret), capability scoping in <code>hello</code>, short-TTL signed tokens, revocation from the dashboard, and a roadmap to E2E (§13) so the hub routes ciphertext.</td></tr>
+      <tr><td><b>Privacy.</b> Phase-1 <code>hub-trusted</code> means the operator can see traffic and prompts.</td><td>Be explicit about it; offer the self-hosted gateway and the phase-2 mesh for users who need the hub blind.</td></tr>
+      <tr><td><b>Vendor lock-in.</b> DO-shaped design.</td><td>Transport-agnostic wire protocol → a self-hosted NATS/Redis hub buildable from the same connector.</td></tr>
+      <tr><td><b>Reconnect storms / whale tenants / sandbox churn.</b></td><td>Jittered backoff, connection draining, per-user DO sharding, ephemeral TTL presence (§12).</td></tr>
+      <tr><td><b>Always-on dependency.</b> The hub is a 24/7 service.</td><td>Stateless edge + DO removes the node pool; the self-hosted gateway is the fallback for users who'd rather own uptime.</td></tr>
+    </table>
+    <h3>Simpler fallbacks</h3>
+    <ul>
+      <li><b>Tunnel-per-instance</b> (tailscale/cloudflared): gives each remote box a reachable URL so today's fan-out works unchanged, zero new services. Ship the feature now, defer the hub.</li>
+      <li><b>Self-hosted gateway</b>: the same protocol, but the relay is a binary the user runs on one box they already expose. Write the routing once, never operate it.</li>
+    </ul>
+  </section>
+
+  <!-- 17 -->
+  <section id="glossary">
+    <h2>17 · Glossary</h2>
+    <table>
+      <tr><td class="k">Dumb hub</td><td>A relay that only authenticates, tracks presence, and forwards frames; stores no application data.</td></tr>
+      <tr><td class="k">Durable Object (DO)</td><td>Cloudflare's single, globally-addressable, single-threaded stateful object with small transactional storage. Here: one per user.</td></tr>
+      <tr><td class="k">Hibernation</td><td>Evicting a DO from memory while its WebSockets stay open at the edge; the next frame rehydrates it. Idle ≈ free.</td></tr>
+      <tr><td class="k">Reverse WS / dial-out</td><td>The instance opens the connection <i>to</i> the hub (outbound), so NAT/firewalls that block inbound don't matter.</td></tr>
+      <tr><td class="k">Connector</td><td>The new module in <code>@myra/server</code> that dials the hub and serves RPC/events over the tunnel using the existing dispatch.</td></tr>
+      <tr><td class="k">Instance credential</td><td>A long-lived, revocable secret bound to <code>(userId, instanceId)</code>, obtained via pairing.</td></tr>
+      <tr><td class="k">GlobalId</td><td><code>${connId}::${entityId}</code> — the client's existing cross-server id namespacing; here <code>connId = instanceId</code>.</td></tr>
+      <tr><td class="k">Sidecar</td><td>The Node server the Tauri desktop app spawns locally on 127.0.0.1.</td></tr>
+      <tr><td class="k">STUN / TURN / ICE</td><td>WebRTC NAT-traversal: STUN finds your public address for direct P2P; TURN relays when direct fails; ICE is the negotiation. Phase 2 only.</td></tr>
+    </table>
+  </section>
+
+  </div>
+</div>
+
+<script>
+/* ===== shared svg helpers ===== */
+const NS='http://www.w3.org/2000/svg';
+function E(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
+function svgRoot(vb){const s=E('svg',{viewBox:vb,preserveAspectRatio:'xMidYMid meet'});
+  const defs=E('defs');
+  [['ar-blue','#58a6ff'],['ar-green','#3fb950'],['ar-amber','#d29922'],['ar-pink','#f778ba'],['ar-grey','#8b949e']].forEach(([id,c])=>{
+    const m=E('marker',{id,markerWidth:9,markerHeight:7,refX:8,refY:3.5,orient:'auto'});
+    m.appendChild(E('polygon',{points:'0 0,9 3.5,0 7',fill:c}));defs.appendChild(m);});
+  s.appendChild(defs);return s;}
+function box(s,n){
+  const g=E('g',{transform:`translate(${n.x},${n.y})`});
+  g.appendChild(E('rect',{x:0,y:0,width:n.w,height:n.h,rx:n.rx??10,fill:n.fill,opacity:n.op??.93,stroke:n.stroke??'#0d1117','stroke-width':1.5,'stroke-dasharray':n.dash??''}));
+  g.appendChild(E('text',{x:n.w/2,y:n.sub?n.h/2-3:n.h/2+4,'text-anchor':'middle',fill:n.tc??'#fff','font-size':n.fs??12.5,'font-weight':600},n.label));
+  if(n.sub)g.appendChild(E('text',{x:n.w/2,y:n.h/2+13,'text-anchor':'middle',fill:'rgba(255,255,255,.82)','font-size':9.5,'font-family':'ui-monospace,monospace'},n.sub));
+  s.appendChild(g);
+}
+function curve(s,a,b,color,marker,dash,label){
+  const ax=a.x+a.w/2, bx=b.x+b.w/2;
+  const ab=a.y<b.y;
+  const y1=ab?a.y+a.h:a.y, y2=ab?b.y:b.y+b.h;
+  const my=(y1+y2)/2;
+  s.appendChild(E('path',{d:`M ${ax} ${y1} C ${ax} ${my}, ${bx} ${my}, ${bx} ${y2}`,fill:'none',stroke:color,'stroke-width':2,'stroke-dasharray':dash||'','marker-end':`url(#${marker})`,opacity:.9}));
+  if(label)s.appendChild(E('text',{x:(ax+bx)/2,y:my-3,fill:color,'font-size':9.5,'text-anchor':'middle','font-family':'ui-monospace,monospace'},label));
+}
+function mount(id,svg){const d=document.getElementById(id);if(d)d.appendChild(svg);}
+
+/* ===== Fig 1: fan-out vs hub ===== */
+(function(){
+  const s=svgRoot('0 0 900 300');
+  // left: fan-out (broken)
+  const dashL={x:60,y:20,w:150,h:46,fill:'#1f6feb',label:'Dashboard',sub:'browser'};
+  box(s,dashL);
+  [['Local',60],['Remote ✗',230],['Sandbox ✗',360]].forEach(([l,x],i)=>{
+    const n={x:x-10,y:210,w:120,h:46,fill:i?'#6e2b2b':'#238636',label:l,sub:i?'unreachable':'ok'};box(s,n);
+    curve(s,dashL,n,i?'#f85149':'#3fb950','ar-'+(i?'grey':'green'),i?'4,4':'', i?'inbound ✗':'inbound ✓');
+  });
+  s.appendChild(E('text',{x:230,y:286,'text-anchor':'middle',fill:'#8b949e','font-size':11},'Direct fan-out — needs each instance reachable'));
+  // divider
+  s.appendChild(E('line',{x1:450,y1:10,x2:450,y2:270,stroke:'#2a3140','stroke-dasharray':'4,4'}));
+  // right: hub
+  const dashR={x:520,y:20,w:140,h:46,fill:'#1f6feb',label:'Dashboard',sub:'browser'};
+  const hub={x:560,y:120,w:120,h:46,fill:'#6e40c9',label:'Hub',sub:'relay'};
+  box(s,dashR);box(s,hub);curve(s,dashR,hub,'#58a6ff','ar-blue','','');
+  [['Local',470],['Remote',640],['Sandbox',770]].forEach(([l,x])=>{
+    const n={x:x,y:230,w:110,h:42,fill:'#238636',label:l,sub:'dials out'};box(s,n);
+    curve(s,n,hub,'#3fb950','ar-green','','out ↑');
+  });
+  s.appendChild(E('text',{x:680,y:294,'text-anchor':'middle',fill:'#8b949e','font-size':11},'Relay — instances dial out, all reachable'));
+  mount('d-why',s);
+})();
+
+/* ===== Fig 2: full topology ===== */
+(function(){
+  const s=svgRoot('0 0 900 540');
+  // container DO
+  const doC={x:280,y:210,w:340,h:150};
+  s.appendChild(E('rect',{x:doC.x,y:doC.y,width:doC.w,height:doC.h,rx:12,fill:'#3a2a63',opacity:.4,stroke:'#8957e5','stroke-width':1.5,'stroke-dasharray':'4,3'}));
+  s.appendChild(E('text',{x:doC.x+doC.w/2,y:doC.y+18,'text-anchor':'middle',fill:'#d6c7ff','font-size':12,'font-weight':600},'UserHub Durable Object — one per user'));
+  const dashB={x:90,y:30,w:170,h:50,fill:'#1f6feb',label:'Browser Dashboard',sub:'1 WS to hub'};
+  const dashT={x:640,y:30,w:170,h:50,fill:'#1f6feb',label:'Tauri Desktop',sub:'local-direct + hub'};
+  const worker={x:300,y:120,w:300,h:48,fill:'#9e6a03',label:'Cloudflare Worker',sub:'verify JWT → route by userId'};
+  const doTop={x:280,y:210,w:340,h:1,fill:'none'};
+  const parts=[
+    {x:300,y:262,w:150,h:38,fill:'#8957e5',label:'instances Map',sub:'reverse tunnels'},
+    {x:300,y:308,w:150,h:38,fill:'#8957e5',label:'dashboards Set',sub:'event fan-out'},
+    {x:460,y:262,w:150,h:38,fill:'#8957e5',label:'KV storage',sub:'enrolled + creds'},
+    {x:460,y:308,w:150,h:38,fill:'#8957e5',label:'hibernation',sub:'idle RAM ≈ 0'},
+  ];
+  const local={x:40,y:440,w:190,h:60,fill:'#238636',label:'Local Desktop',sub:'127.0.0.1 · owns board'};
+  const remote={x:360,y:440,w:190,h:60,fill:'#238636',label:'Remote Computer',sub:'dials out'};
+  const sandbox={x:680,y:440,w:190,h:60,fill:'#238636',label:'Remote Sandbox',sub:'ephemeral · dials out'};
+  // conns
+  curve(s,dashB,worker,'#58a6ff','ar-blue','','auth + WS');
+  curve(s,dashT,worker,'#58a6ff','ar-blue','','remote');
+  curve(s,worker,doTop,'#58a6ff','ar-blue','','route by userId');
+  curve(s,remote,{x:280,y:360,w:340,h:1},'#3fb950','ar-green','','reverse WS out');
+  curve(s,sandbox,{x:280,y:360,w:340,h:1},'#3fb950','ar-green','','reverse WS out');
+  curve(s,dashT,local,'#d29922','ar-amber','','127.0.0.1 direct');
+  curve(s,dashB,remote,'#f778ba','ar-pink','8,4','P2P (phase 2)');
+  // nodes
+  [dashB,dashT,worker,...parts,local,remote,sandbox].forEach(n=>box(s,n));
+  mount('d-topo',s);
+  // legend
+  const lg=document.getElementById('topo-legend');
+  [['#58a6ff','RPC/WS through hub',false],['#3fb950','Outbound dial',false],['#d29922','Direct (bypass hub)',false],['#f778ba','P2P (phase 2)',true]]
+    .forEach(([c,t,d])=>{const r=document.createElement('div');r.className='row';
+      r.innerHTML=`<span class="sw" style="border-top-color:${c};border-top-style:${d?'dashed':'solid'}"></span>${t}`;lg.appendChild(r);});
+})();
+
+/* ===== sequence renderer ===== */
+function sequence(actors,messages){
+  const colW=Math.max(150,Math.floor(820/actors.length));
+  const W=colW*actors.length, top=54, rowH=46, H=top+messages.length*rowH+30;
+  const s=svgRoot(`0 0 ${W} ${H}`);
+  const cx={};
+  actors.forEach((a,i)=>{
+    const x=i*colW+colW/2; cx[a.id]=x;
+    s.appendChild(E('rect',{x:x-colW/2+12,y:10,width:colW-24,height:34,rx:8,fill:a.fill||'#1c2230',stroke:'#2a3140'}));
+    s.appendChild(E('text',{x,y:31,'text-anchor':'middle',fill:'#e6edf3','font-size':11.5,'font-weight':600},a.label));
+    s.appendChild(E('line',{x1:x,y1:46,x2:x,y2:H-12,stroke:'#2a3140','stroke-dasharray':'3,4'}));
+  });
+  messages.forEach((m,i)=>{
+    const y=top+i*rowH+18;
+    if(m.note){
+      const x=cx[m.from];
+      s.appendChild(E('rect',{x:x-70,y:y-13,width:140,height:24,rx:6,fill:'#283041',stroke:'#3d4757'}));
+      s.appendChild(E('text',{x,y:y+3,'text-anchor':'middle',fill:'#9fb0c3','font-size':10,'font-style':'italic'},m.note));
+      return;
+    }
+    const x1=cx[m.from],x2=cx[m.to];
+    const color=m.color||'#58a6ff', marker=m.marker||'ar-blue';
+    if(x1===x2){ // self
+      s.appendChild(E('path',{d:`M ${x1} ${y-8} C ${x1+44} ${y-14}, ${x1+44} ${y+8}, ${x1} ${y+4}`,fill:'none',stroke:color,'stroke-width':1.8,'marker-end':`url(#${marker})`}));
+      s.appendChild(E('text',{x:x1+50,y:y-2,fill:color,'font-size':10,'font-family':'ui-monospace,monospace'},m.text));
+    }else{
+      const dir=x2>x1?1:-1;
+      s.appendChild(E('line',{x1,y1:y,x2:x2-dir*6,y2:y,stroke:color,'stroke-width':1.8,'stroke-dasharray':m.dash||'','marker-end':`url(#${marker})`}));
+      s.appendChild(E('text',{x:(x1+x2)/2,y:y-6,'text-anchor':'middle',fill:color,'font-size':10,'font-family':'ui-monospace,monospace'},m.text));
+    }
+  });
+  return s;
+}
+
+/* ===== Fig 3: RPC round trip ===== */
+mount('d-rpc',sequence(
+  [{id:'d',label:'Dashboard',fill:'#16314e'},{id:'w',label:'Worker',fill:'#3a2a08'},{id:'o',label:'UserHub DO',fill:'#2a1f47'},{id:'i',label:'Instance',fill:'#10351c'}],
+  [
+    {from:'d',to:'w',text:'POST /api/i/:id/rpc/:cmd'},
+    {from:'w',to:'o',text:'forward (userId)'},
+    {from:'o',to:'i',text:'{type:rpc, id, cmd, args}',color:'#3fb950',marker:'ar-green'},
+    {from:'i',to:'i',text:'dispatchData / Os / Agent',color:'#8b949e',marker:'ar-grey'},
+    {from:'i',to:'o',text:'{type:rpc-result, id, ok, data}',color:'#3fb950',marker:'ar-green'},
+    {from:'o',to:'d',text:'{ok, data}  (same envelope as direct)'},
+  ]
+));
+
+/* ===== Fig 4: enrollment ===== */
+mount('d-enroll',sequence(
+  [{id:'d',label:'Dashboard',fill:'#16314e'},{id:'h',label:'Hub',fill:'#2a1f47'},{id:'m',label:'Machine (CLI)',fill:'#10351c'}],
+  [
+    {from:'d',to:'h',text:'Add instance →'},
+    {from:'h',to:'d',text:'one-time pairing code (TTL)',color:'#d29922',marker:'ar-amber'},
+    {from:'m',to:'m',text:'myra enroll <code>',color:'#8b949e',marker:'ar-grey'},
+    {from:'m',to:'h',text:'exchange code',color:'#3fb950',marker:'ar-green'},
+    {from:'h',to:'m',text:'instance credential (userId,instanceId)',color:'#d29922',marker:'ar-amber'},
+    {from:'m',to:'h',text:'dial wss://hub/agent/connect (Bearer)',color:'#3fb950',marker:'ar-green'},
+  ]
+));
+
+/* ===== Fig 5: hibernation ===== */
+(function(){
+  const s=svgRoot('0 0 900 230');
+  // active
+  s.appendChild(E('text',{x:200,y:24,'text-anchor':'middle',fill:'#3fb950','font-size':12,'font-weight':700},'ACTIVE (frame arriving)'));
+  box(s,{x:120,y:50,w:160,h:46,fill:'#3a2a63',op:.85,stroke:'#8957e5',label:'DO in memory',sub:'maps + handlers'});
+  [0,1,2].forEach(i=>{box(s,{x:60+i*90,y:150,w:78,h:36,fill:'#238636',label:'sock',sub:'open',fs:11});
+    curve(s,{x:60+i*90,y:150,w:78,h:36},{x:120,y:50,w:160,h:46},'#3fb950','ar-green','','');});
+  // divider
+  s.appendChild(E('line',{x1:450,y1:20,x2:450,y2:210,stroke:'#2a3140','stroke-dasharray':'4,4'}));
+  // hibernated
+  s.appendChild(E('text',{x:680,y:24,'text-anchor':'middle',fill:'#8b949e','font-size':12,'font-weight':700},'HIBERNATED (idle)'));
+  box(s,{x:600,y:50,w:160,h:46,fill:'#1c2230',op:.7,stroke:'#3d4757',dash:'4,3',label:'DO evicted',sub:'RAM ≈ 0',tc:'#8b949e'});
+  [0,1,2].forEach(i=>{box(s,{x:540+i*90,y:150,w:78,h:36,fill:'#1f5a30',op:.7,label:'sock',sub:'still open',fs:11});
+    s.appendChild(E('line',{x1:579+i*90,y1:150,x2:680,y2:96,stroke:'#3d4757','stroke-width':1.5,'stroke-dasharray':'3,3'}));});
+  s.appendChild(E('text',{x:680,y:120,'text-anchor':'middle',fill:'#8b949e','font-size':9.5,'font-style':'italic'},'sockets held at edge'));
+  mount('d-hib',s);
+})();
+
+/* ===== Fig 6: scaling DO-per-user ===== */
+(function(){
+  const s=svgRoot('0 0 900 280');
+  s.appendChild(E('text',{x:450,y:22,'text-anchor':'middle',fill:'#8b949e','font-size':11},'Cloudflare edge — millions of tiny single-user objects, no shared tier between them'));
+  for(let u=0;u<3;u++){
+    const bx=60+u*290;
+    const hub={x:bx+60,y:50,w:150,h:42,fill:'#6e40c9',label:`User ${u+1} DO`,sub:'isolated'};box(s,hub);
+    const dash={x:bx+85,y:0+50-0,w:0,h:0}; // placeholder
+    const d={x:bx+80,y:0,w:0,h:0};
+    box(s,{x:bx+30,y:120,w:90,h:36,fill:'#1f6feb',label:'dash',sub:'',fs:11});
+    box(s,{x:bx+30,y:200,w:80,h:34,fill:'#238636',label:'inst',sub:'',fs:10});
+    box(s,{x:bx+150,y:200,w:80,h:34,fill:'#238636',label:'inst',sub:'',fs:10});
+    curve(s,{x:bx+30,y:120,w:90,h:36},hub,'#58a6ff','ar-blue','','');
+    curve(s,{x:bx+30,y:200,w:80,h:34},hub,'#3fb950','ar-green','','');
+    curve(s,{x:bx+150,y:200,w:80,h:34},hub,'#3fb950','ar-green','','');
+  }
+  s.appendChild(E('text',{x:450,y:268,'text-anchor':'middle',fill:'#3fb950','font-size':11,'font-weight':600},'No Redis · no pub/sub bus · no sticky-session layer'));
+  mount('d-scale',s);
+})();
+
+/* ===== Fig 7: mesh ===== */
+(function(){
+  const s=svgRoot('0 0 900 300');
+  const dash={x:90,y:30,w:160,h:48,fill:'#1f6feb',label:'Dashboard',sub:''};
+  const hub={x:370,y:30,w:160,h:48,fill:'#6e40c9',label:'Signaling Hub',sub:'handshake only'};
+  const inst={x:650,y:30,w:170,h:48,fill:'#238636',label:'Instance',sub:''};
+  const turn={x:370,y:210,w:160,h:48,fill:'#bd561d',label:'TURN',sub:'relay fallback'};
+  box(s,dash);box(s,hub);box(s,inst);box(s,turn);
+  curve(s,dash,hub,'#bc8cff','ar-pink','5,4','signaling');
+  curve(s,inst,hub,'#bc8cff','ar-pink','5,4','signaling');
+  // P2P direct dash<->inst
+  s.appendChild(E('path',{d:'M 250 54 C 450 150, 650 150, 735 78',fill:'none',stroke:'#f778ba','stroke-width':2.4,'marker-end':'url(#ar-pink)'}));
+  s.appendChild(E('text',{x:470,y:140,'text-anchor':'middle',fill:'#f778ba','font-size':10.5,'font-family':'ui-monospace,monospace'},'E2E P2P data (direct, via STUN)'));
+  curve(s,dash,turn,'#db6d28','ar-amber','6,4','fallback');
+  curve(s,inst,turn,'#db6d28','ar-amber','6,4','fallback');
+  s.appendChild(E('text',{x:450,y:292,'text-anchor':'middle',fill:'#8b949e','font-size':11},'Hub never sees data — even via TURN it\'s ciphertext'));
+  mount('d-mesh',s);
+})();
+
+/* ===== nav scrollspy + copy ===== */
+const links=[...document.querySelectorAll('.nav a[href^="#"]')];
+const main=document.getElementById('main');
+const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+const obs=new IntersectionObserver(es=>{
+  es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));map.get(e.target.id)?.classList.add('active');}});
+},{root:main,rootMargin:'-10% 0px -80% 0px',threshold:0});
+document.querySelectorAll('section').forEach(s=>obs.observe(s));
+links.forEach(a=>a.addEventListener('click',e=>{e.preventDefault();document.getElementById(a.getAttribute('href').slice(1))?.scrollIntoView({behavior:'smooth',block:'start'});}));
+
+function copyDoc(){
+  const txt=document.getElementById('main').innerText.replace(/\n{3,}/g,'\n\n').trim();
+  const preamble='Below is the full architecture design doc for Myra Agents\' centralized dashboard (dumb hub on Cloudflare Durable Objects). Review it, answer any questions I add, and flag anything risky or wrong.\n\n---\n\n';
+  navigator.clipboard.writeText(preamble+txt).then(()=>{
+    const c=document.getElementById('copied');c.classList.add('show');setTimeout(()=>c.classList.remove('show'),1500);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Myra — Dumb-Hub Architecture (annotated)</title>
+<style>
+  :root{
+    --bg:#0d1117;--panel:#161b22;--panel2:#1c2230;--border:#2a3140;
+    --text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--accent2:#bc8cff;
+    --green:#3fb950;--amber:#d29922;--red:#f85149;--pink:#f778ba;--orange:#db6d28;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font-size:13px;line-height:1.5;display:grid;grid-template-columns:320px 1fr;height:100vh;overflow:hidden}
+  code,.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+
+  .sidebar{background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:16px}
+  .sidebar h1{font-size:15px;margin:0 0 2px}
+  .sidebar .sub{color:var(--muted);font-size:11.5px;margin-bottom:14px}
+  .group{margin-bottom:16px}
+  .group>label.title{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:7px;font-weight:600}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px;cursor:pointer}
+  .toggle input{accent-color:var(--accent)}
+
+  .btn{background:var(--accent);color:#0d1117;border:none;border-radius:6px;padding:7px 12px;font-weight:600;cursor:pointer;font-size:12px}
+  .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  .btn:hover{filter:brightness(1.08)}
+
+  .comments-list{display:flex;flex-direction:column;gap:6px}
+  .cmt{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent2);border-radius:6px;padding:7px 9px;font-size:11.5px}
+  .cmt .tgt{color:var(--accent2);font-weight:600;font-size:10.5px}
+  .cmt .tx{margin-top:2px;white-space:pre-wrap;cursor:pointer}
+  .cmt .del{float:right;cursor:pointer;color:var(--muted);border:none;background:none;font-size:13px;line-height:1;padding:0}
+  .cmt .del:hover{color:var(--red)}
+  .cmt .kind{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-left:6px}
+  .empty{color:var(--muted);font-size:11.5px;font-style:italic}
+
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .topbar h2{margin:0;font-size:14px}
+  .topbar .hint{color:var(--muted);font-size:11.5px}
+  .stage{flex:1;overflow:auto;position:relative;padding:8px}
+  svg{width:100%;height:100%;display:block}
+  .node{cursor:pointer}
+  .node:hover rect{filter:brightness(1.14)}
+  .legend{position:absolute;left:16px;bottom:14px;background:rgba(22,27,34,.92);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11px}
+  .legend .row{display:flex;align-items:center;gap:7px;margin:3px 0}
+  .legend .swatch{width:22px;border-top-width:2px;border-top-style:solid}
+
+  .promptbar{border-top:1px solid var(--border);background:var(--panel);padding:12px 14px}
+  .promptbar .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .promptbar .head h3{margin:0;font-size:12.5px}
+  #prompt{background:#0a0e14;border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;max-height:210px;overflow-y:auto;white-space:pre-wrap}
+  .copied{color:var(--green);font-size:11.5px;margin-right:8px;opacity:0;transition:.2s}
+  .copied.show{opacity:1}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;width:460px;max-width:90vw}
+  .modal h3{margin:0 0 4px;font-size:14px}
+  .modal .mt{color:var(--muted);font-size:11.5px;margin-bottom:10px}
+  .modal .kindrow{display:flex;gap:6px;margin-bottom:10px}
+  .modal .kindrow button{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:6px;cursor:pointer;font-size:11.5px}
+  .modal .kindrow button.on{border-color:var(--accent);color:var(--text);background:#18324f}
+  .modal textarea{width:100%;height:90px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:12.5px;resize:vertical;font-family:inherit}
+  .modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <h1>Dumb-Hub Architecture</h1>
+  <div class="sub">The recommended cloud shape: a stateless relay (Durable Object per user) + instances that own their own data + a local-direct desktop path. Click any box to attach a <b>question</b> or a <b>comment</b>, then copy the prompt to interrogate it with an LLM later.</div>
+
+  <div class="group">
+    <label class="title">Layers</label>
+    <label class="toggle"><input type="checkbox" data-layer="future" checked> Show phase-2 (E2E P2P mesh)</label>
+    <label class="toggle"><input type="checkbox" data-layer="ann" checked> Show design annotations</label>
+  </div>
+
+  <div class="group">
+    <label class="title">Notes (<span id="cmtCount">0</span>)</label>
+    <button class="btn ghost" style="width:100%;margin-bottom:8px" onclick="openComment(null)">+ General question / note</button>
+    <div class="comments-list" id="cmtList"></div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <h2>Centralized dashboard — dumb hub on Cloudflare Durable Objects</h2>
+    <span class="hint">Click a box to ask about it →</span>
+  </div>
+  <div class="stage">
+    <svg id="svg" viewBox="0 0 980 660" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="ar-blue" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#58a6ff"/></marker>
+        <marker id="ar-green" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#3fb950"/></marker>
+        <marker id="ar-pink" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#f778ba"/></marker>
+      </defs>
+    </svg>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="promptbar">
+    <div class="head">
+      <h3>Prompt — hand this to an LLM to review the design</h3>
+      <div><span class="copied" id="copied">Copied!</span><button class="btn" onclick="copyPrompt()">Copy Prompt</button></div>
+    </div>
+    <div id="prompt" class="mono"></div>
+  </div>
+</main>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Note</h3>
+    <div class="mt" id="modalSub"></div>
+    <div class="kindrow">
+      <button data-kind="question" class="on" onclick="setKind('question')">❓ Question</button>
+      <button data-kind="comment" onclick="setKind('comment')">💬 Comment</button>
+      <button data-kind="concern" onclick="setKind('concern')">⚠️ Concern</button>
+    </div>
+    <textarea id="modalText" placeholder="e.g. How does the DO behave if the same instance reconnects before the old socket times out?"></textarea>
+    <div class="actions">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveComment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- node + connection model (viewBox 980x660) ---------- */
+const COLORS={dash:'#1f6feb',edge:'#9e6a03',hub:'#6e40c9',hubpart:'#8957e5',instance:'#238636',turn:'#bd561d',ann:'#283041'};
+
+// big container drawn beneath everything
+const CONTAINERS=[
+  {id:'do',label:'UserHub Durable Object — one per user',sub:'single-threaded · globally addressable by userId · hibernatable',
+   x:300,y:250,w:380,h:170,fill:'#3a2a63',stroke:'#8957e5',layer:'core',
+   desc:'A Cloudflare Durable Object, one instance per user. Every connection for that user (all their agent instances + all their open dashboards) is routed to this same object, so cross-node routing, presence stores, and pub/sub buses are unnecessary — everything for a user is colocated. It holds no boards.'},
+];
+
+const NODES=[
+  // dashboards
+  {id:'dash-browser',type:'dash',label:'Browser Dashboard',sub:'web · 1 WS to hub',x:120,y:30,w:190,h:56,layer:'core',
+   desc:'The Next.js frontend in a plain browser. Authenticates to the hub, opens ONE WebSocket, sees every instance merged into one board.'},
+  {id:'dash-tauri',type:'dash',label:'Tauri Desktop App',sub:'local-direct + hub for the rest',x:670,y:30,w:190,h:56,layer:'core',
+   desc:'Same frontend inside the desktop app. Talks to its own local sidecar DIRECTLY (127.0.0.1, no hub), and reaches remote instances through the hub. Mixed transports in one board.'},
+
+  // edge
+  {id:'worker',type:'edge',label:'Cloudflare Worker (front door)',sub:'verify session JWT → route by userId',x:330,y:150,w:320,h:54,layer:'core',
+   desc:'Stateless edge worker. Verifies the user session JWT, derives userId, and forwards the WebSocket upgrade to env.USER_HUB.idFromName(userId) — the user\'s Durable Object. Holds no state itself.'},
+
+  // DO internals
+  {id:'do-instances',type:'hubpart',label:'instances Map<id,WS>',sub:'reverse tunnels',x:320,y:312,w:160,h:40,layer:'core',
+   desc:'In-memory map of the user\'s online instance reverse-sockets, keyed by instanceId. Used to route an RPC frame to the right machine. Rebuilt on wake from storage + live reconnects.'},
+  {id:'do-dash',type:'hubpart',label:'dashboards Set<WS>',sub:'event fan-out',x:320,y:362,w:160,h:40,layer:'core',
+   desc:'The user\'s currently open dashboard sockets. Events from any instance are fanned out to all of these, tagged with instanceId.'},
+  {id:'do-storage',type:'hubpart',label:'KV: enrolled + creds',sub:'small durable state',x:500,y:312,w:160,h:40,layer:'core',
+   desc:'Transactional Durable Object storage. Holds only small durable facts: which instances are enrolled, credential references. NOT boards. Survives hibernation/eviction.'},
+  {id:'do-hib',type:'hubpart',label:'hibernation',sub:'idle RAM ≈ 0',x:500,y:362,w:160,h:40,layer:'core',
+   desc:'Sockets accepted via state.acceptWebSocket(). When the fleet is idle the platform evicts the object from memory while sockets stay open at the edge; an incoming frame rehydrates it. Idle users cost ~no RAM and ~no compute.'},
+
+  // instances
+  {id:'local',type:'instance',label:'Local Desktop (sidecar)',sub:'127.0.0.1 · owns its board.json',x:40,y:500,w:210,h:66,layer:'core',
+   desc:'The @myra/server sidecar spawned by Tauri. Authoritative over its own board. Reached DIRECTLY by the desktop app — no hub hop, works offline.'},
+  {id:'remote',type:'instance',label:'Remote Computer',sub:'@myra/server + connector',x:385,y:500,w:210,h:66,layer:'core',
+   desc:'A build box / second machine behind NAT. Runs the unchanged server plus a connector that DIALS OUT to the hub and serves RPC/events over that reverse channel. Owns its own board.'},
+  {id:'sandbox',type:'instance',label:'Remote Sandbox',sub:'ephemeral · dials out',x:730,y:500,w:210,h:66,layer:'core',
+   desc:'A short-lived cloud env. Enrolls with a pairing token, dials out, does work, disconnects. High churn — presence is ephemeral (TTL), no DB row per session.'},
+
+  // future mesh
+  {id:'turn',type:'turn',label:'TURN (phase 2)',sub:'E2E relay fallback',x:740,y:250,w:180,h:54,layer:'future',
+   desc:'Only for the future mesh data plane. When dashboard↔instance P2P can\'t hole-punch (symmetric NAT, common for sandboxes), traffic relays through TURN — still E2E encrypted, the relay sees only ciphertext.'},
+
+  // annotations (clickable design-decision chips)
+  {id:'ann-dumbhub',type:'ann',label:'DUMB HUB: routes frames, stores no boards',x:300,y:228,w:380,h:0,chip:true,layer:'ann',
+   desc:'The defining invariant: the hub authenticates, tracks presence, and forwards frames — nothing else. Instances are the source of truth for all card data. Keeps the hub stateless and horizontally scalable.'},
+  {id:'ann-direct',type:'ann',label:'Direct · bypasses hub · offline-capable',x:40,y:578,w:210,h:0,chip:true,layer:'ann',
+   desc:'When the dashboard is the desktop app, the local machine is reached directly over 127.0.0.1. Lower latency, no hub round-trip, works with no internet.'},
+  {id:'ann-connid',type:'ann',label:'instanceId = connId → GlobalId scheme unchanged',x:385,y:578,w:210,h:0,chip:true,layer:'ann',
+   desc:'Each instance the hub reports becomes its own client Connection with connId = instanceId. The existing GlobalId = ${connId}::${entityId} aggregation keeps working untouched.'},
+  {id:'ann-cadence',type:'ann',label:'Adaptive log cadence (scheduled = batched)',x:730,y:578,w:210,h:0,chip:true,layer:'ann',
+   desc:'Live line-by-line streaming only when a human watches an interactive run. Scheduled/headless runs batch or send only start/done; full log fetched on demand. Fewer frames → DO stays hibernating → less RAM + cost.'},
+  {id:'ann-pairing',type:'ann',label:'Pairing enrollment → per-instance credential',x:670,y:96,w:190,h:0,chip:true,layer:'ann',
+   desc:'User clicks "Add instance" → hub mints a one-time pairing code (short TTL). On the machine, myra enroll <code> exchanges it for a long-lived credential bound to (userId, instanceId). Revocable from the dashboard.'},
+];
+
+const CONNS=[
+  {from:'dash-browser',to:'worker',type:'data',label:'auth + WS',layer:'core'},
+  {from:'dash-tauri',to:'worker',type:'data',label:'remote instances',layer:'core'},
+  {from:'worker',to:'do',type:'data',label:'route by userId',layer:'core'},
+  {from:'dash-tauri',to:'local',type:'direct',label:'127.0.0.1 direct',layer:'core'},
+  {from:'remote',to:'do',type:'dial',label:'reverse WS (outbound)',layer:'core'},
+  {from:'sandbox',to:'do',type:'dial',label:'reverse WS (outbound)',layer:'core'},
+  {from:'dash-browser',to:'remote',type:'p2p',label:'E2E P2P (phase 2)',layer:'future'},
+  {from:'remote',to:'turn',type:'p2p',label:'fallback',layer:'future'},
+];
+
+const CONN_STYLE={
+  data:{color:'#58a6ff',marker:'ar-blue',dash:'',name:'RPC / WS (through hub)'},
+  dial:{color:'#3fb950',marker:'ar-green',dash:'',name:'Outbound dial (NAT-friendly)'},
+  direct:{color:'#d29922',marker:'ar-green',dash:'',name:'Direct (bypasses hub)'},
+  p2p:{color:'#f778ba',marker:'ar-pink',dash:'8,4',name:'E2E P2P data (phase 2)'},
+};
+
+/* ---------- state ---------- */
+const state={comments:[],layers:{future:true,ann:true},pending:null,editing:null,kind:'question'};
+
+/* ---------- svg helpers ---------- */
+const NS='http://www.w3.org/2000/svg';
+function el(t,a,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
+function findNode(id){return NODES.find(n=>n.id===id)||CONTAINERS.find(c=>c.id===id);}
+function anchor(n,side){const cx=n.x+n.w/2;if(side==='top')return[cx,n.y];if(side==='bottom')return[cx,n.y+n.h];return[cx,n.y+n.h/2];}
+function visible(layer){if(layer==='future')return state.layers.future;if(layer==='ann')return state.layers.ann;return true;}
+
+function render(){
+  const svg=document.getElementById('svg');
+  [...svg.querySelectorAll('g,line,path,rect,text,circle')].forEach(e=>e.remove());
+
+  // containers (beneath)
+  CONTAINERS.forEach(c=>{
+    const g=el('g',{class:'node',transform:`translate(${c.x},${c.y})`});g.style.cursor='pointer';g.onclick=()=>openComment(c);
+    g.appendChild(el('rect',{x:0,y:0,width:c.w,height:c.h,rx:12,fill:c.fill,opacity:.4,stroke:c.stroke,'stroke-width':1.5,'stroke-dasharray':'4,3'}));
+    g.appendChild(el('text',{x:c.w/2,y:20,'text-anchor':'middle',fill:'#d6c7ff','font-size':12.5,'font-weight':600},c.label));
+    g.appendChild(el('text',{x:c.w/2,y:36,'text-anchor':'middle',fill:'rgba(214,199,255,.75)','font-size':10,'font-family':'ui-monospace,monospace'},c.sub));
+    badge(g,c);
+    svg.appendChild(g);
+  });
+
+  // connections
+  CONNS.filter(c=>visible(c.layer)).forEach(c=>{
+    const a=findNode(c.from),b=findNode(c.to);if(!a||!b)return;
+    const st=CONN_STYLE[c.type];const ab=a.y<b.y;
+    const[x1,y1]=anchor(a,ab?'bottom':'top');const[x2,y2]=anchor(b,ab?'top':'bottom');
+    const my=(y1+y2)/2;
+    svg.appendChild(el('path',{d:`M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`,fill:'none',stroke:st.color,'stroke-width':2,'stroke-dasharray':st.dash,'marker-end':`url(#${st.marker})`,opacity:.9}));
+    svg.appendChild(el('text',{x:(x1+x2)/2,y:my-3,fill:st.color,'font-size':10,'text-anchor':'middle','font-family':'ui-monospace,monospace'},c.label));
+  });
+
+  // nodes
+  NODES.filter(n=>visible(n.layer)).forEach(n=>{
+    if(n.chip){renderChip(svg,n);return;}
+    const g=el('g',{class:'node',transform:`translate(${n.x},${n.y})`});g.style.cursor='pointer';g.onclick=()=>openComment(n);
+    g.appendChild(el('rect',{x:0,y:0,width:n.w,height:n.h,rx:10,fill:COLORS[n.type],opacity:.93,stroke:'#0d1117','stroke-width':1.5}));
+    g.appendChild(el('text',{x:n.w/2,y:n.h/2-3,'text-anchor':'middle',fill:'#fff','font-size':12.5,'font-weight':600},n.label));
+    g.appendChild(el('text',{x:n.w/2,y:n.h/2+13,'text-anchor':'middle',fill:'rgba(255,255,255,.82)','font-size':10,'font-family':'ui-monospace,monospace'},n.sub));
+    badge(g,n);
+    svg.appendChild(g);
+  });
+
+  renderLegend();
+}
+
+function renderChip(svg,n){
+  const g=el('g',{class:'node',transform:`translate(${n.x},${n.y})`});g.style.cursor='pointer';g.onclick=()=>openComment(n);
+  const w=n.w,h=22;
+  g.appendChild(el('rect',{x:0,y:0,width:w,height:h,rx:6,fill:'#283041',opacity:.92,stroke:'#3d4757','stroke-width':1,'stroke-dasharray':'3,2'}));
+  g.appendChild(el('text',{x:w/2,y:14.5,'text-anchor':'middle',fill:'#9fb0c3','font-size':10,'font-style':'italic'},n.label));
+  badge(g,n,w-4,4);
+  svg.appendChild(g);
+}
+
+function badge(g,n,bx,by){
+  const cc=state.comments.filter(c=>c.target===n.id).length;if(!cc)return;
+  const x=bx??(n.w-6),y=by??6;
+  g.appendChild(el('circle',{cx:x,cy:y,r:9,fill:'#bc8cff',stroke:'#0d1117','stroke-width':1.5}));
+  g.appendChild(el('text',{x:x,y:y+3.5,'text-anchor':'middle',fill:'#0d1117','font-size':10,'font-weight':700},cc));
+}
+
+function renderLegend(){
+  const types=[...new Set(CONNS.filter(c=>visible(c.layer)).map(c=>c.type))];
+  const lg=document.getElementById('legend');
+  lg.innerHTML='<div style="font-weight:600;margin-bottom:5px;font-size:10.5px;color:var(--muted)">CONNECTIONS</div>';
+  types.forEach(t=>{const st=CONN_STYLE[t];const r=document.createElement('div');r.className='row';
+    r.innerHTML=`<span class="swatch" style="border-top-color:${st.color};border-top-style:${st.dash?'dashed':'solid'}"></span><span>${st.name}</span>`;lg.appendChild(r);});
+}
+
+/* ---------- comments ---------- */
+function setKind(k){state.kind=k;document.querySelectorAll('.kindrow button').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));}
+function openComment(node){
+  state.pending=node?{id:node.id,label:node.label,desc:node.desc}:{id:'general',label:'General / whole design',desc:''};
+  state.editing=null;setKind('question');
+  document.getElementById('modalTitle').textContent='Ask about: '+state.pending.label;
+  document.getElementById('modalSub').textContent=state.pending.desc||'Applies to the overall architecture.';
+  document.getElementById('modalText').value='';
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('modalText').focus(),30);
+}
+function editComment(id){
+  const c=state.comments.find(x=>x.id===id);if(!c)return;
+  state.pending={id:c.target,label:c.targetLabel,desc:c.desc};state.editing=id;setKind(c.kind);
+  document.getElementById('modalTitle').textContent='Edit: '+c.targetLabel;
+  document.getElementById('modalSub').textContent='';
+  document.getElementById('modalText').value=c.text;
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('modalText').focus(),30);
+}
+function closeModal(){document.getElementById('modalBg').classList.remove('open');}
+function saveComment(){
+  const txt=document.getElementById('modalText').value.trim();if(!txt){closeModal();return;}
+  if(state.editing){const c=state.comments.find(x=>x.id===state.editing);c.text=txt;c.kind=state.kind;}
+  else state.comments.push({id:Date.now(),target:state.pending.id,targetLabel:state.pending.label,desc:state.pending.desc,text:txt,kind:state.kind});
+  closeModal();update();
+}
+function deleteComment(id){state.comments=state.comments.filter(c=>c.id!==id);update();}
+function renderComments(){
+  document.getElementById('cmtCount').textContent=state.comments.length;
+  const list=document.getElementById('cmtList');
+  if(!state.comments.length){list.innerHTML='<div class="empty">No notes yet. Click any box in the diagram, or use the button above.</div>';return;}
+  list.innerHTML='';
+  const icon={question:'❓',comment:'💬',concern:'⚠️'};
+  state.comments.forEach(c=>{
+    const d=document.createElement('div');d.className='cmt';
+    d.innerHTML=`<button class="del" title="delete" onclick="deleteComment(${c.id})">×</button>
+      <div class="tgt">${icon[c.kind]||''} ${c.targetLabel}<span class="kind">${c.kind}</span></div><div class="tx"></div>`;
+    const tx=d.querySelector('.tx');tx.textContent=c.text;tx.onclick=()=>editComment(c.id);
+    list.appendChild(d);
+  });
+}
+
+/* ---------- prompt ---------- */
+const ARCH_BRIEF=`I'm reviewing a proposed architecture for Myra Agents — a Kanban board that launches CLI coding agents. I want a centralized, authenticated dashboard that gathers all my agent instances (local desktop, remote computers, remote sandboxes) into one board.
+
+Proposed design ("dumb hub" on Cloudflare Durable Objects):
+- DUMB HUB invariant: the hub only authenticates, tracks presence, and forwards frames. It stores NO boards. Each instance owns its own board.json and is the source of truth.
+- Hub = one Durable Object per user (env.USER_HUB.idFromName(userId)). All of a user's instances + dashboards route to the same object, so there's no separate presence store / pub-sub bus / sticky-session layer — everything for a user is colocated.
+- A stateless Cloudflare Worker is the front door: verifies the session JWT, derives userId, forwards the WS upgrade to that user's DO.
+- Instances run the existing @myra/server plus a connector that DIALS OUT to the hub over a persistent reverse WebSocket (NAT-friendly) and serves RPC/events from it using the same dispatch the HTTP route already uses.
+- Inside the DO: instances Map<instanceId,WS>, dashboards Set<WS>, small KV storage (enrolled instances + credential refs), and WebSocket Hibernation (idle users cost ~0 RAM/compute; sockets stay open at the edge, a frame rehydrates the object).
+- Client: each instance becomes a Connection with connId = instanceId, so the existing GlobalId = \${connId}::\${entityId} aggregation is unchanged. The desktop app reaches its LOCAL sidecar directly over 127.0.0.1 (bypassing the hub, offline-capable) and remote instances through the hub.
+- Enrollment: dashboard mints a one-time pairing code; \`myra enroll <code>\` on the machine swaps it for a long-lived per-instance credential bound to (userId, instanceId), revocable from the dashboard.
+- Adaptive log cadence: live line-by-line only when a human watches an interactive run; scheduled/headless runs batch or send only start/done, full log fetched on demand (keeps the DO hibernating).
+- Phase 2 (optional): E2E P2P data plane via WebRTC — hub does only signaling/presence, data goes peer-to-peer with TURN fallback (still E2E) for symmetric-NAT cases like sandboxes.`;
+
+function updatePrompt(){
+  const parts=[ARCH_BRIEF];
+  if(state.comments.length){
+    const byKind=k=>state.comments.filter(c=>c.kind===k);
+    const sec=(title,arr)=>{if(!arr.length)return;parts.push(`\n## ${title}`);arr.forEach(c=>{
+      const where=c.target==='general'?'Overall':c.targetLabel;
+      parts.push(`\n[${where}]\n${c.text}`);});};
+    parts.push('\n---\nMy notes on specific parts of the diagram:');
+    sec('Questions',byKind('question'));
+    sec('Concerns',byKind('concern'));
+    sec('Comments',byKind('comment'));
+  }
+  parts.push(`\n## What I want from you\nAnswer each question and concern above specifically, in the context of this design. Where a choice is risky or has a simpler alternative, say so. If any of my assumptions about Durable Objects, NAT traversal, hibernation, or the dumb-hub model are wrong, correct them.`);
+  document.getElementById('prompt').textContent=parts.join('\n');
+}
+
+function copyPrompt(){
+  navigator.clipboard.writeText(document.getElementById('prompt').textContent).then(()=>{
+    const c=document.getElementById('copied');c.classList.add('show');setTimeout(()=>c.classList.remove('show'),1400);
+  });
+}
+
+/* ---------- wire up ---------- */
+function update(){render();renderComments();updatePrompt();}
+document.querySelectorAll('input[data-layer]').forEach(cb=>{
+  cb.onchange=()=>{state.layers[cb.dataset.layer]=cb.checked;update();};
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeModal();
+  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&document.getElementById('modalBg').classList.contains('open'))saveComment();
+});
+document.getElementById('modalBg').addEventListener('click',e=>{if(e.target.id==='modalBg')closeModal();});
+update();
+</script>
+</body>
+</html>
