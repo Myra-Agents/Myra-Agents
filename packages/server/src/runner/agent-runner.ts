@@ -69,6 +69,15 @@ export class AgentRunner {
   private readonly queue: string[] = [];
   /** Guards against onExit + watcher double-processing the same result file. */
   private readonly handling = new Set<string>();
+  /**
+   * Adaptive log cadence: which cards have a live viewer (an open card modal on
+   * some dashboard). `null` = no client has opted in → stream every line
+   * (back-compat). A set = stream only those cards' lines live; everything else
+   * is still written to the run log and fetched on demand via `get_run_log`.
+   * This is what lets a scheduled/headless run produce no live frames — keeping
+   * an idle Cloudflare DO hibernating. See `docs/centralized-hub-plan.md` §P6.
+   */
+  private logWatch: Set<string> | null = null;
 
   constructor(store: Store, bus: EventBus, opts: { dataDir?: string; executor?: AgentExecutor } = {}) {
     this.store = store;
@@ -88,6 +97,21 @@ export class AgentRunner {
   /** Number of agents currently running. */
   runningCount(): number {
     return this.running.size;
+  }
+
+  /**
+   * Set the live-log viewer set (the `set_log_watch` command). `null` restores
+   * stream-everything; an array (possibly empty) restricts live frames to those
+   * card ids. Result frames (`agent-result-changed`) are never gated.
+   */
+  setLogWatch(cardIds: string[] | null): void {
+    this.logWatch = cardIds === null ? null : new Set(cardIds);
+  }
+
+  /** Emit a log line only if a viewer is watching this card (or no gate is set). */
+  private emitLog(cardId: string, runId: string, line: string): void {
+    if (this.logWatch !== null && !this.logWatch.has(cardId)) return;
+    this.bus.emit(EVENTS.agentLogAppended, { cardId, runId, line });
   }
 
   /**
@@ -197,7 +221,7 @@ export class AgentRunner {
         onLine: (stream, line) => {
           const prefixed = stream === "err" ? `[err] ${line}\n` : `${line}\n`;
           append(prefixed);
-          this.bus.emit(EVENTS.agentLogAppended, { cardId: card.id, runId, line: prefixed.trimEnd() });
+          this.emitLog(card.id, runId, prefixed.trimEnd());
         },
         onExit: (code) => {
           void this.onExit(card.id, runId, label, code, logPath);
@@ -242,7 +266,7 @@ export class AgentRunner {
   ): Promise<void> {
     const footer = `\n[myra-agents] ${label} exited with code ${code ?? "?"}\n`;
     await appendFile(logPath, footer).catch(() => undefined);
-    this.bus.emit(EVENTS.agentLogAppended, { cardId, runId, line: footer.trimEnd() });
+    this.emitLog(cardId, runId, footer.trimEnd());
 
     this.running.delete(cardId);
 

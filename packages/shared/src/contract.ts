@@ -42,10 +42,18 @@ export const AGENT_COMMANDS = [
 /** OS actions that live in the Tauri shell regardless of data backend. */
 export const OS_COMMANDS = ["open_path", "open_card_working_dir"] as const;
 
+/**
+ * Control commands: stateful hints to a host that carry no capability and touch
+ * no data. `set_log_watch` tells the host which cards have a live viewer so it
+ * can throttle live log frames for headless/scheduled runs (adaptive cadence).
+ */
+export const CONTROL_COMMANDS = ["set_log_watch"] as const;
+
 export type DataCommand = (typeof DATA_COMMANDS)[number];
 export type AgentCommand = (typeof AGENT_COMMANDS)[number];
 export type OsCommand = (typeof OS_COMMANDS)[number];
-export type Command = DataCommand | AgentCommand | OsCommand;
+export type ControlCommand = (typeof CONTROL_COMMANDS)[number];
+export type Command = DataCommand | AgentCommand | OsCommand | ControlCommand;
 
 /** Push events emitted by a backend over the live channel. */
 export const EVENTS = {

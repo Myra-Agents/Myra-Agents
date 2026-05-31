@@ -17,6 +17,7 @@ import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { connIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
+import { connectionManager } from "@/lib/connections/manager";
 import { normalizeTag, parseTags } from "@/lib/kanban-tags";
 import { invokeOn } from "@/lib/tauri";
 import { useShortcutStore } from "@/stores/shortcut-store";
@@ -236,6 +237,14 @@ export default function KanbanPage() {
       .then(() => toast.success(t("toast.canceled")))
       .catch((e) => toast.error(String(e)));
   }, [cancelNonce, cardModalOpen, editingCard, cards, t]);
+
+  // Adaptive log cadence (P6): only the card whose modal is open has a live
+  // viewer, so tell its backend to stream that card's log lines and let every
+  // other (headless/scheduled) run go quiet. Closing the modal clears the set.
+  useEffect(() => {
+    const watched = cardModalOpen && editingCard ? [editingCard.id] : [];
+    void connectionManager.setLogWatch(watched);
+  }, [cardModalOpen, editingCard]);
 
   if (loading) {
     return (

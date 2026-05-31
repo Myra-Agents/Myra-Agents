@@ -1,5 +1,6 @@
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 
+import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { browserTransport } from "@/lib/transport/browser";
 import { createHttpTransport } from "@/lib/transport/http";
 import { createHubClient, type HubClient } from "@/lib/transport/hub";
@@ -54,6 +55,8 @@ class ConnectionManager {
   private statusListeners = new Set<() => void>();
   private sidecarReady?: Promise<void>;
   private hubsReady?: Promise<void>;
+  /** GlobalIds of cards with an open modal — pushed to backends as `set_log_watch`. */
+  private watchedGlobalIds = new Set<string>();
 
   constructor() {
     this.loadRegistry();
@@ -243,6 +246,9 @@ class ConnectionManager {
 
   private emitTopology(): void {
     for (const cb of this.topologyListeners) cb();
+    // Re-assert the live-log watch set so connections added since the last
+    // setLogWatch start out gated too.
+    void this.pushLogWatch();
   }
 
   private emitStatus(): void {
@@ -398,6 +404,36 @@ class ConnectionManager {
   async invokeOne<T>(connId: string, cmd: string, args?: Record<string, unknown>): Promise<T> {
     await this.ready();
     return this.transport(connId).invoke<T>(cmd, args);
+  }
+
+  /**
+   * Adaptive log cadence (P6). Tell each connection which of its cards has a
+   * live viewer (an open modal) so headless/scheduled runs elsewhere stop
+   * streaming live log frames — the full log stays fetchable via `get_run_log`.
+   * Every active connection is addressed (empty set included) so gating is on by
+   * default once the board is open. Best-effort: a backend that doesn't know
+   * `set_log_watch` (browser offline) just ignores it.
+   */
+  async setLogWatch(globalIds: string[]): Promise<void> {
+    this.watchedGlobalIds = new Set(globalIds);
+    await this.pushLogWatch();
+  }
+
+  private async pushLogWatch(): Promise<void> {
+    await this.ready();
+    const byConn = new Map<string, string[]>();
+    for (const conn of this.activeConnections()) byConn.set(conn.id, []);
+    for (const gid of this.watchedGlobalIds) {
+      const { connId, entityId } = parseGlobalId(gid);
+      byConn.get(connId)?.push(entityId);
+    }
+    await Promise.all(
+      [...byConn].map(([connId, cardIds]) =>
+        this.transport(connId)
+          .invoke("set_log_watch", { cardIds })
+          .catch(() => undefined),
+      ),
+    );
   }
 
   /** Fan a read out to every active connection; never rejects — failures land per-entry. */

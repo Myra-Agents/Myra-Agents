@@ -20,6 +20,14 @@ export async function dispatchCommand(
   cmd: string,
   args?: Record<string, unknown>,
 ): Promise<unknown> {
+  // Control commands (capability-free, no data) are handled before the cascade.
+  if (cmd === "set_log_watch") {
+    const raw = args?.cardIds;
+    const ids = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : null;
+    runner.setLogWatch(ids);
+    return { ok: true };
+  }
+
   try {
     return await dispatchData(store, cmd, args);
   } catch (errData) {

@@ -87,6 +87,8 @@ const localStorageStore: Store = {
  * them in the browser.
  */
 export async function browserInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  // Control commands are no-ops offline (no live log stream to throttle).
+  if (cmd === "set_log_watch") return { ok: true } as T;
   try {
     return await dispatchData<T>(localStorageStore, cmd, args);
   } catch (error) {
