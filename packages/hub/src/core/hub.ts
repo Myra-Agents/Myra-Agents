@@ -71,6 +71,19 @@ export class HubCore {
     if (conn && (!sink || conn.sink === sink)) state.instances.delete(instanceId);
   }
 
+  /** Forcibly close and drop an instance's tunnel — used when its credential is revoked. */
+  closeInstance(userId: string, instanceId: string): void {
+    const state = this.users.get(userId);
+    const conn = state?.instances.get(instanceId);
+    if (!conn) return;
+    state?.instances.delete(instanceId);
+    try {
+      conn.sink.close();
+    } catch {
+      // already gone.
+    }
+  }
+
   /** Handle a frame arriving from an instance tunnel: rpc-result correlation + event fan-out. */
   handleInstanceFrame(userId: string, instanceId: string, frame: HubFrame): void {
     const state = this.users.get(userId);

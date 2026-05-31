@@ -20,7 +20,7 @@ import { dispatchCommand } from "../runner/dispatch-all";
  */
 export interface ConnectorOptions {
   hubUrl: string;
-  userId: string;
+  token: string;
   instanceId: string;
   label: string;
   capabilities: Capability[];
@@ -64,11 +64,9 @@ export function startConnector(opts: ConnectorOptions): ConnectorHandle {
   }
 
   function connect(): void {
-    const base = opts.hubUrl.replace(/\/$/, "");
-    const sep = base.includes("?") ? "&" : "?";
-    // Dev placeholder auth: userId on the query string. Phase 2 swaps this for a
-    // Bearer instance credential parsed by the hub.
-    const url = `${base}/agent/connect${sep}userId=${encodeURIComponent(opts.userId)}`;
+    // The credential's hubUrl is the http(s) base; the tunnel is ws(s).
+    const wsBase = opts.hubUrl.replace(/\/$/, "").replace(/^http/, "ws");
+    const url = `${wsBase}/agent/connect?token=${encodeURIComponent(opts.token)}`;
     const ws = new WebSocket(url);
     socket = ws;
 
@@ -82,7 +80,7 @@ export function startConnector(opts: ConnectorOptions): ConnectorHandle {
       });
       pingTimer = setInterval(() => send({ type: "ping" }), PING_MS);
       unsubscribeBus = opts.bus.subscribe((f) => send({ type: "event", event: f.event, payload: f.payload }));
-      console.log(`[connector] registered "${opts.instanceId}" at ${base}`);
+      console.log(`[connector] registered "${opts.instanceId}" at ${opts.hubUrl}`);
     };
 
     ws.onmessage = async (ev: MessageEvent) => {
@@ -105,9 +103,16 @@ export function startConnector(opts: ConnectorOptions): ConnectorHandle {
       if (frame.type === "ping") send({ type: "pong" });
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev: CloseEvent) => {
       teardownLive();
       socket = undefined;
+      // 1008 = policy violation: the hub rejected our credential (revoked /
+      // expired / invalid). Retrying can't help — stop and require re-enrollment.
+      if (ev.code === 1008) {
+        stopped = true;
+        console.warn(`[connector] hub rejected credential for "${opts.instanceId}" — re-enroll with: bun run enroll <code>`);
+        return;
+      }
       if (!stopped) scheduleReconnect();
     };
 

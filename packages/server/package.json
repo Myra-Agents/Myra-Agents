@@ -6,7 +6,8 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts"
+    "start": "bun src/index.ts",
+    "enroll": "bun src/connector/cli.ts"
   },
   "dependencies": {
     "@myra/shared": "workspace:*",
