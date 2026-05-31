@@ -6,6 +6,7 @@ export * from "./domain/command";
 export * from "./domain/ids";
 export * from "./domain/schedules";
 export * from "./domain/settings";
+export * from "./hub-contract";
 export * from "./store";
 export * from "./types/kanban";
 export * from "./types/schedule";

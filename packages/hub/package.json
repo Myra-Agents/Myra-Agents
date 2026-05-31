@@ -1,0 +1,15 @@
+{
+  "name": "@myra/hub",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "main": "src/node/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/node/index.ts",
+    "start": "bun src/node/index.ts"
+  },
+  "dependencies": {
+    "@myra/shared": "workspace:*",
+    "hono": "^4.6.14"
+  }
+}

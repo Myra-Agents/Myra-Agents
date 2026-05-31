@@ -1,12 +1,11 @@
-import { dispatchData, type Store, UnknownCommandError } from "@myra/shared";
+import { type Store, UnknownCommandError } from "@myra/shared";
 import { Hono } from "hono";
 import { createBunWebSocket, serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 
 import { EventBus } from "./realtime/bus";
 import { AgentRunner } from "./runner/agent-runner";
-import { dispatchAgent } from "./runner/dispatch";
-import { dispatchOs } from "./runner/os";
+import { dispatchCommand } from "./runner/dispatch-all";
 import { FileStore, isDemoMode, resolveDataDir } from "./store/file-store";
 
 export interface AppDeps {
@@ -78,21 +77,9 @@ export function createApp(deps: AppDeps = {}) {
     }
 
     try {
-      // Three dispatch layers, tried in order: data CRUD against the store,
-      // OS file-open helpers, then the agent runner. Each rethrows
-      // UnknownCommandError so the next layer gets a try; the last → 400.
-      let data: unknown;
-      try {
-        data = await dispatchData(store, cmd, args);
-      } catch (errData) {
-        if (!(errData instanceof UnknownCommandError)) throw errData;
-        try {
-          data = await dispatchOs(store, cmd, args);
-        } catch (errOs) {
-          if (!(errOs instanceof UnknownCommandError)) throw errOs;
-          data = await dispatchAgent(runner, cmd, args);
-        }
-      }
+      // Data CRUD → OS file-open → agent runner, tried in order; an unknown
+      // command in the last layer surfaces as UnknownCommandError → 400.
+      const data = await dispatchCommand(store, runner, cmd, args);
       return c.json({ ok: true, data });
     } catch (err) {
       if (err instanceof UnknownCommandError) {
