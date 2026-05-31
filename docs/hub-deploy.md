@@ -149,6 +149,73 @@ You should see `cloud-test` online and the second call return the instance's
 cards — proof the Worker routed through the Durable Object to your machine and
 back.
 
+## 6b. Hardening (P6)
+
+Once the hub is exposed, the security posture matters more than the happy path.
+
+### Turn off dev login
+
+Dev login (`MYRA_HUB_DEV_LOGIN`) trusts any `userId` — **anyone can mint a
+session for anyone**. It must be off in production:
+
+```bash
+wrangler deploy        # redeploy WITHOUT --var MYRA_HUB_DEV_LOGIN:1
+```
+
+Until OIDC / Cloudflare Access is wired in (deferred), the hub has no real
+identity provider — keep it unexposed or behind Access while dev login is off.
+
+### Capability scoping
+
+Each instance enrolls with `capabilities` (`agent`, `os`). The instance rejects
+any RPC outside its grant before it reaches the runner — an `agent`-only
+instance can't be told to `open_path`. Pure data commands need no capability.
+Enroll a restricted instance by narrowing the capabilities the connector sends
+in its `hello` (see `packages/server/src/connector`).
+
+### Lock down a self-hosted direct server
+
+The direct Node server (`@myra/server`, no hub) is open by default — fine for
+the desktop sidecar on `127.0.0.1`, not for a LAN/public bind. Lock it:
+
+```bash
+MYRA_SERVER_TOKEN=$(openssl rand -hex 32) \
+MYRA_CORS_ORIGIN=https://board.example.com \
+  bun packages/server/src/index.ts
+```
+
+- `MYRA_SERVER_TOKEN` — every `/rpc` + `/events` request must carry it (Bearer
+  header, or `?token=` for the browser WebSocket). The dashboard sends it from
+  the connection's `auth.token`.
+- `MYRA_CORS_ORIGIN` — comma-separated allowlist (default
+  `http://localhost:1420,http://127.0.0.1:1420`). Replaces the old `*`.
+
+### Adaptive log cadence
+
+Live log lines stream only for a card whose modal is open on a dashboard
+(`set_log_watch`). Headless/scheduled runs emit no live frames — the full log
+is still written and fetched on demand via `get_run_log`. This keeps an idle
+`UserHub` DO hibernating (near-zero cost). No configuration; it's automatic.
+
+### Corporate networks (connector)
+
+The instance connector dials **outbound** `wss://` only, so it traverses NAT and
+strict egress firewalls. It uses the runtime's standard TLS — no cert pinning:
+
+| Need | Env |
+|---|---|
+| Forced egress proxy | `HTTPS_PROXY=http://proxy:3128` |
+| Custom corporate CA | `NODE_EXTRA_CA_CERTS=/path/corp-ca.pem` |
+
+A 25s ping heartbeat keeps middleboxes from idle-killing the tunnel. The
+connector logs the proxy/CA in effect at startup.
+
+### Revocation + audit
+
+`POST /api/instances/:id/revoke` blacklists a credential and drops its live
+tunnel (the connector sees close code `1008` and stops — it must re-enroll). The
+hub logs `[audit] connect|disconnect|revoke` lines (visible via `wrangler tail`).
+
 ## 7. Operations
 
 | Task | Command |
@@ -159,6 +226,7 @@ back.
 | Inspect KV | `wrangler kv key list --binding PAIRING` |
 | Rotate signing secret | `openssl rand -hex 32 \| wrangler secret put MYRA_HUB_SECRET` (then re-enroll all instances) |
 | Disable dev login | `wrangler deploy` (without `--var MYRA_HUB_DEV_LOGIN:1`) |
+| Revoke an instance | `curl -XPOST -H "authorization: Bearer $TOKEN" $HUB/api/instances/<id>/revoke` |
 | Delete the Worker | `wrangler delete` |
 
 ## 8. What's where

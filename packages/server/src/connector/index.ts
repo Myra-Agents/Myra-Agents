@@ -37,6 +37,14 @@ const PING_MS = 25_000;
 const MAX_BACKOFF_MS = 10_000;
 
 export function startConnector(opts: ConnectorOptions): ConnectorHandle {
+  // Corporate-network posture: the outbound wss:// tunnel uses the runtime's
+  // standard TLS (system CA trust, no cert pinning), so a custom corporate CA
+  // works via NODE_EXTRA_CA_CERTS, and a forced egress proxy via HTTPS_PROXY.
+  // Log what's in effect so an operator can confirm the tunnel's path.
+  const proxy = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? process.env.HTTP_PROXY;
+  if (proxy) console.log(`[connector] egress proxy: ${proxy}`);
+  if (process.env.NODE_EXTRA_CA_CERTS) console.log(`[connector] extra CA bundle: ${process.env.NODE_EXTRA_CA_CERTS}`);
+
   let socket: WebSocket | undefined;
   let stopped = false;
   let backoff = 500;

@@ -82,7 +82,7 @@ src-tauri/                   # unchanged shell; local stays direct to the sideca
 | P3 ✅ | Client `hubTransport` + aggregation | Dashboard adds a hub; its instances appear as `connId=instanceId` connections, merged board, one shared WS |
 | P4 ✅ | Cloudflare Durable Objects | Same protocol on Worker + UserHub DO with hibernation — deployed to Cloudflare; login→pair→enroll→rpc verified through the live hub |
 | P5 | Desktop split + pairing UX | Tauri: `local` direct, remote via hub; "Add instance" pairing in Settings |
-| P6 | Hardening + adaptive cadence | Capability scoping, revocation, locked-down direct server, batched scheduled logs |
+| P6 ✅ | Hardening + adaptive cadence | Capability scoping, revocation, locked-down direct server, batched scheduled logs |
 | P7 | *(optional)* E2E P2P mesh | WebRTC data plane, hub signaling-only, TURN fallback |
 
 ---
@@ -166,18 +166,20 @@ src-tauri/                   # unchanged shell; local stays direct to the sideca
 
 ---
 
-### Phase 6 — Hardening + adaptive log cadence
-**Goal:** production posture and cost control.
+### Phase 6 ✅ — Hardening + adaptive log cadence
+**Goal:** production posture and cost control. Operate/lock-down runbook:
+[`hub-deploy.md`](hub-deploy.md) §6b.
 
-**Deliverables**
-- **Capability scoping:** honor `capabilities` from `hello`; reject out-of-scope commands.
-- **Locked-down direct server:** require a token on `@myra/server`'s HTTP routes too; tighten the wide-open `cors()` in `app.ts`.
-- **Revocation + audit:** credential lifecycle, basic connection audit log.
-- **Adaptive log cadence:** stream line-by-line only when a card modal is open; scheduled/headless runs batch a coalesced `progress` or send only `started`/`done`; full log fetched on demand via `get_run_log`. Keeps the DO hibernating.
-- **Connector resilience:** respect `HTTPS_PROXY` + system CA trust (no cert pinning), heartbeat-driven middlebox keepalive.
+**Delivered**
+- **Capability scoping:** `requiredCapability(cmd)` in `hub-contract.ts` maps each command to its capability (data=none, `os`, `agent`); the connector rejects an out-of-scope RPC before the runner ever sees it, using the grant from `hello`.
+- **Locked-down direct server:** `MYRA_SERVER_TOKEN` gates `/rpc` + `/events` (Bearer header or `?token=` for the browser WS; the client forwards `auth.token`); `cors()` narrowed from `*` to the `MYRA_CORS_ORIGIN` allowlist. Unset = open (desktop sidecar default — backward compatible).
+- **Revocation + audit:** revoke drops the live tunnel (close `1008` → connector stops, must re-enroll); `HubCore` emits `[audit] connect|disconnect|revoke` records.
+- **Adaptive log cadence:** `set_log_watch` (capability-free control command) tells a host which cards have an open modal; `AgentRunner.emitLog` streams live lines only for watched cards, always writing the full log to disk (`get_run_log` on demand). Headless/scheduled runs emit no live frames → idle DO hibernates. The client fans the open-modal set per connection (re-asserted on topology change).
+- **Connector resilience:** outbound `wss://` over standard TLS (no pinning) → `NODE_EXTRA_CA_CERTS` for a corporate CA, `HTTPS_PROXY` for forced egress (logged at startup); existing 25s ping heartbeat keeps middleboxes from idle-killing the tunnel.
 
-**Verification:** corporate-network smoke (proxy + DPI), scheduled run produces no live frames but a fetchable log, revoked credential cannot act.
-**Exit:** safe to expose; idle cost minimized.
+**Verified:** capability map (data→none/os/agent); token gate (401 without/ with bad token, 200 with good token via header + query); log gate (`watch=[]` → 0 live frames, `watch=[card]` → frames flow, log file written either way); type-check + biome green across packages.
+**Deferred:** OIDC / Cloudflare Access to replace dev login (still ON in prod — turn off before real use); live corporate proxy+DPI smoke (env wired + logged, not yet exercised against a real proxy).
+**Exit:** safe to expose once dev login is off; idle cost minimized.
 
 ---
 
