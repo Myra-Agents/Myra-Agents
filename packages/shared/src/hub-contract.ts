@@ -12,8 +12,24 @@
  * existing command contract untouched.
  */
 
+import { AGENT_COMMANDS, OS_COMMANDS } from "./contract";
+
 /** What an instance can do; gates which commands the hub will route to it. */
 export type Capability = "agent" | "os";
+
+/**
+ * The capability a command requires, or `null` for pure data CRUD (always
+ * allowed — every backend implements it). Imported here, not in `contract.ts`,
+ * to keep the capability ↔ command mapping next to the {@link Capability} type
+ * the hub gates on. The instance enforces this against its own granted
+ * capabilities before dispatch (see `connector/index.ts`); an out-of-scope
+ * command is rejected without ever touching the runner.
+ */
+export function requiredCapability(cmd: string): Capability | null {
+  if ((OS_COMMANDS as readonly string[]).includes(cmd)) return "os";
+  if ((AGENT_COMMANDS as readonly string[]).includes(cmd)) return "agent";
+  return null;
+}
 
 /** A connected instance as advertised to the dashboard. */
 export interface InstanceInfo {

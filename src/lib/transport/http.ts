@@ -25,9 +25,11 @@ interface EventFrame {
  * registered, and closes when the last one unsubscribes. Frames are demuxed to
  * handlers by event name.
  */
-export function createHttpTransport(baseUrl: string): Transport {
+export function createHttpTransport(baseUrl: string, token?: string): Transport {
   const root = baseUrl.replace(/\/$/, "");
-  const wsUrl = `${root.replace(/^http/, "ws")}/events`;
+  // The browser WebSocket can't set an Authorization header, so a locked-down
+  // server (MYRA_SERVER_TOKEN) takes the token as a `?token=` query param.
+  const wsUrl = `${root.replace(/^http/, "ws")}/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
   const handlers = new Map<string, Set<Handler>>();
 
   let socket: WebSocket | undefined;
@@ -97,7 +99,10 @@ export function createHttpTransport(baseUrl: string): Transport {
     async invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
       const res = await fetch(`${root}/rpc/${cmd}`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(args ?? {}),
       });
 

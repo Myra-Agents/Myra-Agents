@@ -48,8 +48,36 @@ interface UserState {
 
 const RPC_TIMEOUT_MS = 30_000;
 
+/** A connection-lifecycle audit record. No payloads — the dumb hub never sees `args`. */
+export interface AuditEvent {
+  action: "connect" | "disconnect" | "revoke";
+  userId: string;
+  instanceId: string;
+  at: string;
+}
+
+export interface HubCoreOptions {
+  /** Sink for connection-lifecycle audit records. Defaults to a `[audit]` console line. */
+  onAudit?: (e: AuditEvent) => void;
+}
+
 export class HubCore {
   private users = new Map<string, UserState>();
+  private onAudit: (e: AuditEvent) => void;
+
+  constructor(opts: HubCoreOptions = {}) {
+    this.onAudit =
+      opts.onAudit ??
+      ((e) => console.log(`[audit] ${e.action} user=${e.userId} instance=${e.instanceId} at=${e.at}`));
+  }
+
+  private audit(action: AuditEvent["action"], userId: string, instanceId: string): void {
+    try {
+      this.onAudit({ action, userId, instanceId, at: new Date().toISOString() });
+    } catch {
+      // auditing must never break routing.
+    }
+  }
 
   private user(userId: string): UserState {
     let state = this.users.get(userId);
@@ -68,6 +96,7 @@ export class HubCore {
     const existing = state.instances.get(conn.instanceId);
     if (existing && existing.sink !== conn.sink) existing.sink.close(); // supersede a stale socket
     state.instances.set(conn.instanceId, conn);
+    this.audit("connect", userId, conn.instanceId);
     this.broadcastPresence(userId, conn.instanceId, true);
   }
 
@@ -78,6 +107,7 @@ export class HubCore {
     const conn = state.instances.get(instanceId);
     if (conn && (!sink || conn.sink === sink)) {
       state.instances.delete(instanceId);
+      this.audit("disconnect", userId, instanceId);
       this.broadcastPresence(userId, instanceId, false);
     }
   }
@@ -88,6 +118,7 @@ export class HubCore {
     const conn = state?.instances.get(instanceId);
     if (!conn) return;
     state?.instances.delete(instanceId);
+    this.audit("revoke", userId, instanceId);
     this.broadcastPresence(userId, instanceId, false);
     try {
       conn.sink.close();

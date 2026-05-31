@@ -25,6 +25,12 @@ export interface AppDeps {
  * `index.ts` wires up) and the Bun `websocket` handler that `index.ts` must
  * export alongside `fetch` for the WS route to upgrade.
  */
+/** Pull a bearer token from the `Authorization` header or a `?token=` query param. */
+function bearerToken(authHeader?: string, queryToken?: string): string | undefined {
+  if (authHeader?.startsWith("Bearer ")) return authHeader.slice(7).trim();
+  return queryToken && queryToken.length > 0 ? queryToken : undefined;
+}
+
 export function createApp(deps: AppDeps = {}) {
   const store = deps.store ?? new FileStore();
   const bus = deps.bus ?? new EventBus();
@@ -33,8 +39,33 @@ export function createApp(deps: AppDeps = {}) {
   const app = new Hono();
 
   // The web client runs on a different origin (localhost:1420) than the
-  // server, so allow cross-origin RPC. Tighten the allowlist once auth lands.
-  app.use("/*", cors());
+  // server, so allow cross-origin RPC — but to an allowlist, not `*`. Override
+  // with MYRA_CORS_ORIGIN (comma-separated) for a self-host on another origin.
+  const allowedOrigins = (process.env.MYRA_CORS_ORIGIN ?? "http://localhost:1420,http://127.0.0.1:1420")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.use("/*", cors({ origin: allowedOrigins }));
+
+  // Optional auth for the direct server. When MYRA_SERVER_TOKEN is set, every
+  // /rpc and /events request must carry it (Bearer header, or `?token=` for the
+  // browser WebSocket which can't set headers). Unset = open (desktop sidecar on
+  // 127.0.0.1, the default) — backward compatible. The hub path has its own JWT.
+  const serverToken = process.env.MYRA_SERVER_TOKEN;
+  if (serverToken) {
+    app.use("/rpc/*", async (c, next) => {
+      if (bearerToken(c.req.header("authorization"), c.req.query("token")) !== serverToken) {
+        return c.json({ ok: false, error: "unauthorized" }, 401);
+      }
+      return next();
+    });
+    app.use("/events", async (c, next) => {
+      if (bearerToken(c.req.header("authorization"), c.req.query("token")) !== serverToken) {
+        return c.json({ ok: false, error: "unauthorized" }, 401);
+      }
+      return next();
+    });
+  }
 
   app.get("/healthz", (c) =>
     c.json({ ok: true, demo: isDemoMode(), dataDir: resolveDataDir(), ts: new Date().toISOString() }),

@@ -1,4 +1,4 @@
-import type { Capability, HubFrame, Store } from "@myra/shared";
+import { type Capability, type HubFrame, requiredCapability, type Store } from "@myra/shared";
 
 import type { EventBus } from "../realtime/bus";
 import type { AgentRunner } from "../runner/agent-runner";
@@ -87,6 +87,15 @@ export function startConnector(opts: ConnectorOptions): ConnectorHandle {
       const frame = parseFrame(ev.data);
       if (!frame) return;
       if (frame.type === "rpc") {
+        // Capability scoping: reject a command this instance wasn't granted
+        // (e.g. an "agent"-only enrolled instance asked to open a path) before
+        // it reaches the runner. Data CRUD needs no capability.
+        const need = requiredCapability(frame.cmd);
+        if (need && !opts.capabilities.includes(need)) {
+          console.warn(`[connector] denied "${frame.cmd}" — missing capability "${need}"`);
+          send({ type: "rpc-result", id: frame.id, ok: false, error: `capability "${need}" not granted` });
+          return;
+        }
         try {
           const data = await dispatchCommand(opts.store, opts.runner, frame.cmd, frame.args);
           send({ type: "rpc-result", id: frame.id, ok: true, data });

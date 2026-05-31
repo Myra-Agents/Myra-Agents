@@ -132,7 +132,7 @@ class ConnectionManager {
 
   /** Pick the transport for a connection from its baseUrl/runtime. */
   private buildTransport(conn: Connection): Transport {
-    if (conn.baseUrl) return createHttpTransport(conn.baseUrl);
+    if (conn.baseUrl) return createHttpTransport(conn.baseUrl, conn.auth?.token);
     return isTauri() ? tauriTransport : browserTransport;
   }
 
