@@ -110,7 +110,9 @@ export function startConnector(opts: ConnectorOptions): ConnectorHandle {
       // expired / invalid). Retrying can't help — stop and require re-enrollment.
       if (ev.code === 1008) {
         stopped = true;
-        console.warn(`[connector] hub rejected credential for "${opts.instanceId}" — re-enroll with: bun run enroll <code>`);
+        console.warn(
+          `[connector] hub rejected credential for "${opts.instanceId}" — re-enroll with: bun run enroll <code>`,
+        );
         return;
       }
       if (!stopped) scheduleReconnect();

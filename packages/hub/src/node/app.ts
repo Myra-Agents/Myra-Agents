@@ -226,7 +226,7 @@ export function createHubApp() {
     const userId = await sessionUser(c);
     if (!userId) return c.json({ ok: false, error: "unauthorized" }, 401);
     const instanceId = c.req.param("instanceId");
-    const existed = auth.revoke(userId, instanceId);
+    const existed = await auth.revoke(userId, instanceId);
     hub.closeInstance(userId, instanceId);
     return c.json({ ok: true, data: { revoked: existed } });
   });

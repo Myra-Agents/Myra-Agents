@@ -1,14 +1,8 @@
+import type { CredentialStore, EnrolledInstance } from "./credential-store";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
-/** A machine enrolled to a user. The `jti` ties it to its current credential. */
-export interface EnrolledInstance {
-  userId: string;
-  instanceId: string;
-  label: string;
-  jti: string;
-  enrolledAt: string;
-}
+export type { CredentialStore, EnrolledInstance } from "./credential-store";
 
 interface StoreData {
   instances: EnrolledInstance[];
@@ -21,7 +15,7 @@ interface StoreData {
  * No boards, no card data — the dumb-hub invariant. The Cloudflare host (phase
  * 4) swaps this for Durable Object storage; the shape is identical.
  */
-export class AuthStore {
+export class AuthStore implements CredentialStore {
   private data: StoreData = { instances: [], revokedJti: [] };
 
   constructor(private readonly file: string) {

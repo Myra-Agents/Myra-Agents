@@ -115,5 +115,15 @@
       "indentScriptAndStyle": false,
       "selfCloseVoidElements": "always"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/hub/src/cf/**"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUndeclaredVariables": "off" }
+        }
+      }
+    }
+  ]
 }

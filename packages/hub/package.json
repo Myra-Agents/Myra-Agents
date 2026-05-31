@@ -11,5 +11,8 @@
   "dependencies": {
     "@myra/shared": "workspace:*",
     "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260531.1"
   }
 }

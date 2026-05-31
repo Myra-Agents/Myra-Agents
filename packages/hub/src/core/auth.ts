@@ -1,6 +1,6 @@
 import { sign, verify } from "hono/jwt";
 
-import type { AuthStore } from "./auth-store";
+import type { CredentialStore } from "./credential-store";
 
 /**
  * Identity for the relay (transport-agnostic).
@@ -41,7 +41,7 @@ export class AuthService {
 
   constructor(
     private readonly secret: string,
-    private readonly store: AuthStore,
+    private readonly store: CredentialStore,
   ) {}
 
   // --- user sessions --------------------------------------------------------
@@ -75,29 +75,32 @@ export class AuthService {
     if (!entry) throw new Error("invalid pairing code");
     if (Date.now() > entry.expiresAt) throw new Error("pairing code expired");
 
+    const token = await this.issueInstanceCredential(entry.userId, instanceId, label);
+    return { token, userId: entry.userId };
+  }
+
+  /**
+   * Mint an instance credential directly (no pairing-code step). Used by the
+   * Cloudflare host, where the pairing code → userId mapping is resolved in KV
+   * by the Worker before routing to the user's Durable Object.
+   */
+  async issueInstanceCredential(userId: string, instanceId: string, label: string): Promise<string> {
     const jti = crypto.randomUUID();
     const exp = Math.floor(Date.now() / 1000) + INSTANCE_TTL_S;
-    this.store.addInstance({
-      userId: entry.userId,
-      instanceId,
-      label,
-      jti,
-      enrolledAt: new Date().toISOString(),
-    });
-    const token = await sign({ sub: entry.userId, iid: instanceId, jti, typ: "instance", exp }, this.secret, "HS256");
-    return { token, userId: entry.userId };
+    await this.store.addInstance({ userId, instanceId, label, jti, enrolledAt: new Date().toISOString() });
+    return sign({ sub: userId, iid: instanceId, jti, typ: "instance", exp }, this.secret, "HS256");
   }
 
   /** Verify an instance credential → claims. Throws if bad/expired/wrong-type/revoked. */
   async verifyInstance(token: string): Promise<InstanceClaims> {
     const claims = (await verify(token, this.secret, "HS256")) as unknown as InstanceClaims;
     if (claims.typ !== "instance") throw new Error("not an instance token");
-    if (this.store.isRevoked(claims.jti)) throw new Error("credential revoked");
+    if (await this.store.isRevoked(claims.jti)) throw new Error("credential revoked");
     return claims;
   }
 
   /** Revoke a user's instance credential. Returns true if it existed. */
-  revoke(userId: string, instanceId: string): boolean {
+  revoke(userId: string, instanceId: string): boolean | Promise<boolean> {
     return this.store.revoke(userId, instanceId);
   }
 
