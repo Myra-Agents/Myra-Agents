@@ -1,4 +1,11 @@
-import { type DashboardEventFrame, HUB_ROUTES, type InstanceInfo, PRESENCE_EVENT, type RpcResult } from "@myra/shared";
+import {
+  type DashboardEventFrame,
+  HUB_ROUTES,
+  type InstanceInfo,
+  type PairingCode,
+  PRESENCE_EVENT,
+  type RpcResult,
+} from "@myra/shared";
 
 import type { Transport, UnlistenFn } from "./types";
 
@@ -22,6 +29,10 @@ export interface HubClient {
   listInstances(): Promise<InstanceInfo[]>;
   transportFor(instanceId: string): Transport;
   onPresence(cb: () => void): () => void;
+  /** Mint a one-time pairing code to enroll a new instance against this hub. */
+  pair(): Promise<PairingCode>;
+  /** Revoke an instance's credential and drop its live tunnel. */
+  revoke(instanceId: string): Promise<void>;
   close(): void;
 }
 
@@ -163,6 +174,19 @@ export function createHubClient(baseUrl: string, token: string): HubClient {
       presenceCbs.add(cb);
       openSocket();
       return () => presenceCbs.delete(cb);
+    },
+
+    async pair() {
+      const res = await fetch(`${root}${HUB_ROUTES.pair}`, { method: "POST", headers: authHeaders });
+      const body = (await res.json().catch(() => null)) as { ok?: boolean; data?: PairingCode; error?: string } | null;
+      if (!body?.ok || !body.data) throw new Error(body?.error ?? `pair failed (${res.status})`);
+      return body.data;
+    },
+
+    async revoke(instanceId: string) {
+      const res = await fetch(`${root}${HUB_ROUTES.revoke(instanceId)}`, { method: "POST", headers: authHeaders });
+      const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!body?.ok) throw new Error(body?.error ?? `revoke failed (${res.status})`);
     },
 
     close() {

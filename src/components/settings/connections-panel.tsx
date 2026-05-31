@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 
-import { CheckCircle2Icon, CircleIcon, NetworkIcon, PlusIcon, ServerIcon, TrashIcon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  CircleIcon,
+  CopyIcon,
+  KeyRoundIcon,
+  NetworkIcon,
+  PlusIcon,
+  ServerIcon,
+  TrashIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -29,13 +38,54 @@ const STATUS_COLOR: Record<ConnectionStatus, string> = {
  */
 export function ConnectionsPanel() {
   const t = useTranslations("settings.connections");
-  const { connections, hubs, primaryId, add, remove, addHub, removeHub, setPrimary, toggleVisible, isVisible } =
-    useConnections();
+  const {
+    connections,
+    hubs,
+    primaryId,
+    add,
+    remove,
+    addHub,
+    removeHub,
+    pairHub,
+    revokeHubInstance,
+    setPrimary,
+    toggleVisible,
+    isVisible,
+  } = useConnections();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
   const [hubUrl, setHubUrl] = useState("");
   const [hubUser, setHubUser] = useState("");
   const [hubBusy, setHubBusy] = useState(false);
+  // The freshly minted pairing code for one hub (cleared when another is paired).
+  const [pairing, setPairing] = useState<{ hubId: string; code: string; expiresAt: number } | null>(null);
+  const [pairBusy, setPairBusy] = useState(false);
+
+  const handlePair = async (hubId: string) => {
+    setPairBusy(true);
+    try {
+      const { code, expiresAt } = await pairHub(hubId);
+      setPairing({ hubId, code, expiresAt });
+    } catch {
+      toast.error(t("hub.pairFailed"));
+    } finally {
+      setPairBusy(false);
+    }
+  };
+
+  const handleRevoke = async (hubId: string, instanceId: string) => {
+    try {
+      await revokeHubInstance(hubId, instanceId);
+      toast.success(t("hub.revoked"));
+    } catch {
+      toast.error(t("hub.revokeFailed"));
+    }
+  };
+
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text);
+    toast.success(t("hub.copied"));
+  };
 
   const handleAdd = () => {
     const trimmed = url.trim();
@@ -164,19 +214,77 @@ export function ConnectionsPanel() {
           <p className="text-muted-foreground text-sm">{t("hub.description")}</p>
 
           {hubs.length > 0 && (
-            <div className="space-y-2">
-              {hubs.map((hub) => (
-                <div key={hub.id} className="flex items-center gap-2 rounded-md border p-3">
-                  <NetworkIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <span className="truncate font-medium text-sm">{hub.label}</span>
-                    <p className="truncate font-mono text-muted-foreground text-xs">{hub.baseUrl}</p>
+            <div className="space-y-3">
+              {hubs.map((hub) => {
+                const instances = connections.filter((c) => c.hubId === hub.id);
+                const enrollCmd = `MYRA_HUB_URL=${hub.baseUrl} bun run enroll ${pairing?.code ?? "<code>"}`;
+                return (
+                  <div key={hub.id} className="space-y-2 rounded-md border p-3">
+                    <div className="flex items-center gap-2">
+                      <NetworkIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <span className="truncate font-medium text-sm">{hub.label}</span>
+                        <p className="truncate font-mono text-muted-foreground text-xs">{hub.baseUrl}</p>
+                      </div>
+                      <Button variant="outline" size="sm" disabled={pairBusy} onClick={() => handlePair(hub.id)}>
+                        <KeyRoundIcon className="size-3" />
+                        {t("hub.pair")}
+                      </Button>
+                      <Button variant="ghost" size="icon-xs" onClick={() => removeHub(hub.id)} title={t("hub.remove")}>
+                        <TrashIcon />
+                      </Button>
+                    </div>
+
+                    {pairing?.hubId === hub.id && (
+                      <div className="space-y-2 rounded-md bg-muted/50 p-2">
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 font-mono text-base tracking-widest">{pairing.code}</code>
+                          <span className="text-muted-foreground text-xs">
+                            {t("hub.expires", { time: new Date(pairing.expiresAt).toLocaleTimeString() })}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => copy(pairing.code)}
+                            title={t("hub.copy")}
+                          >
+                            <CopyIcon />
+                          </Button>
+                        </div>
+                        <p className="text-muted-foreground text-xs">{t("hub.enrollHint")}</p>
+                        <div className="flex items-center gap-2">
+                          <code className="flex-1 overflow-x-auto whitespace-nowrap rounded bg-background p-1.5 font-mono text-xs">
+                            {enrollCmd}
+                          </code>
+                          <Button variant="ghost" size="icon-xs" onClick={() => copy(enrollCmd)} title={t("hub.copy")}>
+                            <CopyIcon />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {instances.length > 0 && (
+                      <div className="space-y-1 border-t pt-2">
+                        {instances.map((inst) => (
+                          <div key={inst.id} className="flex items-center gap-2 pl-1">
+                            <CircleIcon className={cn("size-2.5 shrink-0 fill-current", STATUS_COLOR[inst.status])} />
+                            <span className="min-w-0 flex-1 truncate text-sm">{inst.label}</span>
+                            <span className="text-muted-foreground text-xs">{t(`status.${inst.status}`)}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => inst.instanceId && handleRevoke(hub.id, inst.instanceId)}
+                              title={t("hub.revoke")}
+                            >
+                              <TrashIcon />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <Button variant="ghost" size="icon-xs" onClick={() => removeHub(hub.id)} title={t("hub.remove")}>
-                    <TrashIcon />
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

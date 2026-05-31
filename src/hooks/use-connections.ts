@@ -60,6 +60,11 @@ export function useConnections() {
     [],
   );
   const removeHub = useCallback((id: string) => connectionManager.removeHub(id), []);
+  const pairHub = useCallback((id: string) => connectionManager.pairHub(id), []);
+  const revokeHubInstance = useCallback(
+    (hubId: string, instanceId: string) => connectionManager.revokeHubInstance(hubId, instanceId),
+    [],
+  );
   const update = useCallback(
     (id: string, patch: Partial<Pick<Connection, "label" | "baseUrl">>) => connectionManager.update(id, patch),
     [],
@@ -87,6 +92,8 @@ export function useConnections() {
     remove,
     addHub,
     removeHub,
+    pairHub,
+    revokeHubInstance,
     update,
     setPrimary,
     toggleVisible,

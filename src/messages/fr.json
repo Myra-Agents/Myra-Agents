@@ -308,7 +308,16 @@
         "add": "Ajouter un hub",
         "added": "Hub ajouté.",
         "loginFailed": "Connexion au hub impossible.",
-        "remove": "Supprimer le hub"
+        "remove": "Supprimer le hub",
+        "pair": "Appairer une instance",
+        "pairFailed": "Impossible de créer un code d'appairage.",
+        "expires": "expire à {time}",
+        "enrollHint": "Sur la machine à ajouter, exécutez :",
+        "copy": "Copier",
+        "copied": "Copié.",
+        "revoke": "Révoquer",
+        "revoked": "Instance révoquée.",
+        "revokeFailed": "Révocation de l'instance impossible."
       }
     },
     "agents": {

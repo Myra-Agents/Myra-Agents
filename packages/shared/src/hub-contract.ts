@@ -105,6 +105,14 @@ export type RpcResult = { ok: true; data: unknown } | { ok: false; error: string
 export const HUB_ROUTES = {
   agentConnect: "/agent/connect",
   instances: "/api/instances",
+  pair: "/api/instances/pair",
+  revoke: (instanceId: string) => `/api/instances/${instanceId}/revoke`,
   events: "/api/events",
   rpc: (instanceId: string, cmd: string) => `/api/i/${instanceId}/rpc/${cmd}`,
 } as const;
+
+/** A freshly minted one-time pairing code (the dashboard shows it; a machine enrolls with it). */
+export interface PairingCode {
+  code: string;
+  expiresAt: number;
+}

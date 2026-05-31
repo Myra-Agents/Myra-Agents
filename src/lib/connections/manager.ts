@@ -331,6 +331,22 @@ class ConnectionManager {
     this.emitTopology();
   }
 
+  /** Mint a one-time pairing code on a hub, for enrolling a new instance. */
+  async pairHub(hubId: string): Promise<{ code: string; expiresAt: number }> {
+    const entry = this.hubs.get(hubId);
+    if (!entry) throw new Error(`unknown hub "${hubId}"`);
+    return entry.client.pair();
+  }
+
+  /** Revoke one instance on a hub, then re-expand so its connection drops. */
+  async revokeHubInstance(hubId: string, instanceId: string): Promise<void> {
+    const entry = this.hubs.get(hubId);
+    if (!entry) throw new Error(`unknown hub "${hubId}"`);
+    await entry.client.revoke(instanceId);
+    await this.expandHub(hubId);
+    this.emitTopology();
+  }
+
   /** Resolve all registered hubs into their instance connections; memoized like the sidecar. */
   ensureHubs(): Promise<void> {
     if (!this.hubsReady)

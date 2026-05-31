@@ -308,7 +308,16 @@
         "add": "Add hub",
         "added": "Hub added.",
         "loginFailed": "Could not sign in to the hub.",
-        "remove": "Remove hub"
+        "remove": "Remove hub",
+        "pair": "Pair instance",
+        "pairFailed": "Could not create a pairing code.",
+        "expires": "expires {time}",
+        "enrollHint": "On the machine to add, run:",
+        "copy": "Copy",
+        "copied": "Copied.",
+        "revoke": "Revoke",
+        "revoked": "Instance revoked.",
+        "revokeFailed": "Could not revoke the instance."
       }
     },
     "agents": {

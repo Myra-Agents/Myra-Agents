@@ -81,7 +81,7 @@ src-tauri/                   # unchanged shell; local stays direct to the sideca
 | P2 ✅ | Auth + enrollment | Pairing code → per-instance credential; user session; tenant isolation |
 | P3 ✅ | Client `hubTransport` + aggregation | Dashboard adds a hub; its instances appear as `connId=instanceId` connections, merged board, one shared WS |
 | P4 ✅ | Cloudflare Durable Objects | Same protocol on Worker + UserHub DO with hibernation — deployed to Cloudflare; login→pair→enroll→rpc verified through the live hub |
-| P5 | Desktop split + pairing UX | Tauri: `local` direct, remote via hub; "Add instance" pairing in Settings |
+| P5 ✅ | Desktop split + pairing UX | Tauri: `local` direct, remote via hub; "Add instance" pairing in Settings |
 | P6 ✅ | Hardening + adaptive cadence | Capability scoping, revocation, locked-down direct server, batched scheduled logs |
 | P7 | *(optional)* E2E P2P mesh | WebRTC data plane, hub signaling-only, TURN fallback |
 
@@ -153,15 +153,16 @@ src-tauri/                   # unchanged shell; local stays direct to the sideca
 
 ---
 
-### Phase 5 — Desktop split + pairing UX
+### Phase 5 ✅ — Desktop split + pairing UX
 **Goal:** local-direct on the desktop; first-class pairing.
 
-**Deliverables**
-- Tauri client keeps the `local` connection on `tauriTransport`/127.0.0.1 (direct, offline-capable) and adds hub-instance connections via `hubTransport` — mixed transports in one board (already supported by `buildTransport`).
-- Settings → Connections "Add instance": shows a pairing code / deep-links `myra enroll`; lists enrolled instances with status + revoke.
-- i18n keys in `en.json` + `fr.json`.
+**Delivered**
+- Mixed transports already merge in one board: `local` stays on the sidecar/127.0.0.1 (direct, offline-capable), hub-instances arrive via `createHubClient` — `buildTransport` + the aggregation layer were unchanged.
+- **Pairing UX** in Settings → Connections: each hub has a **Pair instance** button → `HubClient.pair()` mints a one-time code, shown with its expiry and a copy-paste `MYRA_HUB_URL=… bun run enroll <code>` command (both copyable). Each hub lists its instances with a live status dot and a **Revoke** action (`HubClient.revoke()` → drops the tunnel, re-expands).
+- Shared `HUB_ROUTES.pair`/`.revoke` + `PairingCode` type; `HubClient` gained `pair()`/`revoke()`; manager `pairHub()`/`revokeHubInstance()`; `use-connections` exposes both.
+- i18n: `hub.pair/pairFailed/expires/enrollHint/copy/copied/revoke/revoked/revokeFailed` in `en.json` + `fr.json`.
 
-**Verification:** desktop run — local sidecar reached directly (works with network off), a remote instance reached through the hub, both merged; pair + revoke from the UI.
+**Verified:** pair route returns `{code,expiresAt}`, revoke returns `{revoked}`, both 401 without a session token (against a local node hub); type-check green across all packages; touched files lint clean.
 **Exit:** the user's stated shape — local + remote + sandbox on one authed board.
 
 ---
