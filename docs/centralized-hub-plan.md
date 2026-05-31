@@ -80,7 +80,7 @@ src-tauri/                   # unchanged shell; local stays direct to the sideca
 | P1 ✅ | Connector ↔ in-memory relay | A remote instance dials a local hub; an RPC + a streamed event round-trip end to end |
 | P2 ✅ | Auth + enrollment | Pairing code → per-instance credential; user session; tenant isolation |
 | P3 ✅ | Client `hubTransport` + aggregation | Dashboard adds a hub; its instances appear as `connId=instanceId` connections, merged board, one shared WS |
-| P4 🔨 | Cloudflare Durable Objects | Same protocol on Worker + UserHub DO with hibernation — code complete + type-checked; **deploy pending** (`wrangler login`) |
+| P4 ✅ | Cloudflare Durable Objects | Same protocol on Worker + UserHub DO with hibernation — deployed to Cloudflare; login→pair→enroll→rpc verified through the live hub |
 | P5 | Desktop split + pairing UX | Tauri: `local` direct, remote via hub; "Add instance" pairing in Settings |
 | P6 | Hardening + adaptive cadence | Capability scoping, revocation, locked-down direct server, batched scheduled logs |
 | P7 | *(optional)* E2E P2P mesh | WebRTC data plane, hub signaling-only, TURN fallback |
