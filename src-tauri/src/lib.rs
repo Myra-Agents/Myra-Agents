@@ -37,7 +37,12 @@ fn spawn_sidecar(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let mut command = app
         .handle()
         .shell()
-        .sidecar("binaries/myra-server")?
+        // The shell plugin resolves a sidecar relative to the executable's own
+        // directory by joining this arg verbatim — and Tauri bundles externalBin
+        // flat next to the exe (Contents/MacOS/myra-server, target/<profile>/
+        // myra-server), with no `binaries/` subdir. So pass the basename, not the
+        // configured externalBin path, or spawn fails with ENOENT on launch.
+        .sidecar("myra-server")?
         .env("PORT", port.to_string());
     if let Ok(demo) = std::env::var("DEMO") {
         command = command.env("DEMO", demo);
