@@ -68,9 +68,21 @@ Inspired by [mobslide](https://github.com/thewh1teagle/mobslide): scan a QR, no 
 
 - [ ] **Linux support** — CI build; note any WebRTC/Tauri gaps (cf. mobslide Linux caveat).
 - [ ] **Auto-update** — Tauri updater + release channel.
-- [ ] **Structured logging** — Rotating log file for scheduler, watcher, agent spawn errors.
+- [ ] **Structured logging** — Rotating log file for scheduler, watcher, agent spawn errors. See Observability §1.
 - [ ] **Health panel** — Watcher alive, scheduler tick, disk space under `.myra-agents`.
 - [ ] **Multi-machine sync** — Optional sync of `board.json` / schedules (git, cloud drive, or custom — TBD).
+
+---
+
+## Observability & monitoring (centralized hub)
+
+Today: agent runs are persisted + viewable (Logs page, `agent-runs/*.log`); everything else is print-debugging — instance/server `console.log` to terminal or the Tauri desktop console, hub `console`/`[audit]` lines visible only via `wrangler tail` (ephemeral). `/healthz` is liveness only. No levels, no off-instance persistence, no metrics, no cross-hop tracing.
+
+- [ ] **1. Structured logger** — Shared logger in `@myra/shared`: level (`LOG_LEVEL`) + JSON + `[component]` tag; replace scattered `console.*` across hub/server/connector/frontend. Unblocks the rest. _(supersedes Platform §Structured logging for the hub path)_
+- [ ] **2. Hub metrics + log persistence** — `/metrics` route on the hub (connections, RPC count/latency/error rate, queue depth, hibernation hits per user) + Cloudflare Logpush so DO/Worker logs survive past `wrangler tail`. Highest value for the cloud hub.
+- [ ] **3. End-to-end trace id** — Thread one correlation id dashboard → hub → instance on every RPC (the hub frame already carries an `id`); log it at each hop so one command is greppable across all three.
+- [ ] **4. Client + instance error reporting** — Sentry (or equivalent) for frontend crashes and instance/connector exceptions; surface beyond devtools/terminal.
+- [ ] **5. Persist the audit log** — `[audit] connect/disconnect/revoke` is `console.log` only; store + make queryable (DO storage or Logpush) for a basic security trail.
 
 ---
 
