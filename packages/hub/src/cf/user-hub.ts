@@ -35,6 +35,8 @@ export interface Env {
   PAIRING: KVNamespace;
   MYRA_HUB_SECRET: string;
   MYRA_HUB_DEV_LOGIN?: string;
+  /** Comma-separated CORS allowlist override; defaults cover the dashboard apps. */
+  MYRA_CORS_ORIGIN?: string;
 }
 
 interface SocketAttachment {

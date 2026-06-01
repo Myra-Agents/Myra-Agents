@@ -21,8 +21,51 @@ export { UserHub } from "./user-hub";
  */
 const SESSION_TTL_S = 60 * 60;
 
+// The dashboard is a desktop app (Tauri webview, origin `tauri://localhost` on
+// macOS/Linux or `(http|https)://tauri.localhost` on Windows) plus the Next dev
+// server; all call the hub cross-origin. Allowlist them so the browser doesn't
+// block the preflight. Override with MYRA_CORS_ORIGIN (comma-separated).
+const DEFAULT_ORIGINS =
+  "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost,https://tauri.localhost,http://tauri.localhost";
+
+function allowedOrigins(env: Env): string[] {
+  return (env.MYRA_CORS_ORIGIN ?? DEFAULT_ORIGINS)
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+}
+
+/** CORS headers for an allowed origin, or none when the origin isn't allowed. */
+function corsHeaders(req: Request, env: Env): Record<string, string> {
+  const origin = req.headers.get("Origin");
+  if (!origin || !allowedOrigins(env).includes(origin)) return {};
+  return {
+    "access-control-allow-origin": origin,
+    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-headers": "authorization,content-type",
+    "access-control-max-age": "86400",
+    vary: "Origin",
+  };
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    // Preflight: answer before any auth/routing.
+    if (req.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders(req, env) });
+    }
+    const resp = await handle(req, env);
+    // Stamp CORS on normal responses; never on a 101 WebSocket upgrade (its
+    // headers are immutable and it carries no body the browser CORS-checks).
+    if (resp.status === 101) return resp;
+    const headers = new Headers(resp.headers);
+    for (const [k, v] of Object.entries(corsHeaders(req, env))) headers.set(k, v);
+    return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers });
+  },
+};
+
+async function handle(req: Request, env: Env): Promise<Response> {
+  {
     const url = new URL(req.url);
     const secret = env.MYRA_HUB_SECRET;
 
@@ -83,8 +126,8 @@ export default {
     }
 
     return route(env, userId, req, {});
-  },
-};
+  }
+}
 
 /** Forward a request to the user's Durable Object, stamping the verified identity. */
 function route(env: Env, userId: string, req: Request, extra: Record<string, string>): Promise<Response> {
