@@ -1,5 +1,5 @@
 import { resolveDataDir } from "../store/file-store";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /**
@@ -31,4 +31,14 @@ export function saveCredential(cred: HubCredential): void {
   const file = credentialFile();
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, JSON.stringify(cred, null, 2));
+}
+
+/** Drop the enrollment so the server stops dialing the hub. Idempotent. */
+export function deleteCredential(): boolean {
+  try {
+    rmSync(credentialFile());
+    return true;
+  } catch {
+    return false;
+  }
 }

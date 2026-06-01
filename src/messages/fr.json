@@ -317,7 +317,9 @@
         "copied": "Copié.",
         "revoke": "Révoquer",
         "revoked": "Instance révoquée.",
-        "revokeFailed": "Révocation de l'instance impossible."
+        "revokeFailed": "Révocation de l'instance impossible.",
+        "osUnix": "macOS / Linux",
+        "osWindows": "Windows"
       }
     },
     "agents": {

@@ -60,6 +60,7 @@ export function ConnectionsPanel() {
   // The freshly minted pairing code for one hub (cleared when another is paired).
   const [pairing, setPairing] = useState<{ hubId: string; code: string; expiresAt: number } | null>(null);
   const [pairBusy, setPairBusy] = useState(false);
+  const [installOs, setInstallOs] = useState<"unix" | "windows">("unix");
 
   const handlePair = async (hubId: string) => {
     setPairBusy(true);
@@ -217,7 +218,12 @@ export function ConnectionsPanel() {
             <div className="space-y-3">
               {hubs.map((hub) => {
                 const instances = connections.filter((c) => c.hubId === hub.id);
-                const enrollCmd = `MYRA_HUB_URL=${hub.baseUrl} bun run enroll ${pairing?.code ?? "<code>"}`;
+                const code = pairing?.code ?? "<code>";
+                const host = hub.baseUrl.replace(/\/$/, "");
+                const enrollCmd =
+                  installOs === "unix"
+                    ? `curl -sSf ${host}/install-remote.sh | MYRA_HUB_URL=${host} CODE=${code} sh`
+                    : `$env:MYRA_HUB_URL="${host}"; $env:CODE="${code}"; iwr ${host}/install-remote.ps1 | iex`;
                 return (
                   <div key={hub.id} className="space-y-2 rounded-md border p-3">
                     <div className="flex items-center gap-2">
@@ -251,7 +257,27 @@ export function ConnectionsPanel() {
                             <CopyIcon />
                           </Button>
                         </div>
-                        <p className="text-muted-foreground text-xs">{t("hub.enrollHint")}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-muted-foreground text-xs">{t("hub.enrollHint")}</p>
+                          <div className="flex shrink-0 gap-1">
+                            <Button
+                              variant={installOs === "unix" ? "secondary" : "ghost"}
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => setInstallOs("unix")}
+                            >
+                              {t("hub.osUnix")}
+                            </Button>
+                            <Button
+                              variant={installOs === "windows" ? "secondary" : "ghost"}
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => setInstallOs("windows")}
+                            >
+                              {t("hub.osWindows")}
+                            </Button>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2">
                           <code className="flex-1 overflow-x-auto whitespace-nowrap rounded bg-background p-1.5 font-mono text-xs">
                             {enrollCmd}

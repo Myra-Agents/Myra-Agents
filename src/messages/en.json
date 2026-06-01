@@ -317,7 +317,9 @@
         "copied": "Copied.",
         "revoke": "Revoke",
         "revoked": "Instance revoked.",
-        "revokeFailed": "Could not revoke the instance."
+        "revokeFailed": "Could not revoke the instance.",
+        "osUnix": "macOS / Linux",
+        "osWindows": "Windows"
       }
     },
     "agents": {
