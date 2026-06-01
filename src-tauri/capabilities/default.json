@@ -12,6 +12,10 @@
     "core:window:allow-set-decorations",
     "core:window:allow-start-dragging",
     "core:window:allow-toggle-maximize",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "deep-link:default",
+    "shell:allow-open",
     {
       "identifier": "shell:allow-execute",
       "allow": [{ "name": "binaries/myra-server", "sidecar": true, "args": true }]

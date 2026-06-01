@@ -8,11 +8,52 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, RunEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
 use tray::TrayState;
+
+/// Buffer for a `myra://auth/callback?code=…` that arrives before the webview's
+/// listener is ready (the deep link can launch/focus the app first). The
+/// frontend drains it via `take_pending_auth_code` on mount.
+#[derive(Default)]
+struct PendingAuth(Mutex<Option<String>>);
+
+/// Where the hosted web app's desktop login bridge page lives. The desktop
+/// opens `<base>/auth/desktop/` in the system browser; the bridge runs Clerk,
+/// then deep-links back with a one-time handoff code.
+///
+/// In `tauri:dev` the bridge is served by the local Next dev server (port 1420),
+/// not the production host — so default there unless `MYRA_WEB_APP_URL` overrides.
+/// Note: this is the **web app** origin, not the hub Worker (the Worker has no
+/// `/auth/desktop/` page).
+fn web_app_url() -> String {
+    std::env::var("MYRA_WEB_APP_URL").unwrap_or_else(|_| {
+        if cfg!(debug_assertions) {
+            "http://localhost:1420".to_string()
+        } else {
+            "https://app.myra-agents.ai".to_string()
+        }
+    })
+}
+
+/// Payload emitted to the frontend when a `myra://auth/callback` deep link arrives.
+#[derive(Clone, Serialize)]
+struct AuthCallback {
+    code: String,
+}
+
+/// Extract the `code` query param from a `myra://auth/callback?code=…` URL.
+fn parse_auth_code(url: &url::Url) -> Option<String> {
+    if url.scheme() != "myra" {
+        return None;
+    }
+    url.query_pairs()
+        .find(|(k, _)| k == "code")
+        .map(|(_, v)| v.into_owned())
+        .filter(|c| !c.is_empty())
+}
 
 /// The stable port the persistent (hub-enrolled) service listens on. When a
 /// service is running here we *adopt* it instead of spawning a duplicate writer
@@ -256,14 +297,64 @@ async fn remote_access_status(app: AppHandle) -> Result<RemoteStatus, String> {
     serde_json::from_str(line).map_err(|e| format!("parse status: {e} (output: {out})"))
 }
 
+/// Open the system browser at the web app's desktop login bridge. The browser
+/// runs Clerk's hosted sign-in (which the Tauri webview can't host), then deep-
+/// links a one-time code back to `myra://auth/callback`.
+#[tauri::command]
+async fn start_login(app: AppHandle) -> Result<(), String> {
+    let url = format!("{}/auth/desktop/", web_app_url().trim_end_matches('/'));
+    app.shell().open(url, None).map_err(|e| e.to_string())
+}
+
+/// Drain any auth code buffered before the frontend's deep-link listener mounted.
+#[tauri::command]
+fn take_pending_auth_code(state: tauri::State<'_, PendingAuth>) -> Option<String> {
+    state.0.lock().ok().and_then(|mut c| c.take())
+}
+
+/// Wire the `myra://` deep-link handler: buffer the auth code, notify the
+/// frontend, and bring the window forward.
+fn setup_deep_link(handle: &AppHandle) {
+    use tauri_plugin_deep_link::DeepLinkExt;
+
+    // Linux/Windows: register the scheme at runtime (macOS registers via the
+    // Info.plist generated from tauri.conf.json's plugins.deep-link.schemes).
+    #[cfg(any(windows, target_os = "linux"))]
+    {
+        let _ = handle.deep_link().register_all();
+    }
+
+    let h = handle.clone();
+    handle.deep_link().on_open_url(move |event| {
+        for url in event.urls() {
+            let Some(code) = parse_auth_code(&url) else {
+                continue;
+            };
+            if let Some(state) = h.try_state::<PendingAuth>() {
+                if let Ok(mut slot) = state.0.lock() {
+                    *slot = Some(code.clone());
+                }
+            }
+            let _ = h.emit("auth-callback", AuthCallback { code });
+            if let Some(win) = h.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(TrayState::default())
+        .manage(PendingAuth::default())
         .setup(|app| {
             tray::setup_tray(app.handle())?;
             start_local_backend(app.handle());
+            setup_deep_link(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -278,7 +369,9 @@ pub fn run() {
             refresh_local_backend,
             enable_remote_access,
             disable_remote_access,
-            remote_access_status
+            remote_access_status,
+            start_login,
+            take_pending_auth_code
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

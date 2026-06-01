@@ -1,4 +1,5 @@
-import type { HubFrame } from "@myra/shared";
+import type { AccountInfo, HubFrame } from "@myra/shared";
+import { AUTH_ROUTES } from "@myra/shared";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { createBunWebSocket } from "hono/bun";
@@ -6,7 +7,9 @@ import { cors } from "hono/cors";
 
 import { AuthService } from "../core/auth";
 import { AuthStore } from "../core/auth-store";
+import { deriveAccount, verifyClerkToken } from "../core/clerk";
 import { type FrameSink, HubCore } from "../core/hub";
+import { JsonAccountStore, MemHandoffStore, MemRefreshStore } from "./auth-stores";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -30,8 +33,24 @@ export function createHubApp() {
   }
   const dir = process.env.MYRA_HUB_DIR?.trim() || join(homedir(), ".myra-hub");
   const store = new AuthStore(join(dir, "auth.json"));
-  const auth = new AuthService(secret, store);
+  const accounts = new JsonAccountStore(join(dir, "accounts.json"));
+  const handoff = new MemHandoffStore();
+  const auth = new AuthService(secret, { credentials: store, refresh: new MemRefreshStore() });
   const hub = new HubCore();
+
+  const clerkCfg = {
+    issuer: process.env.CLERK_ISSUER?.trim() || "",
+    jwksUrl: process.env.CLERK_JWKS_URL?.trim() || "",
+    audience: process.env.CLERK_AUDIENCE?.trim() || undefined,
+  };
+  // Verify a Clerk bearer token (from the Authorization header) → upserted account.
+  const accountFromClerk = async (c: Context) => {
+    const payload = await verifyClerkToken(tokenOf(c) ?? "", clerkCfg);
+    if (!payload?.sub) return null;
+    const account = deriveAccount(payload, accounts.get(`clerk:${payload.sub}`));
+    accounts.upsert(account);
+    return account;
+  };
 
   const { upgradeWebSocket, websocket } = createBunWebSocket();
   const app = new Hono();
@@ -48,7 +67,7 @@ export function createHubApp() {
     const tok = tokenOf(c);
     if (!tok) return null;
     try {
-      return await auth.verifySession(tok);
+      return (await auth.verifySession(tok)).sub;
     } catch {
       return null;
     }
@@ -69,7 +88,69 @@ export function createHubApp() {
     }
     const userId = body.userId?.trim();
     if (!userId) return c.json({ ok: false, error: "missing userId" }, 400);
-    return c.json({ ok: true, data: { token: await auth.issueSession(userId) } });
+    // Local-test convenience: dev-login users are treated as pro so the board
+    // is reachable without Clerk. The CF host drops dev login entirely.
+    const token = await auth.issueSession({ userId, tier: "pro", role: "member" });
+    return c.json({ ok: true, data: { token } });
+  });
+
+  // --- real auth (Clerk identity; hub-owned sessions) -----------------------
+
+  const mint = async (account: AccountInfo) => ({
+    session: await auth.issueSession(account),
+    refresh: await auth.issueRefresh(account.userId),
+  });
+
+  app.post(AUTH_ROUTES.exchange, async (c) => {
+    const account = await accountFromClerk(c);
+    if (!account) return c.json({ ok: false, error: "invalid identity token" }, 401);
+    return c.json({ ok: true, data: { ...(await mint(account)), account } });
+  });
+
+  app.post(AUTH_ROUTES.refresh, async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { refresh?: string };
+    if (!body.refresh) return c.json({ ok: false, error: "missing refresh token" }, 400);
+    try {
+      const { userId } = await auth.consumeRefresh(body.refresh);
+      const account = accounts.get(userId) ?? { userId, tier: "free" as const, role: "member" as const };
+      return c.json({ ok: true, data: { ...(await mint(account)), account } });
+    } catch (e) {
+      return c.json({ ok: false, error: e instanceof Error ? e.message : "refresh failed" }, 401);
+    }
+  });
+
+  app.post(AUTH_ROUTES.logout, async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { refresh?: string };
+    if (body.refresh) await auth.revokeRefresh(body.refresh);
+    return c.json({ ok: true });
+  });
+
+  app.post(AUTH_ROUTES.desktopHandoff, async (c) => {
+    const account = await accountFromClerk(c);
+    if (!account) return c.json({ ok: false, error: "invalid identity token" }, 401);
+    const code = crypto.randomUUID().replace(/-/g, "");
+    handoff.put(code, await mint(account));
+    return c.json({ ok: true, data: { code } });
+  });
+
+  app.post(AUTH_ROUTES.desktopClaim, async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { code?: string };
+    if (!body.code) return c.json({ ok: false, error: "missing code" }, 400);
+    const tokens = handoff.take(body.code);
+    if (!tokens) return c.json({ ok: false, error: "invalid or expired code" }, 400);
+    return c.json({ ok: true, data: tokens });
+  });
+
+  app.get(AUTH_ROUTES.me, async (c) => {
+    try {
+      const claims = await auth.verifySession(tokenOf(c) ?? "");
+      return c.json({
+        ok: true,
+        data: { userId: claims.sub, tier: claims.tier, role: claims.role, orgId: claims.orgId },
+      });
+    } catch {
+      return c.json({ ok: false, error: "unauthorized" }, 401);
+    }
   });
 
   // Dashboard mints a one-time pairing code for the logged-in user.
@@ -177,7 +258,7 @@ export function createHubApp() {
       const tok = c.req.query("token");
       let userId: string | null = null;
       try {
-        if (tok) userId = await auth.verifySession(tok);
+        if (tok) userId = (await auth.verifySession(tok)).sub;
       } catch {
         userId = null;
       }

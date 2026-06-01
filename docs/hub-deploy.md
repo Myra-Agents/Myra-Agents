@@ -224,17 +224,41 @@ hub logs `[audit] connect|disconnect|revoke` lines (visible via `wrangler tail`)
 | List deployments | `wrangler deployments list` |
 | Roll back | `wrangler rollback [<version-id>]` |
 | Inspect KV | `wrangler kv key list --binding PAIRING` |
-| Rotate signing secret | `openssl rand -hex 32 \| wrangler secret put MYRA_HUB_SECRET` (then re-enroll all instances) |
-| Disable dev login | `wrangler deploy` (without `--var MYRA_HUB_DEV_LOGIN:1`) |
+| Rotate signing secret | `openssl rand -hex 32 \| wrangler secret put MYRA_HUB_SECRET` (then re-enroll all instances + everyone re-signs in) |
+| Set a user's tier | `wrangler kv key put --binding ACCOUNTS "acct:clerk:<id>" '{"userId":"clerk:<id>","tier":"pro","role":"member"}'` |
 | Revoke an instance | `curl -XPOST -H "authorization: Bearer $TOKEN" $HUB/api/instances/<id>/revoke` |
 | Delete the Worker | `wrangler delete` |
 
-## 8. What's where
+## 8. Authentication (Clerk)
+
+Identity is proven by **Clerk**; the hub verifies the Clerk JWT and mints its own
+session + refresh tokens (the dev `/auth/login` was removed on the CF host).
+
+Setup:
+1. Create a Clerk application; copy the **Frontend API / issuer** and **JWKS URL**
+   (Clerk dashboard → API Keys / "Show JWT public key").
+2. Set them in `wrangler.toml` `[vars]`: `CLERK_ISSUER`, `CLERK_JWKS_URL`
+   (optional `CLERK_AUDIENCE` if you mint via a Clerk JWT template).
+3. Create the `ACCOUNTS` and `AUTH` KV namespaces; paste their ids into
+   `wrangler.toml` (replacing the `REPLACE_WITH_*` placeholders).
+4. In Clerk, add the web app origin + the `/auth/desktop/` bridge URL to the
+   allowed redirect origins.
+5. Frontend build env: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`,
+   `NEXT_PUBLIC_MYRA_HUB_URL`, `NEXT_PUBLIC_MYRA_WEB_APP_URL` (the hosted bridge),
+   and for the desktop binary `MYRA_WEB_APP_URL`.
+
+`tier` defaults to `free` per account; set `pro` manually via the KV command in
+§7 (no billing wired). Desktop login deep-links back via the `myra://` scheme —
+on Windows/Linux pair the deep-link plugin with single-instance (follow-up).
+
+## 9. What's where
 
 | Thing | Lives in | Secret? | In git? |
 |---|---|---|---|
 | `MYRA_HUB_SECRET` | Cloudflare secret store | yes | no |
-| `MYRA_HUB_DEV_LOGIN` | Worker var (deploy flag) | no | no |
-| KV namespace id | `wrangler.toml` | no | yes |
+| `CLERK_ISSUER` / `CLERK_JWKS_URL` | Worker vars (`wrangler.toml`) | no | yes |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | frontend build env | no | no |
+| KV namespace ids (`PAIRING`/`ACCOUNTS`/`AUTH`) | `wrangler.toml` | no | yes |
+| Account record + tier | KV `ACCOUNTS` (`acct:<userId>`) | no | no |
 | DO + Worker code | `packages/hub/src/cf/` | no | yes |
 | Instance credential | `~/.myra-agents[-demo]/hub-credential.json` on each machine | yes | no |

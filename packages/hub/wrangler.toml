@@ -2,13 +2,24 @@
 # Deploy is NOT run by CI/the repo — it needs `wrangler login` + an account:
 #   cd packages/hub
 #   wrangler kv namespace create PAIRING        # paste the id below
+#   wrangler kv namespace create ACCOUNTS       # paste the id below
+#   wrangler kv namespace create AUTH           # paste the id below
 #   wrangler secret put MYRA_HUB_SECRET         # a long random string
+#   # set the Clerk vars below (CLERK_ISSUER / CLERK_JWKS_URL) for your instance
 #   wrangler deploy
-# Flip dev login on only for testing: `wrangler deploy --var MYRA_HUB_DEV_LOGIN:1`.
 
 name = "myra-hub"
 main = "src/cf/worker.ts"
 compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Identity is proven by Clerk; the hub verifies Clerk JWTs against this JWKS and
+# issues its own short session + refresh tokens. Find these in the Clerk
+# dashboard (API Keys → "Show JWT public key" / Frontend API URL).
+[vars]
+CLERK_ISSUER = "https://fun-moose-52.clerk.accounts.dev"
+CLERK_JWKS_URL = "https://fun-moose-52.clerk.accounts.dev/.well-known/jwks.json"
+# CLERK_AUDIENCE = "myra-hub"   # only if you mint via a Clerk JWT template
 
 [[durable_objects.bindings]]
 name = "USER_HUB"
@@ -18,7 +29,17 @@ class_name = "UserHub"
 tag = "v1"
 new_sqlite_classes = ["UserHub"]
 
-# Create the namespace, then replace the placeholder id:
+# Create each namespace, then replace the placeholder id:
 [[kv_namespaces]]
 binding = "PAIRING"
 id = "8be5ab52e37742e2ab15ab6d395b81d4"
+
+# Account records (acct:<userId> → AccountInfo).
+[[kv_namespaces]]
+binding = "ACCOUNTS"
+id = "2fda23d22497462c80c67f81e5d3fb8d"
+
+# Refresh tokens (rt:<token>) + one-time desktop handoff codes (ho:<code>).
+[[kv_namespaces]]
+binding = "AUTH"
+id = "06269c2fdccc465b91cd10af4d0f7bb5"

@@ -1,7 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
-import { sign, verify } from "hono/jwt";
+import type { AccountInfo, AuthTokens } from "@myra/shared";
+import { AUTH_ROUTES } from "@myra/shared";
+import { verify } from "hono/jwt";
 
+import { AuthService } from "../core/auth";
+import { deriveAccount, verifyClerkToken } from "../core/clerk";
+import { KvAccountStore } from "./account-store";
 import { INSTALL_PS1, INSTALL_SH } from "./install-scripts";
+import { KvHandoffStore, KvRefreshStore } from "./refresh-store";
 import type { Env } from "./user-hub";
 
 export { UserHub } from "./user-hub";
@@ -20,7 +26,6 @@ export { UserHub } from "./user-hub";
  * Phase-4 skeleton: type-checks against workers-types; not yet deployed
  * (`docs/centralized-hub-plan.md` P4). Deploy with `wrangler deploy`.
  */
-const SESSION_TTL_S = 60 * 60;
 
 // The dashboard is a desktop app (Tauri webview, origin `tauri://localhost` on
 // macOS/Linux or `(http|https)://tauri.localhost` on Windows) plus the Next dev
@@ -82,15 +87,72 @@ async function handle(req: Request, env: Env): Promise<Response> {
       return new Response(INSTALL_PS1, { headers: { "content-type": "text/plain; charset=utf-8" } });
     }
 
-    // Dev login placeholder (gated). Real deploys wire OIDC / magic-link.
-    if (url.pathname === "/auth/login" && req.method === "POST") {
-      if (!env.MYRA_HUB_DEV_LOGIN) return json({ ok: false, error: "dev login disabled" }, 501);
-      const body = (await req.json().catch(() => ({}))) as { userId?: string };
-      const userId = body.userId?.trim();
-      if (!userId) return json({ ok: false, error: "missing userId" }, 400);
-      const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_S;
-      const token = await sign({ sub: userId, typ: "session", exp }, secret, "HS256");
-      return json({ ok: true, data: { token } });
+    // --- authentication (Clerk proves identity; the hub owns sessions) ------
+    const auth = new AuthService(secret, { refresh: new KvRefreshStore(env.AUTH) });
+    const accounts = new KvAccountStore(env.ACCOUNTS);
+
+    // Exchange a verified Clerk token for a hub session + refresh.
+    if (url.pathname === AUTH_ROUTES.exchange && req.method === "POST") {
+      const account = await accountFromClerk(req, env, accounts);
+      if (!account) return json({ ok: false, error: "invalid identity token" }, 401);
+      const tokens = await mintTokens(auth, account);
+      return json({ ok: true, data: { ...tokens, account } });
+    }
+
+    // Rotate a refresh token (single-use) → fresh session + refresh.
+    if (url.pathname === AUTH_ROUTES.refresh && req.method === "POST") {
+      const body = (await req.json().catch(() => ({}))) as { refresh?: string };
+      if (!body.refresh) return json({ ok: false, error: "missing refresh token" }, 400);
+      try {
+        const { userId } = await auth.consumeRefresh(body.refresh);
+        const account = (await accounts.get(userId)) ?? { userId, tier: "free", role: "member" };
+        const tokens = await mintTokens(auth, account);
+        return json({ ok: true, data: { ...tokens, account } });
+      } catch (e) {
+        return json({ ok: false, error: e instanceof Error ? e.message : "refresh failed" }, 401);
+      }
+    }
+
+    // Logout — revoke the refresh token.
+    if (url.pathname === AUTH_ROUTES.logout && req.method === "POST") {
+      const body = (await req.json().catch(() => ({}))) as { refresh?: string };
+      if (body.refresh) await auth.revokeRefresh(body.refresh);
+      return json({ ok: true });
+    }
+
+    // Desktop handoff: bridge page (already Clerk-authed in the system browser)
+    // stashes the minted tokens under a one-time code so they never ride the
+    // myra:// deep-link URL.
+    if (url.pathname === AUTH_ROUTES.desktopHandoff && req.method === "POST") {
+      const account = await accountFromClerk(req, env, accounts);
+      if (!account) return json({ ok: false, error: "invalid identity token" }, 401);
+      const tokens = await mintTokens(auth, account);
+      const code = crypto.randomUUID().replace(/-/g, "");
+      await new KvHandoffStore(env.AUTH).put(code, tokens);
+      return json({ ok: true, data: { code } });
+    }
+
+    // Desktop claim: the app exchanges the one-time code for its tokens.
+    if (url.pathname === AUTH_ROUTES.desktopClaim && req.method === "POST") {
+      const body = (await req.json().catch(() => ({}))) as { code?: string };
+      if (!body.code) return json({ ok: false, error: "missing code" }, 400);
+      const tokens = await new KvHandoffStore(env.AUTH).take(body.code);
+      if (!tokens) return json({ ok: false, error: "invalid or expired code" }, 400);
+      return json({ ok: true, data: tokens });
+    }
+
+    // Who am I — decode the session claims for the UI / entitlement.
+    if (url.pathname === AUTH_ROUTES.me && req.method === "GET") {
+      const token = bearer(req) ?? url.searchParams.get("token") ?? "";
+      try {
+        const claims = await auth.verifySession(token);
+        return json({
+          ok: true,
+          data: { userId: claims.sub, tier: claims.tier, role: claims.role, orgId: claims.orgId },
+        });
+      } catch {
+        return json({ ok: false, error: "unauthorized" }, 401);
+      }
     }
 
     // Instance reverse tunnel: verify the instance token's signature to route.
@@ -171,4 +233,26 @@ function bearer(req: Request): string | null {
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+// --- Clerk identity → hub account -------------------------------------------
+
+/** Verify the request's Clerk bearer token, then upsert + return the account. */
+async function accountFromClerk(req: Request, env: Env, accounts: KvAccountStore): Promise<AccountInfo | null> {
+  const payload = await verifyClerkToken(bearer(req) ?? "", {
+    issuer: env.CLERK_ISSUER,
+    jwksUrl: env.CLERK_JWKS_URL,
+    audience: env.CLERK_AUDIENCE,
+  });
+  if (!payload?.sub) return null;
+  const account = deriveAccount(payload, await accounts.get(`clerk:${payload.sub}`));
+  await accounts.upsert(account);
+  return account;
+}
+
+/** Mint a fresh session + refresh pair for an account. */
+async function mintTokens(auth: AuthService, account: AccountInfo): Promise<AuthTokens> {
+  const session = await auth.issueSession(account);
+  const refresh = await auth.issueRefresh(account.userId);
+  return { session, refresh };
 }

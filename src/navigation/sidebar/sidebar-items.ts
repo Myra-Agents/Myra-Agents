@@ -1,11 +1,4 @@
-import {
-  Calendar,
-  ClipboardList,
-  Kanban,
-  type LucideIcon,
-  ScrollText,
-  Settings,
-} from "lucide-react";
+import { Calendar, ClipboardList, Kanban, type LucideIcon, ScrollText } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -56,17 +49,6 @@ export const sidebarItems: NavGroup[] = [
         title: "Logs",
         url: "/logs",
         icon: ScrollText,
-      },
-    ],
-  },
-  {
-    id: 2,
-    label: "Configuration",
-    items: [
-      {
-        title: "Settings",
-        url: "/settings",
-        icon: Settings,
       },
     ],
   },

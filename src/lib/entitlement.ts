@@ -1,6 +1,4 @@
-import { isTauri } from "@tauri-apps/api/core";
-
-import { connectionManager } from "@/lib/connections/manager";
+import { getAccount, isAuthenticated } from "@/lib/auth/session";
 
 export type Tier = "free" | "pro";
 export type Role = "admin" | "member";
@@ -20,20 +18,19 @@ function envTier(): Tier | undefined {
 }
 
 /**
- * STUB entitlement resolver — the single seam where tier/role is decided, so
- * real billing / hub-reported entitlement can swap in here later without
- * touching any call site. Source order (per the remote-access plan):
- *  - web: a registered hub (a logged-in hub user) ⇒ Pro; otherwise the env
- *    override; otherwise default `free`.
- *  - desktop: the env override; otherwise default `free` (free desktop keeps the
- *    local-only board).
- * `role`/`orgId` come from env stubs for now — populated and displayed, but not
- * enforced this round.
+ * The single seam where tier/role is decided. With a real auth session, the
+ * tier/role/orgId come straight from the hub-issued session claims (the account
+ * record, set by Clerk org claims + manual tier). With no session it falls back
+ * to the env override (desktop/local testing), else `free` — so free desktop
+ * keeps its local-only board. Real billing later only changes how the account
+ * record's `tier` is set, not this resolver.
  */
 export function resolveEntitlement(): Entitlement {
-  const env = envTier();
-  const hasHubSession = !isTauri() && connectionManager.listHubs().length > 0;
-  const tier: Tier = hasHubSession ? "pro" : (env ?? "free");
+  const account = isAuthenticated() ? getAccount() : null;
+  if (account) {
+    return { tier: account.tier, isPro: account.tier === "pro", role: account.role, orgId: account.orgId };
+  }
+  const tier: Tier = envTier() ?? "free";
   const role: Role = process.env.NEXT_PUBLIC_MYRA_ROLE === "admin" ? "admin" : "member";
   const orgId = process.env.NEXT_PUBLIC_MYRA_ORG_ID?.trim() || undefined;
   return { tier, isPro: tier === "pro", role, orgId };

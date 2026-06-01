@@ -191,9 +191,15 @@ and streams agent output end-to-end (project convention requires a manual run).
   stubbed; sqlite store uses coarse JSON-document rows. Real cloud (auth,
   sandbox tech, secrets, per-row tables) is deferred.
 - **Cross-server moves** disallowed (move stays within origin server).
-- **Entitlement is a STUB** — `src/lib/entitlement.ts` (`resolveEntitlement`) is
-  the single seam deciding tier/role. Today it reads: a registered hub session
-  (web ⇒ Pro), `NEXT_PUBLIC_MYRA_TIER`, else `free`; `role`/`orgId` come from
-  `NEXT_PUBLIC_MYRA_ROLE`/`NEXT_PUBLIC_MYRA_ORG_ID`. Real billing / hub-reported
-  entitlement swaps in here without touching call sites. `role`/`orgId` are
-  surfaced but **not enforced** (admin-sees-all-org-instances is a hub follow-up).
+- **Auth: Clerk wired; billing still a stub.** Identity is real — Clerk proves
+  who you are; the hub verifies the Clerk JWT at `/auth/exchange` and mints its
+  own short **session** JWT + a single-use, revocable **refresh** token
+  (`packages/hub/src/core/auth.ts`, stores in `cf/{account,refresh}-store.ts`).
+  Web signs in in-page; desktop via system browser + `myra://` deep-link through
+  the `/auth/desktop/` bridge page. `src/lib/auth/session.ts` owns the client
+  session lifecycle; `src/lib/entitlement.ts` reads tier/role/orgId from the
+  session claims. **Still stubbed:** `tier` is set manually on the account record
+  (KV `acct:<userId>`) — no billing/Stripe webhook yet; `role`/`orgId` come from
+  Clerk org claims but admin-sees-all-org enforcement is a hub follow-up (DO is
+  per-`userId`). `NEXT_PUBLIC_MYRA_TIER`/`_ROLE`/`_ORG_ID` remain env fallbacks
+  for local/desktop testing when there's no session.

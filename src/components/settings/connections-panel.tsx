@@ -19,10 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/use-auth";
 import { useConnections } from "@/hooks/use-connections";
 import { useEntitlement } from "@/hooks/use-entitlement";
 import type { ConnectionStatus } from "@/lib/connections/types";
-import { hubLogin } from "@/lib/transport/hub";
 import { cn } from "@/lib/utils";
 
 const STATUS_COLOR: Record<ConnectionStatus, string> = {
@@ -40,13 +40,13 @@ const STATUS_COLOR: Record<ConnectionStatus, string> = {
 export function ConnectionsPanel() {
   const t = useTranslations("settings.connections");
   const { isPro } = useEntitlement();
+  const { account, isAuthenticated, signIn, signOut, busy: authBusy } = useAuth();
   const {
     connections,
     hubs,
     primaryId,
     add,
     remove,
-    addHub,
     removeHub,
     pairHub,
     revokeHubInstance,
@@ -56,9 +56,6 @@ export function ConnectionsPanel() {
   } = useConnections();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
-  const [hubUrl, setHubUrl] = useState("");
-  const [hubUser, setHubUser] = useState("");
-  const [hubBusy, setHubBusy] = useState(false);
   // The freshly minted pairing code for one hub (cleared when another is paired).
   const [pairing, setPairing] = useState<{ hubId: string; code: string; expiresAt: number } | null>(null);
   const [pairBusy, setPairBusy] = useState(false);
@@ -101,28 +98,6 @@ export function ConnectionsPanel() {
     setLabel("");
     setUrl("");
     toast.success(t("added"));
-  };
-
-  const handleAddHub = async () => {
-    const trimmed = hubUrl.trim();
-    const user = hubUser.trim();
-    if (!trimmed || !user) return;
-    if (!/^https?:\/\//.test(trimmed)) {
-      toast.error(t("invalidUrl"));
-      return;
-    }
-    setHubBusy(true);
-    try {
-      const token = await hubLogin(trimmed, user);
-      addHub({ label: `${user} @ ${trimmed.replace(/^https?:\/\//, "")}`, baseUrl: trimmed, token });
-      setHubUrl("");
-      setHubUser("");
-      toast.success(t("hub.added"));
-    } catch {
-      toast.error(t("hub.loginFailed"));
-    } finally {
-      setHubBusy(false);
-    }
   };
 
   return (
@@ -219,6 +194,28 @@ export function ConnectionsPanel() {
             </div>
             <p className="text-muted-foreground text-sm">{t("hub.description")}</p>
 
+            <div className="flex items-center gap-2 rounded-md border p-3">
+              <div className="min-w-0 flex-1">
+                {isAuthenticated ? (
+                  <>
+                    <p className="font-medium text-sm">{t("account.signedInAs")}</p>
+                    <p className="truncate text-muted-foreground text-xs">{account?.email ?? account?.userId}</p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-sm">{t("account.signedOut")}</p>
+                )}
+              </div>
+              {isAuthenticated ? (
+                <Button variant="outline" size="sm" disabled={authBusy} onClick={() => void signOut()}>
+                  {t("account.signOut")}
+                </Button>
+              ) : (
+                <Button size="sm" disabled={authBusy} onClick={() => void signIn()}>
+                  {t("account.signIn")}
+                </Button>
+              )}
+            </div>
+
             {hubs.length > 0 && (
               <div className="space-y-3">
                 {hubs.map((hub) => {
@@ -241,14 +238,16 @@ export function ConnectionsPanel() {
                           <KeyRoundIcon className="size-3" />
                           {t("hub.pair")}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => removeHub(hub.id)}
-                          title={t("hub.remove")}
-                        >
-                          <TrashIcon />
-                        </Button>
+                        {hub.id !== "cloud" && (
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => removeHub(hub.id)}
+                            title={t("hub.remove")}
+                          >
+                            <TrashIcon />
+                          </Button>
+                        )}
                       </div>
 
                       {pairing?.hubId === hub.id && (
@@ -328,32 +327,6 @@ export function ConnectionsPanel() {
                 })}
               </div>
             )}
-
-            <div className="grid gap-2 rounded-md border border-dashed p-3 sm:grid-cols-[1fr_1.5fr_auto] sm:items-end">
-              <div className="space-y-1">
-                <Label className="text-xs">{t("hub.userField")}</Label>
-                <Input
-                  value={hubUser}
-                  onChange={(e) => setHubUser(e.target.value)}
-                  placeholder={t("hub.userPlaceholder")}
-                  className="h-8"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("urlField")}</Label>
-                <Input
-                  value={hubUrl}
-                  onChange={(e) => setHubUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddHub()}
-                  placeholder={t("hub.urlPlaceholder")}
-                  className="h-8 font-mono text-xs"
-                />
-              </div>
-              <Button size="sm" onClick={handleAddHub} disabled={hubBusy || !hubUrl.trim() || !hubUser.trim()}>
-                <PlusIcon className="size-3" />
-                {t("hub.add")}
-              </Button>
-            </div>
           </div>
         )}
       </CardContent>

@@ -22,7 +22,22 @@
     "schedules": "Planifications",
     "planner": "Planifier la journée",
     "logs": "Journaux",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "account": {
+      "guest": "Invité",
+      "signedIn": "Connecté",
+      "notSignedIn": "Non connecté",
+      "account": "Compte",
+      "settings": "Paramètres",
+      "signIn": "Se connecter",
+      "signOut": "Se déconnecter"
+    },
+    "support": {
+      "title": "Besoin de plus ?",
+      "body": "Ouvrez une issue ou contactez-nous sur",
+      "repo": "Ouvrir le dépôt",
+      "dismiss": "Masquer"
+    }
   },
   "kanban": {
     "title": "Tableau Kanban",
@@ -276,6 +291,23 @@
   "settings": {
     "title": "Paramètres",
     "description": "Configurez les agents, préférences et comportement de l'application",
+    "hub": {
+      "title": "Hub",
+      "connected": "Connecté · {count, plural, =0 {aucune machine en ligne} one {# machine en ligne} other {# machines en ligne}}",
+      "checking": "Vérification de la disponibilité du hub…",
+      "unreachable": "Hub injoignable",
+      "notSignedIn": "Non connecté",
+      "notConfigured": "Hub non configuré",
+      "signIn": "Se connecter",
+      "signOut": "Se déconnecter",
+      "retry": "Réessayer"
+    },
+    "tabs": {
+      "hub": "Hub",
+      "preferences": "Préférences",
+      "agents": "Agents",
+      "data": "Données"
+    },
     "connections": {
       "title": "Connexions",
       "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les cartes de chacun portent une étiquette d'origine. La connexion locale est permanente.",
@@ -342,6 +374,12 @@
           "notNow": "Plus tard",
           "needHub": "Ajoutez d'abord un hub dans les Paramètres, puis activez l'accès distant."
         }
+      },
+      "account": {
+        "signedInAs": "Connecté en tant que",
+        "signedOut": "Non connecté",
+        "signOut": "Se déconnecter",
+        "signIn": "Se connecter"
       }
     },
     "agents": {
@@ -421,11 +459,6 @@
     "title": "Myra Pro",
     "body": "Myra Pro vous permet d'accéder à vos agents où que vous soyez. L'application gratuite est réservée au bureau — passez à Pro pour utiliser l'application web et superviser vos machines à distance.",
     "signInTitle": "Déjà Pro ? Connectez-vous à votre hub",
-    "userField": "Utilisateur",
-    "urlField": "URL du hub",
-    "signIn": "Se connecter",
-    "signedIn": "Connecté.",
-    "loginFailed": "Impossible de se connecter au hub.",
-    "invalidUrl": "Saisissez une URL complète (http:// ou https://)."
+    "signIn": "Se connecter"
   }
 }

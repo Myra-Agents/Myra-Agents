@@ -33,8 +33,17 @@ import { DOCredentialStore } from "./do-credential-store";
 export interface Env {
   USER_HUB: DurableObjectNamespace;
   PAIRING: KVNamespace;
+  /** Account records (`acct:<userId>` → AccountInfo). */
+  ACCOUNTS: KVNamespace;
+  /** Refresh tokens (`rt:<token>`) + desktop handoff codes (`ho:<code>`). */
+  AUTH: KVNamespace;
   MYRA_HUB_SECRET: string;
-  MYRA_HUB_DEV_LOGIN?: string;
+  /** Clerk issuer (e.g. https://<subdomain>.clerk.accounts.dev). */
+  CLERK_ISSUER: string;
+  /** Clerk JWKS endpoint used to verify Clerk-issued JWTs. */
+  CLERK_JWKS_URL: string;
+  /** Optional audience to enforce when a Clerk JWT template sets `aud`. */
+  CLERK_AUDIENCE?: string;
   /** Comma-separated CORS allowlist override; defaults cover the dashboard apps. */
   MYRA_CORS_ORIGIN?: string;
 }
@@ -56,7 +65,7 @@ export class UserHub implements DurableObject {
     private state: DurableObjectState,
     env: Env,
   ) {
-    this.auth = new AuthService(env.MYRA_HUB_SECRET, new DOCredentialStore(state.storage));
+    this.auth = new AuthService(env.MYRA_HUB_SECRET, { credentials: new DOCredentialStore(state.storage) });
   }
 
   async fetch(req: Request): Promise<Response> {

@@ -1,24 +1,24 @@
+import type { AccountInfo, SessionClaims } from "@myra/shared";
 import { sign, verify } from "hono/jwt";
 
+import type { RefreshStore } from "./auth-stores";
 import type { CredentialStore } from "./credential-store";
 
 /**
  * Identity for the relay (transport-agnostic).
  *
- * Two token kinds, both HS256-signed with the hub secret:
- *  - **session** — short-lived, carries `userId`; held by a dashboard.
+ * Token kinds, all HS256-signed with the hub secret:
+ *  - **session** — short-lived, carries `userId` + tier/role/orgId claims; held
+ *    by a dashboard. Refreshed via an opaque **refresh** token (single-use,
+ *    rotated, revocable — stored in {@link RefreshStore}).
  *  - **instance** — long-lived, carries `(userId, instanceId, jti)`; held by a
  *    machine, obtained by exchanging a one-time pairing code.
  *
- * The identity *proof* for a session (who is this user?) is pluggable — phase 1
- * of the cloud rollout wires OIDC / magic-link here; the dev login below is the
- * placeholder behind `MYRA_HUB_DEV_LOGIN`.
+ * The identity *proof* for a session (who is this user?) is no longer the dev
+ * stub: the host front door verifies a managed-IdP (Clerk) token and calls
+ * {@link issueSession} with the resolved account. Sessions + refresh are owned
+ * here so the connector and Tauri webview never depend on the IdP SDK.
  */
-export interface SessionClaims {
-  sub: string;
-  typ: "session";
-  exp: number;
-}
 export interface InstanceClaims {
   sub: string;
   iid: string;
@@ -27,7 +27,8 @@ export interface InstanceClaims {
   exp: number;
 }
 
-const SESSION_TTL_S = 60 * 60; // 1h
+const SESSION_TTL_S = 15 * 60; // 15min
+const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30d
 const INSTANCE_TTL_S = 60 * 60 * 24 * 90; // 90d
 const PAIRING_TTL_MS = 10 * 60 * 1000; // 10min
 
@@ -36,26 +37,78 @@ interface PairingEntry {
   expiresAt: number;
 }
 
+export interface AuthStores {
+  /** Per-user enrolled-instance state (the per-user DO, on the CF host). */
+  credentials?: CredentialStore;
+  /** Refresh-token state (the host front door, on the CF host). */
+  refresh?: RefreshStore;
+}
+
 export class AuthService {
   private pairing = new Map<string, PairingEntry>();
+  private readonly credentials?: CredentialStore;
+  private readonly refreshStore?: RefreshStore;
 
   constructor(
     private readonly secret: string,
-    private readonly store: CredentialStore,
-  ) {}
+    stores: AuthStores = {},
+  ) {
+    this.credentials = stores.credentials;
+    this.refreshStore = stores.refresh;
+  }
+
+  private credentialStore(): CredentialStore {
+    if (!this.credentials) throw new Error("AuthService: no credential store configured");
+    return this.credentials;
+  }
+  private refresh(): RefreshStore {
+    if (!this.refreshStore) throw new Error("AuthService: no refresh store configured");
+    return this.refreshStore;
+  }
 
   // --- user sessions --------------------------------------------------------
 
-  async issueSession(userId: string): Promise<string> {
+  /** Mint a short-lived session JWT carrying the account's tier/role/orgId. */
+  async issueSession(account: AccountInfo): Promise<string> {
     const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_S;
-    return sign({ sub: userId, typ: "session", exp }, this.secret, "HS256");
+    const claims: SessionClaims = {
+      sub: account.userId,
+      typ: "session",
+      tier: account.tier,
+      role: account.role,
+      orgId: account.orgId,
+      exp,
+    };
+    return sign({ ...claims }, this.secret, "HS256");
   }
 
-  /** Verify a session token → userId. Throws on bad/expired/wrong-type tokens. */
-  async verifySession(token: string): Promise<string> {
+  /** Verify a session token → claims. Throws on bad/expired/wrong-type tokens. */
+  async verifySession(token: string): Promise<SessionClaims> {
     const claims = (await verify(token, this.secret, "HS256")) as unknown as SessionClaims;
     if (claims.typ !== "session") throw new Error("not a session token");
-    return claims.sub;
+    return claims;
+  }
+
+  // --- refresh tokens -------------------------------------------------------
+
+  /** Mint an opaque, single-use refresh token bound to a user. */
+  async issueRefresh(userId: string): Promise<string> {
+    const token = crypto.randomUUID().replace(/-/g, "");
+    await this.refresh().put(token, { userId, exp: Date.now() + REFRESH_TTL_MS });
+    return token;
+  }
+
+  /** Consume a refresh token (single-use) → userId. Throws if invalid/expired/reused. */
+  async consumeRefresh(token: string): Promise<{ userId: string }> {
+    const rec = await this.refresh().take(token.trim());
+    if (!rec) throw new Error("invalid refresh token");
+    if (Date.now() > rec.exp) throw new Error("refresh token expired");
+    return { userId: rec.userId };
+  }
+
+  /** Revoke a refresh token (logout). Idempotent. */
+  async revokeRefresh(token: string): Promise<void> {
+    await this.refresh().del(token.trim());
   }
 
   // --- pairing + enrollment -------------------------------------------------
@@ -87,7 +140,7 @@ export class AuthService {
   async issueInstanceCredential(userId: string, instanceId: string, label: string): Promise<string> {
     const jti = crypto.randomUUID();
     const exp = Math.floor(Date.now() / 1000) + INSTANCE_TTL_S;
-    await this.store.addInstance({ userId, instanceId, label, jti, enrolledAt: new Date().toISOString() });
+    await this.credentialStore().addInstance({ userId, instanceId, label, jti, enrolledAt: new Date().toISOString() });
     return sign({ sub: userId, iid: instanceId, jti, typ: "instance", exp }, this.secret, "HS256");
   }
 
@@ -95,16 +148,16 @@ export class AuthService {
   async verifyInstance(token: string): Promise<InstanceClaims> {
     const claims = (await verify(token, this.secret, "HS256")) as unknown as InstanceClaims;
     if (claims.typ !== "instance") throw new Error("not an instance token");
-    if (await this.store.isRevoked(claims.jti)) throw new Error("credential revoked");
+    if (await this.credentialStore().isRevoked(claims.jti)) throw new Error("credential revoked");
     return claims;
   }
 
   /** Revoke a user's instance credential. Returns true if it existed. */
   revoke(userId: string, instanceId: string): boolean | Promise<boolean> {
-    return this.store.revoke(userId, instanceId);
+    return this.credentialStore().revoke(userId, instanceId);
   }
 
   listEnrolled(userId: string) {
-    return this.store.list(userId);
+    return this.credentialStore().list(userId);
   }
 }

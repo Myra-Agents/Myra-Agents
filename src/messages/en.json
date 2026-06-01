@@ -22,7 +22,22 @@
     "schedules": "Schedules",
     "planner": "Day Planner",
     "logs": "Logs",
-    "settings": "Settings"
+    "settings": "Settings",
+    "account": {
+      "guest": "Guest",
+      "signedIn": "Signed in",
+      "notSignedIn": "Not signed in",
+      "account": "Account",
+      "settings": "Settings",
+      "signIn": "Sign in",
+      "signOut": "Sign out"
+    },
+    "support": {
+      "title": "Looking for something more?",
+      "body": "Open an issue or reach out on",
+      "repo": "Open the repository",
+      "dismiss": "Dismiss"
+    }
   },
   "kanban": {
     "title": "Kanban Board",
@@ -276,6 +291,23 @@
   "settings": {
     "title": "Settings",
     "description": "Configure agents, preferences, and app behavior",
+    "hub": {
+      "title": "Hub",
+      "connected": "Connected · {count, plural, =0 {no machines online} one {# machine online} other {# machines online}}",
+      "checking": "Checking hub availability…",
+      "unreachable": "Hub unreachable",
+      "notSignedIn": "Not signed in",
+      "notConfigured": "Hub not configured",
+      "signIn": "Sign in",
+      "signOut": "Sign out",
+      "retry": "Retry"
+    },
+    "tabs": {
+      "hub": "Hub",
+      "preferences": "Preferences",
+      "agents": "Agents",
+      "data": "Data"
+    },
     "connections": {
       "title": "Connections",
       "description": "Backends this board aggregates. Add remote servers; cards from each are tagged by origin. The local connection is permanent.",
@@ -342,6 +374,12 @@
           "notNow": "Not now",
           "needHub": "Add a hub in Settings first, then enable remote access."
         }
+      },
+      "account": {
+        "signedInAs": "Signed in as",
+        "signedOut": "Not signed in",
+        "signOut": "Sign out",
+        "signIn": "Sign in"
       }
     },
     "agents": {
@@ -421,11 +459,6 @@
     "title": "Myra Pro",
     "body": "Myra Pro lets you reach your agents from anywhere. The free app is desktop-only — upgrade to use the web app and observe your machines remotely.",
     "signInTitle": "Already Pro? Sign in to your hub",
-    "userField": "User",
-    "urlField": "Hub URL",
-    "signIn": "Sign in",
-    "signedIn": "Signed in.",
-    "loginFailed": "Could not sign in to the hub.",
-    "invalidUrl": "Enter a full URL (http:// or https://)."
+    "signIn": "Sign in"
   }
 }

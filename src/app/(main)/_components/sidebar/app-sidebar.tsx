@@ -23,6 +23,8 @@ import { useShortcutStore } from "@/stores/shortcut-store";
 
 import { MacSidebarControls } from "../window-controls";
 import { NavMain } from "./nav-main";
+import { NavUser } from "./nav-user";
+import { SidebarSupportCard } from "./sidebar-support-card";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations("nav");
@@ -85,7 +87,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={sidebarItems} />
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-3 py-2 text-xs text-muted-foreground">v{APP_CONFIG.version}</div>
+        <SidebarSupportCard />
+        <NavUser />
+        <div className="px-3 pb-1 text-center text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
+          v{APP_CONFIG.version}
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

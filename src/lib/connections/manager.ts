@@ -1,6 +1,14 @@
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 
 import { parseGlobalId } from "@/lib/aggregate/global-id";
+import {
+  getAccount,
+  getValidSessionToken,
+  isAuthConfigured,
+  isAuthenticated,
+  refresh as refreshSession,
+  subscribe as subscribeAuth,
+} from "@/lib/auth/session";
 import { browserTransport } from "@/lib/transport/browser";
 import { createHttpTransport } from "@/lib/transport/http";
 import { createHubClient, type HubClient } from "@/lib/transport/hub";
@@ -8,6 +16,10 @@ import { tauriTransport } from "@/lib/transport/tauri";
 import type { Transport, UnlistenFn } from "@/lib/transport/types";
 
 import type { Connection, ConnectionEntry, ConnectionStatus, HubRegistration } from "./types";
+
+/** The managed cloud hub's fixed id — its auth is owned by `lib/auth/session`. */
+const CLOUD_HUB_ID = "cloud";
+const CLOUD_HUB_URL = process.env.NEXT_PUBLIC_MYRA_HUB_URL?.replace(/\/$/, "") || "";
 
 /** Optional server URL baked at build time — seeds the local connection at a real Node server. */
 const SERVER_URL = process.env.NEXT_PUBLIC_MYRA_SERVER_URL?.trim();
@@ -60,6 +72,10 @@ class ConnectionManager {
 
   constructor() {
     this.loadRegistry();
+    // The cloud hub is derived from auth state, never persisted — sync it now
+    // and whenever the session changes (login / logout / refresh).
+    this.syncCloudHub();
+    subscribeAuth(() => this.syncCloudHub());
   }
 
   // --- registry persistence -------------------------------------------------
@@ -72,6 +88,7 @@ class ConnectionManager {
         this.entries.set(conn.id, { connection: conn, transport: this.buildTransport(conn) });
       }
       for (const reg of persisted.hubs ?? []) {
+        if (reg.id === CLOUD_HUB_ID) continue; // re-derived from auth, not persisted
         this.hubs.set(reg.id, { reg, client: createHubClient(reg.baseUrl, reg.token) });
       }
       this.primaryConnId = this.entries.has(persisted.primaryId)
@@ -103,7 +120,8 @@ class ConnectionManager {
     const payload: PersistedRegistry = {
       connections: this.list().filter((c) => c.kind !== "hub-instance"), // hub-instances are rebuilt from hubs
       primaryId: this.primaryConnId,
-      hubs: [...this.hubs.values()].map((h) => h.reg),
+      // The cloud hub is derived from auth state (syncCloudHub), never persisted.
+      hubs: [...this.hubs.values()].map((h) => h.reg).filter((reg) => reg.id !== CLOUD_HUB_ID),
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -315,6 +333,35 @@ class ConnectionManager {
   }
 
   // --- hubs -----------------------------------------------------------------
+
+  /**
+   * Reconcile the managed cloud hub with the auth session: add it (with a
+   * dynamic-token client that refreshes on 401) when signed in, drop it when
+   * signed out. Never persisted — auth is the single source of truth.
+   */
+  private syncCloudHub(): void {
+    const shouldHave = CLOUD_HUB_URL.length > 0 && isAuthConfigured() && isAuthenticated();
+    const has = this.hubs.has(CLOUD_HUB_ID);
+    if (shouldHave && !has) {
+      const reg: HubRegistration = {
+        id: CLOUD_HUB_ID,
+        label: getAccount()?.email ?? "Myra Cloud",
+        baseUrl: CLOUD_HUB_URL,
+        token: "",
+      };
+      const client = createHubClient(CLOUD_HUB_URL, {
+        getToken: () => getValidSessionToken(),
+        onUnauthorized: () => refreshSession(),
+      });
+      this.hubs.set(CLOUD_HUB_ID, { reg, client });
+      this.hubsReady = undefined; // force re-expand on the next fan-out
+      this.expandHub(CLOUD_HUB_ID)
+        .then(() => this.emitTopology())
+        .catch((e) => console.error("[ConnectionManager] cloud hub expand failed:", e));
+    } else if (!shouldHave && has) {
+      this.removeHub(CLOUD_HUB_ID);
+    }
+  }
 
   /** Registered hubs (one URL+token that expands into N instance connections). */
   listHubs(): HubRegistration[] {

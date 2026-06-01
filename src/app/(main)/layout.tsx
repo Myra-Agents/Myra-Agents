@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AppSidebar } from "@/app/(main)/_components/sidebar/app-sidebar";
+import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { RequirePro } from "@/components/require-pro";
 import { RemoteAccessConsent } from "@/components/settings/remote-access-consent";
 import { Separator } from "@/components/ui/separator";
@@ -74,6 +75,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
           <RequirePro>{children}</RequirePro>
         </div>
       </SidebarInset>
+      <AuthBootstrap />
       <RemoteAccessConsent />
     </SidebarProvider>
   );

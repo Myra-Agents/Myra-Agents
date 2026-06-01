@@ -104,6 +104,8 @@ export type RpcResult = { ok: true; data: unknown } | { ok: false; error: string
 /** Canonical hub route shapes, shared by host + client transport. */
 export const HUB_ROUTES = {
   agentConnect: "/agent/connect",
+  /** Unauthenticated liveness probe — used by the dashboard to show hub availability. */
+  health: "/healthz",
   instances: "/api/instances",
   pair: "/api/instances/pair",
   revoke: (instanceId: string) => `/api/instances/${instanceId}/revoke`,
@@ -116,3 +118,56 @@ export interface PairingCode {
   code: string;
   expiresAt: number;
 }
+
+// --- Authentication ---------------------------------------------------------
+
+/** Product tier. `free` = desktop-only/local; `pro` = remote/hub access. */
+export type Tier = "free" | "pro";
+/** Org role. Surfaced now; admin-sees-all-org enforcement is a follow-up. */
+export type Role = "admin" | "member";
+
+/**
+ * The account record the hub keeps per user (keyed by `userId`). `tier` is set
+ * manually for now (no billing); `role`/`orgId` come from the IdP's org claims.
+ */
+export interface AccountInfo {
+  userId: string;
+  email?: string;
+  tier: Tier;
+  role: Role;
+  orgId?: string;
+}
+
+/**
+ * Claims embedded in a hub **session** JWT (HS256, short-lived). Mirrors
+ * {@link AccountInfo} minus `email`, so the client can read tier/role/orgId
+ * without an extra round-trip. `sub` is the `userId`.
+ */
+export interface SessionClaims {
+  sub: string;
+  typ: "session";
+  tier: Tier;
+  role: Role;
+  orgId?: string;
+  exp: number;
+}
+
+/** Result of a login exchange / refresh: a short session + a long refresh token. */
+export interface AuthTokens {
+  session: string;
+  refresh: string;
+}
+
+/**
+ * Hub auth routes. Identity is proven by a managed IdP (Clerk) at
+ * `exchange`/`desktopHandoff`; the hub then owns the session lifecycle
+ * (`refresh`/`logout`) and the desktop handoff (`desktopClaim`).
+ */
+export const AUTH_ROUTES = {
+  exchange: "/auth/exchange",
+  refresh: "/auth/refresh",
+  logout: "/auth/logout",
+  desktopHandoff: "/auth/desktop-handoff",
+  desktopClaim: "/auth/desktop-claim",
+  me: "/auth/me",
+} as const;

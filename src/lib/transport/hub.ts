@@ -53,10 +53,34 @@ export async function hubLogin(baseUrl: string, userId: string): Promise<string>
   return body.data.token;
 }
 
-export function createHubClient(baseUrl: string, token: string): HubClient {
+/**
+ * How a hub client gets its bearer token. A static `string` for self-hosted
+ * hubs; for the managed cloud hub a {@link HubClientAuth} whose `getToken`
+ * returns the current (possibly just-refreshed) session token and whose
+ * `onUnauthorized` attempts a refresh on a 401 so one retry can succeed.
+ */
+export interface HubClientAuth {
+  getToken(): string | null | Promise<string | null>;
+  onUnauthorized?(): Promise<boolean>;
+}
+
+export function createHubClient(baseUrl: string, auth: string | HubClientAuth): HubClient {
   const root = baseUrl.replace(/\/$/, "");
-  const wsUrl = `${root.replace(/^http/, "ws")}${HUB_ROUTES.events}?token=${encodeURIComponent(token)}`;
-  const authHeaders = { authorization: `Bearer ${token}` };
+  const getToken: HubClientAuth["getToken"] = typeof auth === "string" ? () => auth : auth.getToken;
+  const onUnauthorized = typeof auth === "string" ? undefined : auth.onUnauthorized;
+
+  /** fetch with the current bearer token; on 401, refresh once then retry. */
+  async function authedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+    const once = async (): Promise<Response> => {
+      const token = await getToken();
+      const headers = new Headers(init.headers);
+      if (token) headers.set("authorization", `Bearer ${token}`);
+      return fetch(`${root}${path}`, { ...init, headers });
+    };
+    const res = await once();
+    if (res.status === 401 && onUnauthorized && (await onUnauthorized())) return once();
+    return res;
+  }
 
   // keyed `${instanceId}::${event}` → handlers
   const handlers = new Map<string, Set<Handler>>();
@@ -92,8 +116,14 @@ export function createHubClient(baseUrl: string, token: string): HubClient {
     return !closed && (handlers.size > 0 || presenceCbs.size > 0);
   }
 
-  function openSocket(): void {
+  async function openSocket(): Promise<void> {
     if (socket || !wantSocket() || typeof WebSocket === "undefined") return;
+    const token = await getToken();
+    // A teardown (or another open) may have happened while awaiting the token.
+    if (socket || !wantSocket() || typeof WebSocket === "undefined") return;
+    const wsUrl = `${root.replace(/^http/, "ws")}${HUB_ROUTES.events}${
+      token ? `?token=${encodeURIComponent(token)}` : ""
+    }`;
     const ws = new WebSocket(wsUrl);
     socket = ws;
     ws.onopen = () => {
@@ -118,14 +148,14 @@ export function createHubClient(baseUrl: string, token: string): HubClient {
     reconnectTimer = setTimeout(() => {
       reconnectTimer = undefined;
       backoff = Math.min(backoff * 2, MAX_BACKOFF);
-      openSocket();
+      void openSocket();
     }, backoff);
   }
 
   async function rpc(instanceId: string, cmd: string, args?: Record<string, unknown>): Promise<unknown> {
-    const res = await fetch(`${root}${HUB_ROUTES.rpc(instanceId, cmd)}`, {
+    const res = await authedFetch(HUB_ROUTES.rpc(instanceId, cmd), {
       method: "POST",
-      headers: { ...authHeaders, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(args ?? {}),
     });
     let body: RpcResult;
@@ -140,7 +170,7 @@ export function createHubClient(baseUrl: string, token: string): HubClient {
 
   return {
     async listInstances() {
-      const res = await fetch(`${root}${HUB_ROUTES.instances}`, { headers: authHeaders });
+      const res = await authedFetch(HUB_ROUTES.instances);
       const body = (await res.json()) as { ok: boolean; data?: InstanceInfo[]; error?: string };
       if (!body.ok) throw new Error(body.error ?? "listInstances failed");
       return body.data ?? [];
@@ -158,7 +188,7 @@ export function createHubClient(baseUrl: string, token: string): HubClient {
             handlers.set(k, set);
           }
           set.add(typed);
-          openSocket();
+          void openSocket();
           return Promise.resolve(() => {
             const current = handlers.get(k);
             if (current) {
@@ -172,19 +202,19 @@ export function createHubClient(baseUrl: string, token: string): HubClient {
 
     onPresence(cb: () => void): () => void {
       presenceCbs.add(cb);
-      openSocket();
+      void openSocket();
       return () => presenceCbs.delete(cb);
     },
 
     async pair() {
-      const res = await fetch(`${root}${HUB_ROUTES.pair}`, { method: "POST", headers: authHeaders });
+      const res = await authedFetch(HUB_ROUTES.pair, { method: "POST" });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; data?: PairingCode; error?: string } | null;
       if (!body?.ok || !body.data) throw new Error(body?.error ?? `pair failed (${res.status})`);
       return body.data;
     },
 
     async revoke(instanceId: string) {
-      const res = await fetch(`${root}${HUB_ROUTES.revoke(instanceId)}`, { method: "POST", headers: authHeaders });
+      const res = await authedFetch(HUB_ROUTES.revoke(instanceId), { method: "POST" });
       const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
       if (!body?.ok) throw new Error(body?.error ?? `revoke failed (${res.status})`);
     },
