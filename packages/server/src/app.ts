@@ -38,10 +38,14 @@ export function createApp(deps: AppDeps = {}) {
   const { upgradeWebSocket, websocket } = createBunWebSocket();
   const app = new Hono();
 
-  // The web client runs on a different origin (localhost:1420) than the
-  // server, so allow cross-origin RPC — but to an allowlist, not `*`. Override
-  // with MYRA_CORS_ORIGIN (comma-separated) for a self-host on another origin.
-  const allowedOrigins = (process.env.MYRA_CORS_ORIGIN ?? "http://localhost:1420,http://127.0.0.1:1420")
+  // The web client runs on a different origin than the server, so allow
+  // cross-origin RPC — but to an allowlist, not `*`. Covers the Next dev server
+  // (localhost:1420) and the packaged Tauri webview, whose origin is
+  // `tauri://localhost` (macOS/Linux) or `(http|https)://tauri.localhost`
+  // (Windows). Override with MYRA_CORS_ORIGIN (comma-separated) for a self-host.
+  const DEFAULT_ORIGINS =
+    "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost,https://tauri.localhost,http://tauri.localhost";
+  const allowedOrigins = (process.env.MYRA_CORS_ORIGIN ?? DEFAULT_ORIGINS)
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);
