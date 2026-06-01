@@ -320,6 +320,28 @@
         "revokeFailed": "Could not revoke the instance.",
         "osUnix": "macOS / Linux",
         "osWindows": "Windows"
+      },
+      "remote": {
+        "title": "Remote Access",
+        "description": "Make this computer reachable from the web app anywhere. It runs Myra in the background as a per-user service enrolled to your hub.",
+        "reachable": "This computer is reachable via {hub} as {label}",
+        "localOnly": "Local only — this computer isn't reachable remotely.",
+        "enable": "Make this computer reachable",
+        "stop": "Stop remote access",
+        "enabled": "Remote access enabled.",
+        "disabled": "Remote access stopped.",
+        "enableFailed": "Could not enable remote access.",
+        "disableFailed": "Could not stop remote access.",
+        "needHub": "Add a hub in the Connections section above first, then come back here.",
+        "hubField": "Hub",
+        "labelField": "This computer's name",
+        "consent": {
+          "title": "Reach this computer from anywhere?",
+          "body": "Run Myra in the background so you can reach this computer's agents from the web app anywhere. It installs a per-user background service. You can stop it anytime in Settings.",
+          "enable": "Enable",
+          "notNow": "Not now",
+          "needHub": "Add a hub in Settings first, then enable remote access."
+        }
       }
     },
     "agents": {
@@ -394,5 +416,16 @@
       "logsCleared": "Logs cleared.",
       "clearFailed": "Failed to clear logs."
     }
+  },
+  "upsell": {
+    "title": "Myra Pro",
+    "body": "Myra Pro lets you reach your agents from anywhere. The free app is desktop-only — upgrade to use the web app and observe your machines remotely.",
+    "signInTitle": "Already Pro? Sign in to your hub",
+    "userField": "User",
+    "urlField": "Hub URL",
+    "signIn": "Sign in",
+    "signedIn": "Signed in.",
+    "loginFailed": "Could not sign in to the hub.",
+    "invalidUrl": "Enter a full URL (http:// or https://)."
   }
 }

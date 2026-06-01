@@ -6,7 +6,11 @@
   "main": "src/node/index.ts",
   "scripts": {
     "dev": "bun --watch src/node/index.ts",
-    "start": "bun src/node/index.ts"
+    "start": "bun src/node/index.ts",
+    "embed-scripts": "node ../../scripts/embed-install-scripts.mjs",
+    "prebuild": "bun run embed-scripts",
+    "predeploy": "bun run embed-scripts",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@myra/shared": "workspace:*",

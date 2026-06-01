@@ -273,23 +273,44 @@ class ConnectionManager {
 
   private async initLocalSidecar(): Promise<void> {
     if (SERVER_URL || !isTauri()) return;
-    const entry = this.entries.get(LOCAL_ID);
-    if (!entry) return;
     try {
       const port = await tauriInvoke<number>("get_sidecar_port");
-      const baseUrl = `http://127.0.0.1:${port}`;
-      // Always override any persisted (stale) port — it changes per launch.
-      const connection: Connection = {
-        ...entry.connection,
-        baseUrl,
-        kind: "sidecar",
-        status: "connecting",
-      };
-      this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl) });
-      this.persist();
-      this.emitTopology();
+      this.pointLocalAtPort(port);
     } catch (e) {
       console.error("[ConnectionManager] sidecar init failed:", e);
+    }
+  }
+
+  /** Re-point the LOCAL connection at `http://127.0.0.1:<port>` and rebuild its transport. */
+  private pointLocalAtPort(port: number): void {
+    const entry = this.entries.get(LOCAL_ID);
+    if (!entry) return;
+    const baseUrl = `http://127.0.0.1:${port}`;
+    // Always override any persisted (stale) port — it changes per launch.
+    const connection: Connection = {
+      ...entry.connection,
+      baseUrl,
+      kind: "sidecar",
+      status: "connecting",
+    };
+    this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl) });
+    this.persist();
+    this.emitTopology();
+  }
+
+  /**
+   * Re-resolve the desktop local backend after remote access is enabled/disabled.
+   * Tauri kills any ephemeral child and either adopts the persistent service on
+   * its stable port or re-spawns; we re-point LOCAL at whatever port it returns.
+   * No-op off the desktop / with a build-time server URL.
+   */
+  async refreshLocal(): Promise<void> {
+    if (SERVER_URL || !isTauri()) return;
+    try {
+      const port = await tauriInvoke<number>("refresh_local_backend");
+      this.pointLocalAtPort(port);
+    } catch (e) {
+      console.error("[ConnectionManager] refreshLocal failed:", e);
     }
   }
 

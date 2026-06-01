@@ -2,7 +2,9 @@ import { deleteCredential, loadCredential } from "./connector/credential";
 import { enroll } from "./connector/enroll";
 import { installService, uninstallService } from "./service";
 import { startServer } from "./start-server";
+import { chmodSync, copyFileSync, mkdirSync } from "node:fs";
 import { hostname } from "node:os";
+import { dirname } from "node:path";
 
 /**
  * Unified `myra-server` entry. Routes on argv:
@@ -23,6 +25,7 @@ const USAGE = [
   "  enroll <code>         pair to a hub (needs MYRA_HUB_URL)",
   "  status                show enrollment + running state",
   "  unenroll              drop the hub credential",
+  "  install-self <dest>   copy this binary to a stable path",
   "  install-service       install the per-user OS service",
   "  uninstall-service     remove the OS service",
 ].join("\n");
@@ -48,6 +51,28 @@ async function runEnroll(code: string | undefined): Promise<void> {
   }
 }
 
+/**
+ * Copy this running binary to a stable destination and mark it executable. The
+ * desktop app calls `install-self <dest>` before enroll/install-service so the
+ * OS service points at a stable path (`~/.myra-agents/bin/myra-server`) instead
+ * of the app bundle, which moves on update.
+ */
+function runInstallSelf(dest: string | undefined): void {
+  if (!dest) {
+    console.error("usage: myra-server install-self <dest>");
+    process.exit(1);
+  }
+  try {
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(process.execPath, dest);
+    if (process.platform !== "win32") chmodSync(dest, 0o755);
+    console.log(`[install-self] copied → ${dest}`);
+  } catch (err) {
+    console.error(`[install-self] ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+}
+
 async function isServerUp(): Promise<boolean> {
   const port = Number(process.env.PORT ?? 4319);
   try {
@@ -58,8 +83,22 @@ async function isServerUp(): Promise<boolean> {
   }
 }
 
-async function runStatus(): Promise<void> {
+async function runStatus(json: boolean): Promise<void> {
   const cred = loadCredential();
+  const running = await isServerUp();
+  if (json) {
+    console.log(
+      JSON.stringify({
+        enrolled: cred !== null,
+        hubUrl: cred?.hubUrl ?? null,
+        userId: cred?.userId ?? null,
+        instanceId: cred?.instanceId ?? null,
+        label: cred?.label ?? null,
+        running,
+      }),
+    );
+    return;
+  }
   if (cred) {
     console.log(`hub:        ${cred.hubUrl}`);
     console.log(`user:       ${cred.userId}`);
@@ -67,7 +106,7 @@ async function runStatus(): Promise<void> {
   } else {
     console.log("not enrolled (run: myra-server enroll <code>)");
   }
-  console.log(`server:     ${(await isServerUp()) ? "running" : "stopped"}`);
+  console.log(`server:     ${running ? "running" : "stopped"}`);
 }
 
 async function main(): Promise<void> {
@@ -81,10 +120,13 @@ async function main(): Promise<void> {
       await runEnroll(rest[0]);
       break;
     case "status":
-      await runStatus();
+      await runStatus(rest.includes("--json"));
       break;
     case "unenroll":
       console.log(deleteCredential() ? "[unenroll] credential removed" : "[unenroll] not enrolled");
+      break;
+    case "install-self":
+      runInstallSelf(rest[0]);
       break;
     case "install-service":
       installService();

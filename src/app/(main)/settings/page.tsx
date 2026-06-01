@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useCallback, useRef, useState } from "react";
 
+import { isTauri } from "@tauri-apps/api/core";
 import {
   DownloadIcon,
   PaletteIcon,
@@ -16,12 +17,14 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
+import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { useEntitlement } from "@/hooks/use-entitlement";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -39,6 +42,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
+  const { isPro } = useEntitlement();
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
@@ -191,6 +195,8 @@ export default function SettingsPage() {
       {error && <p className="text-destructive text-sm">{error}</p>}
 
       <ConnectionsPanel />
+
+      {isTauri() && isPro && <RemoteAccessPanel />}
 
       <Card>
         <CardHeader>

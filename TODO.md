@@ -66,6 +66,7 @@ Inspired by [mobslide](https://github.com/thewh1teagle/mobslide): scan a QR, no 
 
 ## Platform & reliability
 
+- [ ] **Remote instance installer** — One-line cross-platform install for a machine that runs agents + dials the hub (download binary → enroll → per-user service). Plan: [`docs/remote-instance-installer-plan.md`](docs/remote-instance-installer-plan.md).
 - [ ] **Linux support** — CI build; note any WebRTC/Tauri gaps (cf. mobslide Linux caveat).
 - [ ] **Auto-update** — Tauri updater + release channel.
 - [ ] **Structured logging** — Rotating log file for scheduler, watcher, agent spawn errors. See Observability §1.

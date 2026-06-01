@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { sign, verify } from "hono/jwt";
 
+import { INSTALL_PS1, INSTALL_SH } from "./install-scripts";
 import type { Env } from "./user-hub";
 
 export { UserHub } from "./user-hub";
@@ -70,6 +71,16 @@ async function handle(req: Request, env: Env): Promise<Response> {
     const secret = env.MYRA_HUB_SECRET;
 
     if (url.pathname === "/healthz") return json({ ok: true });
+
+    // Bootstrap install scripts — unauthenticated GET on purpose: they carry no
+    // secrets (the pairing CODE is supplied at runtime via env), and the remote
+    // one-liner curls them before any credential exists.
+    if (url.pathname === "/install-remote.sh" && req.method === "GET") {
+      return new Response(INSTALL_SH, { headers: { "content-type": "text/x-shellscript; charset=utf-8" } });
+    }
+    if (url.pathname === "/install-remote.ps1" && req.method === "GET") {
+      return new Response(INSTALL_PS1, { headers: { "content-type": "text/plain; charset=utf-8" } });
+    }
 
     // Dev login placeholder (gated). Real deploys wire OIDC / magic-link.
     if (url.pathname === "/auth/login" && req.method === "POST") {

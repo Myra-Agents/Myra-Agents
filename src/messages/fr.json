@@ -320,6 +320,28 @@
         "revokeFailed": "Révocation de l'instance impossible.",
         "osUnix": "macOS / Linux",
         "osWindows": "Windows"
+      },
+      "remote": {
+        "title": "Accès distant",
+        "description": "Rendez cet ordinateur accessible depuis l'application web, où que vous soyez. Myra tourne en arrière-plan comme service par utilisateur, rattaché à votre hub.",
+        "reachable": "Cet ordinateur est accessible via {hub} en tant que {label}",
+        "localOnly": "Local uniquement — cet ordinateur n'est pas accessible à distance.",
+        "enable": "Rendre cet ordinateur accessible",
+        "stop": "Arrêter l'accès distant",
+        "enabled": "Accès distant activé.",
+        "disabled": "Accès distant arrêté.",
+        "enableFailed": "Impossible d'activer l'accès distant.",
+        "disableFailed": "Impossible d'arrêter l'accès distant.",
+        "needHub": "Ajoutez d'abord un hub dans la section Connexions ci-dessus, puis revenez ici.",
+        "hubField": "Hub",
+        "labelField": "Nom de cet ordinateur",
+        "consent": {
+          "title": "Accéder à cet ordinateur où que vous soyez ?",
+          "body": "Faites tourner Myra en arrière-plan pour accéder aux agents de cet ordinateur depuis l'application web, où que vous soyez. Cela installe un service en arrière-plan par utilisateur. Vous pouvez l'arrêter à tout moment dans les Paramètres.",
+          "enable": "Activer",
+          "notNow": "Plus tard",
+          "needHub": "Ajoutez d'abord un hub dans les Paramètres, puis activez l'accès distant."
+        }
       }
     },
     "agents": {
@@ -394,5 +416,16 @@
       "logsCleared": "Logs supprimés.",
       "clearFailed": "Impossible d'effacer les logs."
     }
+  },
+  "upsell": {
+    "title": "Myra Pro",
+    "body": "Myra Pro vous permet d'accéder à vos agents où que vous soyez. L'application gratuite est réservée au bureau — passez à Pro pour utiliser l'application web et superviser vos machines à distance.",
+    "signInTitle": "Déjà Pro ? Connectez-vous à votre hub",
+    "userField": "Utilisateur",
+    "urlField": "URL du hub",
+    "signIn": "Se connecter",
+    "signedIn": "Connecté.",
+    "loginFailed": "Impossible de se connecter au hub.",
+    "invalidUrl": "Saisissez une URL complète (http:// ou https://)."
   }
 }
