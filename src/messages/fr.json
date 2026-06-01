@@ -22,7 +22,22 @@
     "schedules": "Planifications",
     "planner": "Planifier la journée",
     "logs": "Journaux",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "account": {
+      "guest": "Invité",
+      "signedIn": "Connecté",
+      "notSignedIn": "Non connecté",
+      "account": "Compte",
+      "settings": "Paramètres",
+      "signIn": "Se connecter",
+      "signOut": "Se déconnecter"
+    },
+    "support": {
+      "title": "Besoin de plus ?",
+      "body": "Ouvrez une issue ou contactez-nous sur",
+      "repo": "Ouvrir le dépôt",
+      "dismiss": "Masquer"
+    }
   },
   "kanban": {
     "title": "Tableau Kanban",
@@ -110,6 +125,7 @@
       "tagInputPlaceholder": "Ajouter une étiquette",
       "agentPreset": "Préréglage d'agent",
       "agentPresetPlaceholder": "Sélectionner un agent",
+      "targetServer": "Serveur",
       "agent": "Agent",
       "prompt": "Prompt",
       "optional": "facultatif",
@@ -275,6 +291,97 @@
   "settings": {
     "title": "Paramètres",
     "description": "Configurez les agents, préférences et comportement de l'application",
+    "hub": {
+      "title": "Hub",
+      "connected": "Connecté · {count, plural, =0 {aucune machine en ligne} one {# machine en ligne} other {# machines en ligne}}",
+      "checking": "Vérification de la disponibilité du hub…",
+      "unreachable": "Hub injoignable",
+      "notSignedIn": "Non connecté",
+      "notConfigured": "Hub non configuré",
+      "signIn": "Se connecter",
+      "signOut": "Se déconnecter",
+      "retry": "Réessayer"
+    },
+    "tabs": {
+      "hub": "Hub",
+      "preferences": "Préférences",
+      "agents": "Agents",
+      "data": "Données"
+    },
+    "connections": {
+      "title": "Connexions",
+      "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les cartes de chacun portent une étiquette d'origine. La connexion locale est permanente.",
+      "primary": "Principal",
+      "inProcess": "En interne",
+      "labelField": "Libellé",
+      "labelPlaceholder": "Mon serveur",
+      "urlField": "URL du serveur",
+      "add": "Ajouter",
+      "added": "Connexion ajoutée.",
+      "remove": "Supprimer",
+      "makePrimary": "Définir comme principal",
+      "invalidUrl": "Saisissez une URL complète (http:// ou https://).",
+      "visible": "Visible",
+      "hidden": "Masqué",
+      "show": "Afficher sur le tableau",
+      "hide": "Masquer du tableau",
+      "status": {
+        "connected": "Connecté",
+        "connecting": "Connexion…",
+        "error": "Injoignable",
+        "disabled": "Désactivé"
+      },
+      "hub": {
+        "title": "Hubs",
+        "description": "Connectez-vous à un hub pour réunir toutes vos instances distantes sous une seule connexion. Chaque instance apparaît comme une origine du tableau.",
+        "userField": "Utilisateur",
+        "userPlaceholder": "vous@exemple.com",
+        "urlPlaceholder": "https://hub.exemple.com",
+        "add": "Ajouter un hub",
+        "added": "Hub ajouté.",
+        "loginFailed": "Connexion au hub impossible.",
+        "remove": "Supprimer le hub",
+        "pair": "Appairer une instance",
+        "pairFailed": "Impossible de créer un code d'appairage.",
+        "expires": "expire à {time}",
+        "enrollHint": "Sur la machine à ajouter, exécutez :",
+        "copy": "Copier",
+        "copied": "Copié.",
+        "revoke": "Révoquer",
+        "revoked": "Instance révoquée.",
+        "revokeFailed": "Révocation de l'instance impossible.",
+        "osUnix": "macOS / Linux",
+        "osWindows": "Windows"
+      },
+      "remote": {
+        "title": "Accès distant",
+        "description": "Rendez cet ordinateur accessible depuis l'application web, où que vous soyez. Myra tourne en arrière-plan comme service par utilisateur, rattaché à votre hub.",
+        "reachable": "Cet ordinateur est accessible via {hub} en tant que {label}",
+        "localOnly": "Local uniquement — cet ordinateur n'est pas accessible à distance.",
+        "enable": "Rendre cet ordinateur accessible",
+        "stop": "Arrêter l'accès distant",
+        "enabled": "Accès distant activé.",
+        "disabled": "Accès distant arrêté.",
+        "enableFailed": "Impossible d'activer l'accès distant.",
+        "disableFailed": "Impossible d'arrêter l'accès distant.",
+        "needHub": "Ajoutez d'abord un hub dans la section Connexions ci-dessus, puis revenez ici.",
+        "hubField": "Hub",
+        "labelField": "Nom de cet ordinateur",
+        "consent": {
+          "title": "Accéder à cet ordinateur où que vous soyez ?",
+          "body": "Faites tourner Myra en arrière-plan pour accéder aux agents de cet ordinateur depuis l'application web, où que vous soyez. Cela installe un service en arrière-plan par utilisateur. Vous pouvez l'arrêter à tout moment dans les Paramètres.",
+          "enable": "Activer",
+          "notNow": "Plus tard",
+          "needHub": "Ajoutez d'abord un hub dans les Paramètres, puis activez l'accès distant."
+        }
+      },
+      "account": {
+        "signedInAs": "Connecté en tant que",
+        "signedOut": "Non connecté",
+        "signOut": "Se déconnecter",
+        "signIn": "Se connecter"
+      }
+    },
     "agents": {
       "title": "Préréglages d'agent",
       "description": "Configurez les agents IA pour vos tâches",
@@ -347,5 +454,11 @@
       "logsCleared": "Logs supprimés.",
       "clearFailed": "Impossible d'effacer les logs."
     }
+  },
+  "upsell": {
+    "title": "Myra Pro",
+    "body": "Myra Pro vous permet d'accéder à vos agents où que vous soyez. L'application gratuite est réservée au bureau — passez à Pro pour utiliser l'application web et superviser vos machines à distance.",
+    "signInTitle": "Déjà Pro ? Connectez-vous à votre hub",
+    "signIn": "Se connecter"
   }
 }

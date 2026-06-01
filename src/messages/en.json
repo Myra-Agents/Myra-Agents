@@ -22,7 +22,22 @@
     "schedules": "Schedules",
     "planner": "Day Planner",
     "logs": "Logs",
-    "settings": "Settings"
+    "settings": "Settings",
+    "account": {
+      "guest": "Guest",
+      "signedIn": "Signed in",
+      "notSignedIn": "Not signed in",
+      "account": "Account",
+      "settings": "Settings",
+      "signIn": "Sign in",
+      "signOut": "Sign out"
+    },
+    "support": {
+      "title": "Looking for something more?",
+      "body": "Open an issue or reach out on",
+      "repo": "Open the repository",
+      "dismiss": "Dismiss"
+    }
   },
   "kanban": {
     "title": "Kanban Board",
@@ -110,6 +125,7 @@
       "tagInputPlaceholder": "Add tag",
       "agentPreset": "Agent preset",
       "agentPresetPlaceholder": "Select agent",
+      "targetServer": "Server",
       "agent": "Agent",
       "prompt": "Prompt",
       "optional": "optional",
@@ -275,6 +291,97 @@
   "settings": {
     "title": "Settings",
     "description": "Configure agents, preferences, and app behavior",
+    "hub": {
+      "title": "Hub",
+      "connected": "Connected · {count, plural, =0 {no machines online} one {# machine online} other {# machines online}}",
+      "checking": "Checking hub availability…",
+      "unreachable": "Hub unreachable",
+      "notSignedIn": "Not signed in",
+      "notConfigured": "Hub not configured",
+      "signIn": "Sign in",
+      "signOut": "Sign out",
+      "retry": "Retry"
+    },
+    "tabs": {
+      "hub": "Hub",
+      "preferences": "Preferences",
+      "agents": "Agents",
+      "data": "Data"
+    },
+    "connections": {
+      "title": "Connections",
+      "description": "Backends this board aggregates. Add remote servers; cards from each are tagged by origin. The local connection is permanent.",
+      "primary": "Primary",
+      "inProcess": "In-process",
+      "labelField": "Label",
+      "labelPlaceholder": "My server",
+      "urlField": "Server URL",
+      "add": "Add",
+      "added": "Connection added.",
+      "remove": "Remove",
+      "makePrimary": "Set as primary",
+      "invalidUrl": "Enter a full URL (http:// or https://).",
+      "visible": "Visible",
+      "hidden": "Hidden",
+      "show": "Show on board",
+      "hide": "Hide from board",
+      "status": {
+        "connected": "Connected",
+        "connecting": "Connecting…",
+        "error": "Unreachable",
+        "disabled": "Disabled"
+      },
+      "hub": {
+        "title": "Hubs",
+        "description": "Connect to a hub to gather all of your remote instances under one login. Each instance appears as its own board origin.",
+        "userField": "User",
+        "userPlaceholder": "you@example.com",
+        "urlPlaceholder": "https://hub.example.com",
+        "add": "Add hub",
+        "added": "Hub added.",
+        "loginFailed": "Could not sign in to the hub.",
+        "remove": "Remove hub",
+        "pair": "Pair instance",
+        "pairFailed": "Could not create a pairing code.",
+        "expires": "expires {time}",
+        "enrollHint": "On the machine to add, run:",
+        "copy": "Copy",
+        "copied": "Copied.",
+        "revoke": "Revoke",
+        "revoked": "Instance revoked.",
+        "revokeFailed": "Could not revoke the instance.",
+        "osUnix": "macOS / Linux",
+        "osWindows": "Windows"
+      },
+      "remote": {
+        "title": "Remote Access",
+        "description": "Make this computer reachable from the web app anywhere. It runs Myra in the background as a per-user service enrolled to your hub.",
+        "reachable": "This computer is reachable via {hub} as {label}",
+        "localOnly": "Local only — this computer isn't reachable remotely.",
+        "enable": "Make this computer reachable",
+        "stop": "Stop remote access",
+        "enabled": "Remote access enabled.",
+        "disabled": "Remote access stopped.",
+        "enableFailed": "Could not enable remote access.",
+        "disableFailed": "Could not stop remote access.",
+        "needHub": "Add a hub in the Connections section above first, then come back here.",
+        "hubField": "Hub",
+        "labelField": "This computer's name",
+        "consent": {
+          "title": "Reach this computer from anywhere?",
+          "body": "Run Myra in the background so you can reach this computer's agents from the web app anywhere. It installs a per-user background service. You can stop it anytime in Settings.",
+          "enable": "Enable",
+          "notNow": "Not now",
+          "needHub": "Add a hub in Settings first, then enable remote access."
+        }
+      },
+      "account": {
+        "signedInAs": "Signed in as",
+        "signedOut": "Not signed in",
+        "signOut": "Sign out",
+        "signIn": "Sign in"
+      }
+    },
     "agents": {
       "title": "Agent Presets",
       "description": "Configure which AI agents can run your tasks",
@@ -347,5 +454,11 @@
       "logsCleared": "Logs cleared.",
       "clearFailed": "Failed to clear logs."
     }
+  },
+  "upsell": {
+    "title": "Myra Pro",
+    "body": "Myra Pro lets you reach your agents from anywhere. The free app is desktop-only — upgrade to use the web app and observe your machines remotely.",
+    "signInTitle": "Already Pro? Sign in to your hub",
+    "signIn": "Sign in"
   }
 }

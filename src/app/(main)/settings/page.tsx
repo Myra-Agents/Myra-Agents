@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useCallback, useRef, useState } from "react";
 
+import { isTauri } from "@tauri-apps/api/core";
 import {
   DownloadIcon,
   PaletteIcon,
@@ -15,12 +16,17 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { ConnectionsPanel } from "@/components/settings/connections-panel";
+import { HubStatusCard } from "@/components/settings/hub-status-card";
+import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEntitlement } from "@/hooks/use-entitlement";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -38,6 +44,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
+  const { isPro } = useEntitlement();
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
@@ -189,205 +196,230 @@ export default function SettingsPage() {
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("preferences.title")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label>{t("preferences.language")}</Label>
-              <Select value={current.locale} onValueChange={handleLocaleChange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">{t("preferences.languageOptions.autoDetect")}</SelectItem>
-                  <SelectItem value="en">{t("preferences.languageOptions.english")}</SelectItem>
-                  <SelectItem value="fr">{t("preferences.languageOptions.french")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <Tabs defaultValue="hub" className="w-full">
+        <TabsList variant="line">
+          <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
+          <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
+          <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
+          <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
+        </TabsList>
 
-            <div className="space-y-2">
-              <Label>{t("preferences.defaultPage")}</Label>
-              <Select
-                value={current.defaultHomePage}
-                onValueChange={(value) => update({ defaultHomePage: value as AppSettings["defaultHomePage"] })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="kanban">{t("preferences.pageOptions.kanban")}</SelectItem>
-                  <SelectItem value="schedules">{t("preferences.pageOptions.schedules")}</SelectItem>
-                  <SelectItem value="planner">{t("preferences.pageOptions.planner")}</SelectItem>
-                  <SelectItem value="logs">{t("preferences.pageOptions.logs")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <TabsContent value="hub" className="space-y-6">
+          {isPro && <HubStatusCard />}
+          <ConnectionsPanel />
+          {isTauri() && isPro && <RemoteAccessPanel />}
+        </TabsContent>
 
-            <div className="space-y-2">
-              <Label>{t("preferences.theme")}</Label>
-              <Select value={current.theme} onValueChange={handleThemeChange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">{t("preferences.themeOptions.light")}</SelectItem>
-                  <SelectItem value="dark">{t("preferences.themeOptions.dark")}</SelectItem>
-                  <SelectItem value="system">{t("preferences.themeOptions.system")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-dashed px-4 py-3 text-muted-foreground text-sm">
-            <div className="flex items-center gap-2 font-medium text-foreground">
-              <PaletteIcon className="size-4 text-muted-foreground" />
-              {t("preferences.themeDescription")}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">{t("agents.title")}</CardTitle>
-          <Button variant="outline" size="sm" onClick={addCustomPreset}>
-            <PlusIcon className="size-3" />
-            {t("agents.add")}
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>{t("agents.defaultAgent")}</Label>
-            <Select value={current.defaultAgentId} onValueChange={(value) => update({ defaultAgentId: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {current.agents.map((preset) => (
-                  <SelectItem key={preset.id} value={preset.id}>
-                    {preset.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>{t("agents.maxConcurrent")}</Label>
-            <Input
-              type="number"
-              min={0}
-              value={current.maxConcurrentAgents}
-              onChange={(event) => update({ maxConcurrentAgents: Math.max(0, Number(event.target.value) || 0) })}
-              className="h-8 w-28"
-            />
-            <p className="text-muted-foreground text-xs">{t("agents.maxConcurrentHint")}</p>
-          </div>
-
-          <Separator />
-
-          {current.agents.map((preset, idx) => (
-            <div key={preset.id} className="space-y-2 rounded-md border p-3">
-              <div className="flex items-center justify-between">
-                <Label className="font-semibold text-sm">{preset.name}</Label>
-                {!DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id) && (
-                  <Button variant="ghost" size="icon-xs" onClick={() => removePreset(idx)}>
-                    <TrashIcon />
-                  </Button>
-                )}
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("agents.name")}</Label>
-                  <Input
-                    value={preset.name}
-                    onChange={(event) => updatePreset(idx, { name: event.target.value })}
-                    className="h-7 text-xs"
-                  />
+        <TabsContent value="preferences" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t("preferences.title")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>{t("preferences.language")}</Label>
+                  <Select value={current.locale} onValueChange={handleLocaleChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">{t("preferences.languageOptions.autoDetect")}</SelectItem>
+                      <SelectItem value="en">{t("preferences.languageOptions.english")}</SelectItem>
+                      <SelectItem value="fr">{t("preferences.languageOptions.french")}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("agents.binary")}</Label>
-                  <Input
-                    value={preset.binary}
-                    onChange={(event) => updatePreset(idx, { binary: event.target.value })}
-                    className="h-7 font-mono text-xs"
-                  />
+
+                <div className="space-y-2">
+                  <Label>{t("preferences.defaultPage")}</Label>
+                  <Select
+                    value={current.defaultHomePage}
+                    onValueChange={(value) => update({ defaultHomePage: value as AppSettings["defaultHomePage"] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kanban">{t("preferences.pageOptions.kanban")}</SelectItem>
+                      <SelectItem value="schedules">{t("preferences.pageOptions.schedules")}</SelectItem>
+                      <SelectItem value="planner">{t("preferences.pageOptions.planner")}</SelectItem>
+                      <SelectItem value="logs">{t("preferences.pageOptions.logs")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("preferences.theme")}</Label>
+                  <Select value={current.theme} onValueChange={handleThemeChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">{t("preferences.themeOptions.light")}</SelectItem>
+                      <SelectItem value="dark">{t("preferences.themeOptions.dark")}</SelectItem>
+                      <SelectItem value="system">{t("preferences.themeOptions.system")}</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("agents.argsTemplate")}</Label>
-                <Input
-                  value={preset.argsTemplate}
-                  onChange={(event) => updatePreset(idx, { argsTemplate: event.target.value })}
-                  placeholder="{prompt}"
-                  className="h-7 font-mono text-xs"
-                />
+
+              <div className="rounded-lg border border-dashed px-4 py-3 text-muted-foreground text-sm">
+                <div className="flex items-center gap-2 font-medium text-foreground">
+                  <PaletteIcon className="size-4 text-muted-foreground" />
+                  {t("preferences.themeDescription")}
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("agents.workingDir")}</Label>
-                <Input
-                  value={preset.workingDir ?? ""}
-                  onChange={(event) => updatePreset(idx, { workingDir: event.target.value || undefined })}
-                  placeholder={t("agents.workingDirPlaceholder")}
-                  className="h-7 font-mono text-xs"
-                />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="agents" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">{t("agents.title")}</CardTitle>
+              <Button variant="outline" size="sm" onClick={addCustomPreset}>
+                <PlusIcon className="size-3" />
+                {t("agents.add")}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>{t("agents.defaultAgent")}</Label>
+                <Select value={current.defaultAgentId} onValueChange={(value) => update({ defaultAgentId: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {current.agents.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        {preset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("data.title")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <input
-            ref={importInputRef}
-            type="file"
-            accept="application/json"
-            className="hidden"
-            onChange={handleImportBoard}
-          />
+              <div className="space-y-2">
+                <Label>{t("agents.maxConcurrent")}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={current.maxConcurrentAgents}
+                  onChange={(event) => update({ maxConcurrentAgents: Math.max(0, Number(event.target.value) || 0) })}
+                  className="h-8 w-28"
+                />
+                <p className="text-muted-foreground text-xs">{t("agents.maxConcurrentHint")}</p>
+              </div>
 
-          <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="font-medium">{t("data.exportBoard")}</p>
-              <p className="text-muted-foreground text-sm">{t("data.exportDescription")}</p>
-            </div>
-            <Button variant="outline" onClick={handleExportBoard} disabled={dataAction !== null}>
-              <DownloadIcon className="size-4" />
-              {dataAction === "export" ? t("actions.exporting") : t("data.exportBoard")}
-            </Button>
-          </div>
+              <Separator />
 
-          <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="font-medium">{t("data.importBoard")}</p>
-              <p className="text-muted-foreground text-sm">{t("data.importDescription")}</p>
-            </div>
-            <Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={dataAction !== null}>
-              <UploadIcon className="size-4" />
-              {dataAction === "import" ? t("actions.importing") : t("data.importBoard")}
-            </Button>
-          </div>
+              {current.agents.map((preset, idx) => (
+                <div key={preset.id} className="space-y-2 rounded-md border p-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="font-semibold text-sm">{preset.name}</Label>
+                    {!DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id) && (
+                      <Button variant="ghost" size="icon-xs" onClick={() => removePreset(idx)}>
+                        <TrashIcon />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("agents.name")}</Label>
+                      <Input
+                        value={preset.name}
+                        onChange={(event) => updatePreset(idx, { name: event.target.value })}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("agents.binary")}</Label>
+                      <Input
+                        value={preset.binary}
+                        onChange={(event) => updatePreset(idx, { binary: event.target.value })}
+                        className="h-7 font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("agents.argsTemplate")}</Label>
+                    <Input
+                      value={preset.argsTemplate}
+                      onChange={(event) => updatePreset(idx, { argsTemplate: event.target.value })}
+                      placeholder="{prompt}"
+                      className="h-7 font-mono text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("agents.workingDir")}</Label>
+                    <Input
+                      value={preset.workingDir ?? ""}
+                      onChange={(event) => updatePreset(idx, { workingDir: event.target.value || undefined })}
+                      placeholder={t("agents.workingDirPlaceholder")}
+                      className="h-7 font-mono text-xs"
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="font-medium">{t("data.clearLogs")}</p>
-              <p className="text-muted-foreground text-sm">{t("data.clearLogsDescription")}</p>
-            </div>
-            <Button variant="destructive" onClick={handleClearLogs} disabled={dataAction !== null}>
-              <Trash2Icon className="size-4" />
-              {dataAction === "clear" ? t("actions.clearing") : t("data.clearLogs")}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="data" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t("data.title")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={handleImportBoard}
+              />
+
+              <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="font-medium">{t("data.exportBoard")}</p>
+                  <p className="text-muted-foreground text-sm">{t("data.exportDescription")}</p>
+                </div>
+                <Button variant="outline" onClick={handleExportBoard} disabled={dataAction !== null}>
+                  <DownloadIcon className="size-4" />
+                  {dataAction === "export" ? t("actions.exporting") : t("data.exportBoard")}
+                </Button>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="font-medium">{t("data.importBoard")}</p>
+                  <p className="text-muted-foreground text-sm">{t("data.importDescription")}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => importInputRef.current?.click()}
+                  disabled={dataAction !== null}
+                >
+                  <UploadIcon className="size-4" />
+                  {dataAction === "import" ? t("actions.importing") : t("data.importBoard")}
+                </Button>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="font-medium">{t("data.clearLogs")}</p>
+                  <p className="text-muted-foreground text-sm">{t("data.clearLogsDescription")}</p>
+                </div>
+                <Button variant="destructive" onClick={handleClearLogs} disabled={dataAction !== null}>
+                  <Trash2Icon className="size-4" />
+                  {dataAction === "clear" ? t("actions.clearing") : t("data.clearLogs")}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

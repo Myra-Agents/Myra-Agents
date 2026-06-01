@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Myra — Centralized Dashboard Architecture Explorer</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2230;
+    --border: #2a3140;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #bc8cff;
+    --green: #3fb950;
+    --amber: #d29922;
+    --red: #f85149;
+    --pink: #f778ba;
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+  /* ---- Sidebar ---- */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .sidebar h1 { font-size: 15px; margin: 0 0 2px; }
+  .sidebar .sub { color: var(--muted); font-size: 11.5px; margin-bottom: 16px; }
+  .group { margin-bottom: 18px; }
+  .group > label.title {
+    display: block;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    margin-bottom: 7px;
+    font-weight: 600;
+  }
+  .arch-btns { display: flex; flex-direction: column; gap: 6px; }
+  .arch-btn {
+    text-align: left;
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 11px;
+    cursor: pointer;
+    transition: .12s;
+  }
+  .arch-btn:hover { border-color: var(--accent); }
+  .arch-btn.active { border-color: var(--accent); background: #18324f; }
+  .arch-btn .nm { font-weight: 600; font-size: 12.5px; }
+  .arch-btn .tg { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+  select {
+    width: 100%;
+    background: var(--panel2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .dim { margin-bottom: 10px; }
+  .dim label.dl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .dim.overridden select { border-color: var(--amber); }
+  .dim .ovr { color: var(--amber); font-size: 10px; display: none; margin-top: 2px; }
+  .dim.overridden .ovr { display: block; }
+
+  .comments-list { display: flex; flex-direction: column; gap: 6px; }
+  .cmt {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 11.5px;
+  }
+  .cmt .tgt { color: var(--accent2); font-weight: 600; font-size: 10.5px; }
+  .cmt .tx { color: var(--text); margin-top: 2px; white-space: pre-wrap; }
+  .cmt .del {
+    float: right; cursor: pointer; color: var(--muted);
+    border: none; background: none; font-size: 13px; line-height: 1; padding: 0;
+  }
+  .cmt .del:hover { color: var(--red); }
+  .empty { color: var(--muted); font-size: 11.5px; font-style: italic; }
+  .btn {
+    background: var(--accent); color: #0d1117; border: none; border-radius: 6px;
+    padding: 7px 12px; font-weight: 600; cursor: pointer; font-size: 12px;
+  }
+  .btn.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .btn:hover { filter: brightness(1.08); }
+
+  /* ---- Main ---- */
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+  .tabs { display: flex; gap: 4px; padding: 10px 14px 0; border-bottom: 1px solid var(--border); }
+  .tab {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    padding: 7px 13px; font-size: 12.5px; border-radius: 7px 7px 0 0; font-weight: 600;
+  }
+  .tab.active { color: var(--text); background: var(--panel); border: 1px solid var(--border); border-bottom-color: var(--panel); margin-bottom: -1px; }
+  .stage { flex: 1; overflow: auto; position: relative; }
+  .view { display: none; height: 100%; }
+  .view.active { display: block; }
+
+  #canvasWrap { padding: 10px; height: 100%; }
+  svg { width: 100%; height: 100%; display: block; }
+  .legend {
+    position: absolute; left: 18px; bottom: 14px;
+    background: rgba(22,27,34,.92); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 11px; font-size: 11px;
+  }
+  .legend .row { display: flex; align-items: center; gap: 7px; margin: 3px 0; }
+  .legend .swatch { width: 22px; height: 0; border-top-width: 2px; border-top-style: solid; }
+  .hint { position: absolute; right: 16px; top: 12px; color: var(--muted); font-size: 11px; }
+
+  /* node interactivity */
+  .node { cursor: pointer; }
+  .node:hover rect { filter: brightness(1.12); }
+
+  /* ---- Compare table ---- */
+  .compare { padding: 16px 18px; }
+  table.cmp { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.cmp th, table.cmp td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+  table.cmp th { background: var(--panel2); color: var(--muted); font-weight: 600; position: sticky; top: 0; }
+  table.cmp td.dimname { color: var(--muted); font-weight: 600; }
+  table.cmp col.sel, table.cmp th.sel { background: #18324f; }
+  td.sel { background: rgba(24,50,79,.45); }
+  .dots { letter-spacing: 2px; }
+  .d-on { color: var(--green); }
+  .d-mid { color: var(--amber); }
+  .d-off { color: #3a3f4a; }
+  .scorenote { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* ---- Prompt ---- */
+  .promptbar { border-top: 1px solid var(--border); background: var(--panel); padding: 12px 14px; }
+  .promptbar .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .promptbar .head h3 { margin: 0; font-size: 12.5px; }
+  #prompt {
+    background: #0a0e14; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; font-size: 12px; max-height: 200px; overflow-y: auto;
+    white-space: pre-wrap; color: var(--text);
+  }
+  .copied { color: var(--green); font-size: 11.5px; margin-right: 8px; opacity: 0; transition: .2s; }
+  .copied.show { opacity: 1; }
+
+  /* ---- Modal ---- */
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; width: 440px; max-width: 90vw;
+  }
+  .modal h3 { margin: 0 0 4px; font-size: 14px; }
+  .modal .mt { color: var(--muted); font-size: 11.5px; margin-bottom: 10px; }
+  .modal textarea {
+    width: 100%; height: 90px; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px; font-size: 12.5px;
+    resize: vertical; font-family: inherit;
+  }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar">
+  <h1>Architecture Explorer</h1>
+  <div class="sub">Centralized auth'd dashboard gathering all your Claude agent instances — desktop, remote boxes, sandboxes. Pick a topology, tune the dimensions, click any box to leave a note, then copy the prompt back to Claude.</div>
+
+  <div class="group">
+    <label class="title">Architecture</label>
+    <div class="arch-btns" id="archBtns"></div>
+  </div>
+
+  <div class="group">
+    <label class="title">Dimensions <span style="font-weight:400;text-transform:none">(amber = deviating from this arch's norm)</span></label>
+    <div class="dim" data-dim="auth">
+      <label class="dl">Authentication model</label>
+      <select id="sel-auth"></select>
+      <div class="ovr">↳ overriding the typical choice for this architecture</div>
+    </div>
+    <div class="dim" data-dim="nat">
+      <label class="dl">NAT / reachability</label>
+      <select id="sel-nat"></select>
+      <div class="ovr">↳ overriding the typical choice for this architecture</div>
+    </div>
+    <div class="dim" data-dim="dataplane">
+      <label class="dl">Data plane</label>
+      <select id="sel-dataplane"></select>
+      <div class="ovr">↳ overriding the typical choice for this architecture</div>
+    </div>
+    <div class="dim" data-dim="trust">
+      <label class="dl">Trust boundary</label>
+      <select id="sel-trust"></select>
+      <div class="ovr">↳ overriding the typical choice for this architecture</div>
+    </div>
+  </div>
+
+  <div class="group">
+    <label class="title">Comments (<span id="cmtCount">0</span>)</label>
+    <button class="btn ghost" style="width:100%;margin-bottom:8px" onclick="openComment(null)">+ Add general comment</button>
+    <div class="comments-list" id="cmtList"></div>
+  </div>
+</aside>
+
+<!-- ============ MAIN ============ -->
+<main class="main">
+  <div class="tabs">
+    <button class="tab active" data-view="diagram">Diagram</button>
+    <button class="tab" data-view="compare">Compare all four</button>
+  </div>
+
+  <div class="stage">
+    <div class="view active" id="view-diagram">
+      <div id="canvasWrap">
+        <svg id="svg" viewBox="0 0 820 470" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <marker id="ar-blue" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#58a6ff"/></marker>
+            <marker id="ar-green" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#3fb950"/></marker>
+            <marker id="ar-pink" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#f778ba"/></marker>
+            <marker id="ar-purple" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="#bc8cff"/></marker>
+          </defs>
+        </svg>
+      </div>
+      <div class="hint">Click any box to comment on it</div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="view" id="view-compare">
+      <div class="compare" id="compareWrap"></div>
+    </div>
+  </div>
+
+  <div class="promptbar">
+    <div class="head">
+      <h3>Prompt to hand back to Claude</h3>
+      <div>
+        <span class="copied" id="copied">Copied!</span>
+        <button class="btn" onclick="copyPrompt()">Copy Prompt</button>
+      </div>
+    </div>
+    <div id="prompt" class="mono"></div>
+  </div>
+</main>
+
+<!-- ============ MODAL ============ -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Comment</h3>
+    <div class="mt" id="modalSub"></div>
+    <textarea id="modalText" placeholder="What should change / what's the concern / what do you want here?"></textarea>
+    <div class="actions">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveComment()">Save comment</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   DIMENSION OPTIONS
+========================================================= */
+const DIMS = {
+  auth: {
+    label: 'Authentication',
+    opts: {
+      'per-server-token': 'Per-server token (paste a token per box)',
+      'central-idp':      'Central identity (one login, OAuth/JWT issued centrally)',
+      'mtls-device':      'mTLS device certs (each instance enrolls a cert)',
+      'passkey-pairing':  'Passkey + device pairing codes',
+    }
+  },
+  nat: {
+    label: 'NAT / reachability',
+    opts: {
+      'direct-inbound':  'Direct inbound (each server must be publicly reachable)',
+      'outbound-relay':  'Outbound dial (instances connect OUT to a broker)',
+      'webrtc-p2p':      'WebRTC P2P (STUN hole-punch + TURN fallback)',
+      'tunnel':          'Tunnel (tailscale / cloudflared / ngrok per box)',
+    }
+  },
+  dataplane: {
+    label: 'Data plane',
+    opts: {
+      'direct':            'Direct client ↔ server',
+      'through-relay':     'Relayed through the hub (hub forwards frames)',
+      'e2e-through-relay': 'E2E-encrypted through a blind relay',
+      'p2p-fallback':      'P2P direct, relay only as fallback',
+    }
+  },
+  trust: {
+    label: 'Trust boundary',
+    opts: {
+      'no-central':     'No central party (client is the only aggregator)',
+      'hub-trusted':    'Trusted hub (operator can see traffic)',
+      'zero-knowledge': 'Zero-knowledge hub (operator is blind, E2E)',
+      'self-hosted':    'Self-hosted hub (you own the whole thing)',
+    }
+  },
+};
+
+/* =========================================================
+   ARCHITECTURES
+========================================================= */
+const D = { dash:'#1f6feb', hub:'#8957e5', desktop:'#238636', remote:'#9e6a03', sandbox:'#bd561d' };
+
+// node templates reused across archs (positions on 820x470)
+const N = {
+  dash:    {id:'dash',    label:'Dashboard (frontend)',  sub:'Next.js · your browser/app', x:320,y:18, w:180,h:52, fill:D.dash},
+  hub:     {id:'hub',     label:'Hub / Relay',           sub:'cloud broker',               x:330,y:200,w:160,h:52, fill:D.hub},
+  gateway: {id:'hub',     label:'Your Gateway',          sub:'self-hosted (VPS/home)',     x:330,y:200,w:160,h:52, fill:D.hub},
+  signal:  {id:'hub',     label:'Signaling Hub',         sub:'identity + discovery only',  x:330,y:200,w:160,h:52, fill:D.hub},
+  desktop: {id:'desktop', label:'Local Desktop',         sub:'Tauri sidecar · 127.0.0.1',  x:40, y:375,w:175,h:60, fill:D.desktop},
+  remote:  {id:'remote',  label:'Remote Computer',       sub:'build box behind NAT',       x:322,y:375,w:175,h:60, fill:D.remote},
+  sandbox: {id:'sandbox', label:'Remote Sandbox',        sub:'ephemeral cloud env',        x:605,y:375,w:175,h:60, fill:D.sandbox},
+};
+
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+const inst = () => [clone(N.desktop), clone(N.remote), clone(N.sandbox)];
+
+const ARCH = {
+  fanout: {
+    name: 'Client-Side Fan-Out',
+    tagline: 'Today\'s branch. Dashboard holds N direct connections.',
+    defaults: { auth:'per-server-token', nat:'direct-inbound', dataplane:'direct', trust:'no-central' },
+    build() {
+      const nodes = [clone(N.dash), ...inst()];
+      const conns = [
+        {from:'dash',to:'desktop',type:'data',label:'HTTP/WS'},
+        {from:'dash',to:'remote', type:'data',label:'HTTP/WS'},
+        {from:'dash',to:'sandbox',type:'data',label:'HTTP/WS'},
+      ];
+      return {nodes, conns};
+    },
+    scores: { nat:1, latency:5, infra:5, privacy:5, identity:1, complexity:5, offline:5, reuse:5 },
+    pros: ['Simplest — already built on this branch','Lowest latency, no middle hop','No central infra to run, no third-party trust'],
+    cons: ['NAT\'d remote boxes & sandboxes are unreachable from a browser','No unified identity — you juggle N URLs + tokens','Browser mixed-content / CORS friction','Sandboxes are ephemeral & not addressable'],
+  },
+
+  hub: {
+    name: 'Central Hub / Relay',
+    tagline: 'One cloud broker. Instances dial OUT and register.',
+    defaults: { auth:'central-idp', nat:'outbound-relay', dataplane:'through-relay', trust:'hub-trusted' },
+    build() {
+      const nodes = [clone(N.dash), clone(N.hub), ...inst()];
+      const conns = [
+        {from:'dash',to:'hub',type:'data',label:'login + RPC/WS'},
+        {from:'desktop',to:'hub',type:'dial',label:'outbound WS'},
+        {from:'remote', to:'hub',type:'dial',label:'outbound WS'},
+        {from:'sandbox',to:'hub',type:'dial',label:'outbound WS'},
+      ];
+      return {nodes, conns};
+    },
+    scores: { nat:5, latency:3, infra:1, privacy:2, identity:5, complexity:3, offline:2, reuse:3 },
+    pros: ['One URL + one login for everything','NAT solved — instances only make outbound connections','Sandboxes auto-join on boot; central audit/history','Instances become discoverable'],
+    cons: ['You operate + scale the hub','Hub sees all traffic (privacy/trust choke point)','Single point of failure','Extra relay latency'],
+  },
+
+  mesh: {
+    name: 'Hybrid Mesh',
+    tagline: 'Hub for identity + signaling; data goes P2P.',
+    defaults: { auth:'central-idp', nat:'webrtc-p2p', dataplane:'p2p-fallback', trust:'zero-knowledge' },
+    build() {
+      const nodes = [clone(N.dash), clone(N.signal), ...inst()];
+      const conns = [
+        {from:'dash',to:'hub',type:'sig',label:'signaling'},
+        {from:'desktop',to:'hub',type:'sig',label:'signaling'},
+        {from:'remote', to:'hub',type:'sig',label:'signaling'},
+        {from:'sandbox',to:'hub',type:'sig',label:'signaling'},
+        {from:'dash',to:'desktop',type:'p2p',label:'P2P data'},
+        {from:'dash',to:'remote', type:'p2p',label:'P2P data'},
+        {from:'dash',to:'sandbox',type:'p2p',label:'P2P data'},
+      ];
+      return {nodes, conns};
+    },
+    scores: { nat:4, latency:4, infra:2, privacy:5, identity:5, complexity:1, offline:3, reuse:2 },
+    pros: ['Low latency — data goes direct, not through the hub','Hub never sees data (E2E by default via DTLS)','NAT traversal via STUN, scales (data doesn\'t transit hub)'],
+    cons: ['Most complex — WebRTC / ICE / TURN on both ends','Browser + every instance need a WebRTC stack','Symmetric-NAT sandboxes fall back to TURN anyway (still need relay infra)','Hard to debug'],
+  },
+
+  gateway: {
+    name: 'Self-Hosted Gateway',
+    tagline: 'Same shape as the hub, but you host it.',
+    defaults: { auth:'mtls-device', nat:'outbound-relay', dataplane:'through-relay', trust:'self-hosted' },
+    build() {
+      const nodes = [clone(N.dash), clone(N.gateway), ...inst()];
+      const conns = [
+        {from:'dash',to:'hub',type:'data',label:'RPC/WS'},
+        {from:'desktop',to:'hub',type:'dial',label:'register'},
+        {from:'remote', to:'hub',type:'dial',label:'register'},
+        {from:'sandbox',to:'hub',type:'dial',label:'register'},
+      ];
+      return {nodes, conns};
+    },
+    scores: { nat:4, latency:3, infra:2, privacy:5, identity:4, complexity:3, offline:3, reuse:4 },
+    pros: ['One URL + login, NAT-friendly for instances','Full data ownership — no SaaS dependency','Reuses the hub design but no third party'],
+    cons: ['You must host + expose the gateway (reachability moves to one box)','Ops burden on the user','Gateway is your single point of failure'],
+  },
+};
+
+const CONN_STYLE = {
+  data: {color:'#58a6ff', marker:'ar-blue',   dash:'',     name:'Data (RPC / WS)'},
+  dial: {color:'#3fb950', marker:'ar-green',  dash:'',     name:'Outbound dial (NAT-friendly)'},
+  sig:  {color:'#bc8cff', marker:'ar-purple', dash:'5,4',  name:'Signaling / control'},
+  p2p:  {color:'#f778ba', marker:'ar-pink',   dash:'8,4',  name:'P2P data channel'},
+};
+
+const SCORE_ROWS = [
+  ['nat','NAT / remote + sandbox reachability'],
+  ['latency','Latency'],
+  ['privacy','Privacy / data ownership'],
+  ['identity','Unified identity / SSO'],
+  ['infra','Low infra burden (you run less)'],
+  ['complexity','Low implementation complexity'],
+  ['offline','Offline / local-only still works'],
+  ['reuse','Reuse of current Myra code'],
+];
+
+/* =========================================================
+   STATE
+========================================================= */
+const state = {
+  arch: 'hub',
+  auth: '', nat: '', dataplane: '', trust: '',
+  view: 'diagram',
+  comments: [],
+  pendingTarget: null,
+  editingId: null,
+};
+
+/* =========================================================
+   INIT UI
+========================================================= */
+function initArchBtns() {
+  const wrap = document.getElementById('archBtns');
+  wrap.innerHTML = '';
+  Object.entries(ARCH).forEach(([key, a]) => {
+    const b = document.createElement('button');
+    b.className = 'arch-btn' + (state.arch === key ? ' active' : '');
+    b.dataset.arch = key;
+    b.innerHTML = `<div class="nm">${a.name}</div><div class="tg">${a.tagline}</div>`;
+    b.onclick = () => selectArch(key);
+    wrap.appendChild(b);
+  });
+}
+function initSelects() {
+  Object.entries(DIMS).forEach(([dim, cfg]) => {
+    const sel = document.getElementById('sel-' + dim);
+    sel.innerHTML = '';
+    Object.entries(cfg.opts).forEach(([val, txt]) => {
+      const o = document.createElement('option');
+      o.value = val; o.textContent = txt;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => { state[dim] = sel.value; updateAll(); };
+  });
+}
+
+function selectArch(key) {
+  state.arch = key;
+  const d = ARCH[key].defaults;
+  state.auth = d.auth; state.nat = d.nat; state.dataplane = d.dataplane; state.trust = d.trust;
+  initArchBtns();
+  syncSelects();
+  updateAll();
+}
+function syncSelects() {
+  ['auth','nat','dataplane','trust'].forEach(dim => {
+    document.getElementById('sel-' + dim).value = state[dim];
+  });
+}
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    state.view = t.dataset.view;
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+    document.getElementById('view-diagram').classList.toggle('active', state.view === 'diagram');
+    document.getElementById('view-compare').classList.toggle('active', state.view === 'compare');
+  };
+});
+
+/* =========================================================
+   RENDER DIAGRAM
+========================================================= */
+const SVGNS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, txt) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (txt != null) e.textContent = txt;
+  return e;
+}
+function nodeById(nodes, id) { return nodes.find(n => n.id === id); }
+function anchor(n, side) {
+  const cx = n.x + n.w/2, cy = n.y + n.h/2;
+  if (side === 'top') return [cx, n.y];
+  if (side === 'bottom') return [cx, n.y + n.h];
+  return [cx, cy];
+}
+
+function renderDiagram() {
+  const svg = document.getElementById('svg');
+  // wipe everything except defs
+  [...svg.querySelectorAll('g,line,path,rect,text,circle')].forEach(e => e.remove());
+
+  const { nodes, conns } = ARCH[state.arch].build();
+
+  // connections first
+  conns.forEach(c => {
+    const a = nodeById(nodes, c.from), b = nodeById(nodes, c.to);
+    if (!a || !b) return;
+    const st = CONN_STYLE[c.type];
+    // decide anchors: instances at bottom connect from their top; dashboard bottom; hub top/bottom
+    const aboveB = a.y < b.y;
+    const [x1,y1] = anchor(a, aboveB ? 'bottom' : 'top');
+    const [x2,y2] = anchor(b, aboveB ? 'top' : 'bottom');
+    const midY = (y1 + y2) / 2;
+    const path = el('path', {
+      d:`M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`,
+      fill:'none', stroke:st.color, 'stroke-width':2,
+      'stroke-dasharray': st.dash, 'marker-end':`url(#${st.marker})`,
+      opacity:.9,
+    });
+    svg.appendChild(path);
+    // label
+    const lx = (x1 + x2)/2, ly = midY - 3;
+    const t = el('text', {x:lx, y:ly, fill:st.color, 'font-size':10, 'text-anchor':'middle', 'font-family':'ui-monospace,monospace'}, c.label);
+    svg.appendChild(t);
+  });
+
+  // nodes
+  nodes.forEach(n => {
+    const g = el('g', {class:'node', transform:`translate(${n.x},${n.y})`});
+    g.style.cursor = 'pointer';
+    g.onclick = () => openComment(n);
+    const r = el('rect', {x:0,y:0,width:n.w,height:n.h, rx:10, fill:n.fill, opacity:.92, stroke:'#0d1117','stroke-width':1.5});
+    g.appendChild(r);
+    g.appendChild(el('text',{x:n.w/2,y:n.h/2-3,'text-anchor':'middle',fill:'#fff','font-size':13,'font-weight':600}, n.label));
+    g.appendChild(el('text',{x:n.w/2,y:n.h/2+13,'text-anchor':'middle',fill:'rgba(255,255,255,.8)','font-size':10,'font-family':'ui-monospace,monospace'}, n.sub));
+    // comment badge
+    const cc = state.comments.filter(c => c.target === n.id).length;
+    if (cc) {
+      g.appendChild(el('circle',{cx:n.w-6,cy:6,r:9,fill:'#bc8cff',stroke:'#0d1117','stroke-width':1.5}));
+      g.appendChild(el('text',{x:n.w-6,y:9.5,'text-anchor':'middle',fill:'#0d1117','font-size':10,'font-weight':700}, cc));
+    }
+    svg.appendChild(g);
+  });
+
+  renderLegend(conns);
+}
+
+function renderLegend(conns) {
+  const used = [...new Set(conns.map(c => c.type))];
+  const lg = document.getElementById('legend');
+  lg.innerHTML = '<div style="font-weight:600;margin-bottom:5px;font-size:10.5px;color:var(--muted)">CONNECTIONS</div>';
+  used.forEach(t => {
+    const st = CONN_STYLE[t];
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = `<span class="swatch" style="border-top-color:${st.color};border-top-style:${st.dash?'dashed':'solid'}"></span><span>${st.name}</span>`;
+    lg.appendChild(row);
+  });
+}
+
+/* =========================================================
+   COMPARE TABLE
+========================================================= */
+function dots(n) {
+  let s = '';
+  for (let i=1;i<=5;i++) {
+    const cls = i <= n ? (n>=4?'d-on':(n>=2?'d-mid':'d-off')) : 'd-off';
+    s += `<span class="${cls}">●</span>`;
+  }
+  return `<span class="dots">${s}</span>`;
+}
+function renderCompare() {
+  const keys = Object.keys(ARCH);
+  let h = '<table class="cmp"><colgroup><col>';
+  keys.forEach(k => h += `<col class="${k===state.arch?'sel':''}">`);
+  h += '</colgroup><thead><tr><th>Dimension</th>';
+  keys.forEach(k => h += `<th class="${k===state.arch?'sel':''}">${ARCH[k].name}</th>`);
+  h += '</tr></thead><tbody>';
+  SCORE_ROWS.forEach(([sk, slabel]) => {
+    h += `<tr><td class="dimname">${slabel}</td>`;
+    keys.forEach(k => h += `<td class="${k===state.arch?'sel':''}">${dots(ARCH[k].scores[sk])}</td>`);
+    h += '</tr>';
+  });
+  // pros/cons row
+  h += '<tr><td class="dimname">Strengths</td>';
+  keys.forEach(k => h += `<td class="${k===state.arch?'sel':''}"><ul style="margin:0;padding-left:15px">${ARCH[k].pros.map(p=>`<li>${p}</li>`).join('')}</ul></td>`);
+  h += '</tr><tr><td class="dimname">Trade-offs</td>';
+  keys.forEach(k => h += `<td class="${k===state.arch?'sel':''}"><ul style="margin:0;padding-left:15px;color:var(--muted)">${ARCH[k].cons.map(p=>`<li>${p}</li>`).join('')}</ul></td>`);
+  h += '</tr></tbody></table>';
+  h += '<div class="scorenote">More filled green dots = better on that dimension. The highlighted column is your current pick.</div>';
+  document.getElementById('compareWrap').innerHTML = h;
+}
+
+/* =========================================================
+   COMMENTS
+========================================================= */
+function openComment(node) {
+  state.pendingTarget = node ? {id:node.id, label:node.label} : {id:'general', label:'General / whole design'};
+  state.editingId = null;
+  document.getElementById('modalTitle').textContent = 'Comment on: ' + state.pendingTarget.label;
+  document.getElementById('modalSub').textContent = node ? (node.sub||'') : 'Applies to the overall architecture choice.';
+  document.getElementById('modalText').value = '';
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('modalText').focus(), 30);
+}
+function editComment(id) {
+  const c = state.comments.find(x=>x.id===id);
+  if (!c) return;
+  state.pendingTarget = {id:c.target, label:c.targetLabel};
+  state.editingId = id;
+  document.getElementById('modalTitle').textContent = 'Edit comment: ' + c.targetLabel;
+  document.getElementById('modalSub').textContent = '';
+  document.getElementById('modalText').value = c.text;
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('modalText').focus(), 30);
+}
+function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
+function saveComment() {
+  const txt = document.getElementById('modalText').value.trim();
+  if (!txt) { closeModal(); return; }
+  if (state.editingId) {
+    const c = state.comments.find(x=>x.id===state.editingId);
+    c.text = txt;
+  } else {
+    state.comments.push({
+      id: Date.now(),
+      target: state.pendingTarget.id,
+      targetLabel: state.pendingTarget.label,
+      text: txt,
+    });
+  }
+  closeModal();
+  updateAll();
+}
+function deleteComment(id) {
+  state.comments = state.comments.filter(c => c.id !== id);
+  updateAll();
+}
+function renderComments() {
+  document.getElementById('cmtCount').textContent = state.comments.length;
+  const list = document.getElementById('cmtList');
+  if (!state.comments.length) { list.innerHTML = '<div class="empty">No comments yet. Click a box in the diagram, or use the button above.</div>'; return; }
+  list.innerHTML = '';
+  state.comments.forEach(c => {
+    const d = document.createElement('div'); d.className = 'cmt';
+    d.innerHTML = `<button class="del" title="delete" onclick="deleteComment(${c.id})">×</button>
+      <div class="tgt">${c.targetLabel}</div><div class="tx"></div>`;
+    d.querySelector('.tx').textContent = c.text;
+    d.querySelector('.tx').style.cursor = 'pointer';
+    d.querySelector('.tx').onclick = () => editComment(c.id);
+    list.appendChild(d);
+  });
+}
+
+/* =========================================================
+   DIMENSION OVERRIDE MARKERS
+========================================================= */
+function markOverrides() {
+  const d = ARCH[state.arch].defaults;
+  ['auth','nat','dataplane','trust'].forEach(dim => {
+    const wrap = document.querySelector(`.dim[data-dim="${dim}"]`);
+    wrap.classList.toggle('overridden', state[dim] !== d[dim]);
+  });
+}
+
+/* =========================================================
+   PROMPT
+========================================================= */
+function updatePrompt() {
+  const a = ARCH[state.arch];
+  const d = a.defaults;
+  const parts = [];
+
+  parts.push(`I'm designing the centralized dashboard for Myra Agents — an auth'd frontend that gathers all of my Claude agent instances (local desktop, remote computers, and remote sandboxes) into one board. Context: the current \`feature/backend-refactor\` branch already does client-side fan-out (the browser/Tauri client holds N direct HTTP/WS connections and merges the boards). I'm exploring where to take it next.`);
+
+  parts.push(`\n## Chosen architecture: ${a.name}\n${a.tagline}`);
+
+  // dimensions
+  const dimLine = (dim) => {
+    const chosen = DIMS[dim].opts[state[dim]];
+    const deviating = state[dim] !== d[dim];
+    return `- **${DIMS[dim].label}:** ${chosen}${deviating ? `  _(deviating from this architecture's usual \`${DIMS[dim].opts[d[dim]]}\`)_` : ''}`;
+  };
+  parts.push(`\n**Dimensions:**\n${['auth','nat','dataplane','trust'].map(dimLine).join('\n')}`);
+
+  // why summary from scores
+  const topStrength = a.pros[0];
+  const topRisk = a.cons[0];
+  parts.push(`\nWhy this shape: ${topStrength.toLowerCase()}. Main thing to solve for: ${topRisk.toLowerCase()}.`);
+
+  // comments
+  if (state.comments.length) {
+    const general = state.comments.filter(c => c.target === 'general');
+    const targeted = state.comments.filter(c => c.target !== 'general');
+    parts.push('\n## My notes');
+    if (targeted.length) {
+      targeted.forEach(c => parts.push(`\n**On ${c.targetLabel}:**\n${c.text}`));
+    }
+    if (general.length) {
+      parts.push('\n**Overall:**');
+      general.forEach(c => parts.push(c.text));
+    }
+  }
+
+  parts.push(`\n## What I want from you\nValidate this architecture against my notes, call out where it fights the existing branch, and propose a concrete implementation plan (new packages/services, the wire protocol for instance enrollment + command routing, auth flow, and a migration path from today's fan-out). Flag the biggest risk and a simpler fallback if there is one.`);
+
+  document.getElementById('prompt').textContent = parts.join('\n');
+}
+
+function copyPrompt() {
+  navigator.clipboard.writeText(document.getElementById('prompt').textContent).then(() => {
+    const c = document.getElementById('copied');
+    c.classList.add('show');
+    setTimeout(() => c.classList.remove('show'), 1400);
+  });
+}
+
+/* =========================================================
+   MASTER UPDATE
+========================================================= */
+function updateAll() {
+  renderDiagram();
+  renderCompare();
+  renderComments();
+  markOverrides();
+  updatePrompt();
+}
+
+// keyboard: esc closes modal, cmd/ctrl+enter saves
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if ((e.metaKey||e.ctrlKey) && e.key === 'Enter' && document.getElementById('modalBg').classList.contains('open')) saveComment();
+});
+document.getElementById('modalBg').addEventListener('click', e => { if (e.target.id === 'modalBg') closeModal(); });
+
+// boot
+initArchBtns();
+initSelects();
+selectArch('hub');
+</script>
+</body>
+</html>

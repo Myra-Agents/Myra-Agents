@@ -1,5 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
-import { listen, type UnlistenFn } from "@/lib/tauri";
+import { useCallback, useEffect, useState } from "react";
+
+import { toGlobalId } from "@/lib/aggregate/global-id";
+import { connectionManager } from "@/lib/connections/manager";
+import type { UnlistenFn } from "@/lib/tauri";
 
 interface AgentLogEvent {
   cardId: string;
@@ -10,38 +13,50 @@ interface AgentLogEvent {
 const MAX_LINES_PER_CARD = 500;
 
 /**
- * Subscribes to the `agent-log-appended` Tauri event.
- * Returns a map { cardId -> recent log lines } plus a reset helper.
+ * Subscribes to `agent-log-appended` across every connection. Returns a map
+ * { GlobalId -> recent log lines }; the demuxed connId namespaces each server's
+ * card id so logs from same-id cards on different servers never collide.
  */
 export function useAgentLogs() {
   const [logs, setLogs] = useState<Map<string, string[]>>(new Map());
 
   useEffect(() => {
-    let unlisten: UnlistenFn | undefined;
     let cancelled = false;
+    let unlisten: UnlistenFn | undefined;
 
-    listen<AgentLogEvent>("agent-log-appended", (event) => {
-      if (cancelled) return;
-      const { cardId, line } = event.payload;
-      setLogs((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(cardId) ?? [];
-        const updated = [...existing, line];
-        if (updated.length > MAX_LINES_PER_CARD) {
-          updated.splice(0, updated.length - MAX_LINES_PER_CARD);
-        }
-        next.set(cardId, updated);
-        return next;
-      });
-    })
-      .then((fn) => {
+    const subscribe = async () => {
+      if (unlisten) {
+        unlisten();
+        unlisten = undefined;
+      }
+      try {
+        const fn = await connectionManager.listenAll<AgentLogEvent>("agent-log-appended", ({ connId, payload }) => {
+          if (cancelled) return;
+          const globalId = toGlobalId(connId, payload.cardId);
+          setLogs((prev) => {
+            const next = new Map(prev);
+            const existing = next.get(globalId) ?? [];
+            const updated = [...existing, payload.line];
+            if (updated.length > MAX_LINES_PER_CARD) {
+              updated.splice(0, updated.length - MAX_LINES_PER_CARD);
+            }
+            next.set(globalId, updated);
+            return next;
+          });
+        });
         if (cancelled) fn();
         else unlisten = fn;
-      })
-      .catch((e) => console.error("Failed to subscribe agent-log-appended:", e));
+      } catch (e) {
+        console.error("Failed to subscribe agent-log-appended:", e);
+      }
+    };
+
+    void subscribe();
+    const off = connectionManager.onTopologyChange(() => void subscribe());
 
     return () => {
       cancelled = true;
+      off();
       if (unlisten) unlisten();
     };
   }, []);

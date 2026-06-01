@@ -6,16 +6,14 @@ use tauri::{
     AppHandle, Manager,
 };
 
-use crate::{
-    commands::{agent::AgentProcesses, kanban::load_cards},
-    models::kanban_card::KanbanStatus,
-};
-
 #[derive(Default)]
 pub struct TrayState {
     pub tray_icon: Mutex<Option<TrayIcon>>,
 }
 
+/// Build the system tray: a menu (Open / Quit) plus left-click to reveal the
+/// window. Agent/board status now lives in the Node sidecar, so the tray is a
+/// plain launcher — the tooltip is static.
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "Open Myra Agents", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -48,44 +46,6 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
 
     if let Ok(mut tray_slot) = app.state::<TrayState>().tray_icon.lock() {
         *tray_slot = Some(tray);
-    }
-
-    update_tray_status(app)?;
-    Ok(())
-}
-
-pub fn update_tray_status(app: &AppHandle) -> tauri::Result<()> {
-    let running_agents = app
-        .state::<AgentProcesses>()
-        .pids
-        .lock()
-        .map(|pids| pids.len())
-        .unwrap_or_default();
-
-    let attention_cards = load_cards()
-        .iter()
-        .filter(|card| {
-            matches!(
-                card.status,
-                KanbanStatus::WaitingFeedback | KanbanStatus::AwaitingReview
-            )
-        })
-        .count();
-
-    let mut tooltip = if running_agents > 0 {
-        format!("Myra Agents — {running_agents} agent(s) running")
-    } else {
-        "Myra Agents — Idle".to_string()
-    };
-
-    if attention_cards > 0 {
-        tooltip.push_str(&format!("\n⚠ {attention_cards} card(s) need attention"));
-    }
-
-    if let Ok(tray_slot) = app.state::<TrayState>().tray_icon.lock() {
-        if let Some(tray_icon) = tray_slot.as_ref() {
-            tray_icon.set_tooltip(Some(tooltip))?;
-        }
     }
 
     Ok(())

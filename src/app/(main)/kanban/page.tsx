@@ -12,11 +12,14 @@ import { useAgentEvents } from "@/hooks/use-agent-events";
 import { useAgentLogs } from "@/hooks/use-agent-logs";
 import { useCardTemplates } from "@/hooks/use-card-templates";
 import { useColumnPreferences } from "@/hooks/use-column-preferences";
+import { useConnections } from "@/hooks/use-connections";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
+import { connIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
+import { connectionManager } from "@/lib/connections/manager";
 import { normalizeTag, parseTags } from "@/lib/kanban-tags";
-import { invoke } from "@/lib/tauri";
+import { invokeOn } from "@/lib/tauri";
 import { useShortcutStore } from "@/stores/shortcut-store";
 import type { CardFormData, KanbanCard, KanbanStatus } from "@/types/kanban";
 
@@ -42,6 +45,7 @@ export default function KanbanPage() {
   const { logs } = useAgentLogs();
   const { byId } = useSchedules();
   const { settings } = useSettings();
+  const { isVisible } = useConnections();
   const { templates, saveTemplate } = useCardTemplates();
   const {
     preferences: columnPreferences,
@@ -52,13 +56,16 @@ export default function KanbanPage() {
 
   useAgentEvents(upsertCard);
 
+  // Drop cards from connections the user has hidden via the connection switcher.
+  const visibleCards = useMemo(() => cards.filter((c) => isVisible(connIdOf(c.id))), [cards, isVisible]);
+
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
-    for (const card of cards) {
+    for (const card of visibleCards) {
       for (const tag of card.tags) tags.add(normalizeTag(tag));
     }
     return [...tags].filter(Boolean).sort((a, b) => a.localeCompare(b));
-  }, [cards]);
+  }, [visibleCards]);
 
   const [cardModalOpen, setCardModalOpen] = useState(false);
   const [cardModalMode, setCardModalMode] = useState<"add" | "edit">("add");
@@ -102,20 +109,23 @@ export default function KanbanPage() {
   }, []);
 
   const handleSaveCard = useCallback(
-    async (data: CardFormData, status: KanbanStatus) => {
+    async (data: CardFormData, status: KanbanStatus, targetConnId?: string) => {
       const parsedTags = parseTags(data.tags);
       const agentPresetId = data.agentPresetId ?? editingCard?.agentPresetId ?? settings.defaultAgentId;
 
       if (cardModalMode === "add") {
-        await addCard({
-          title: data.title,
-          description: data.description || undefined,
-          agentPrompt: data.agentPrompt || undefined,
-          agentPresetId,
-          workingDir: data.workingDir,
-          tags: parsedTags,
-          status,
-        });
+        await addCard(
+          {
+            title: data.title,
+            description: data.description || undefined,
+            agentPrompt: data.agentPrompt || undefined,
+            agentPresetId,
+            workingDir: data.workingDir,
+            tags: parsedTags,
+            status,
+          },
+          targetConnId,
+        );
       } else if (editingCard) {
         await updateCard({
           id: editingCard.id,
@@ -140,8 +150,9 @@ export default function KanbanPage() {
   );
 
   const handleOpenWorkingDir = useCallback(async (cardId: string) => {
+    const { connId, entityId } = parseGlobalId(cardId);
     try {
-      await invoke("open_card_working_dir", { cardId });
+      await invokeOn(connId, "open_card_working_dir", { cardId: entityId });
     } catch (e) {
       toast.error(String(e));
     }
@@ -221,10 +232,19 @@ export default function KanbanPage() {
     if (!cardModalOpen || !editingCard) return;
     const card = cards.find((c) => c.id === editingCard.id);
     if (!card || (!card.agentRunId && !card.agentQueued)) return;
-    void invoke("cancel_agent", { cardId: card.id })
+    const { connId, entityId } = parseGlobalId(card.id);
+    void invokeOn(connId, "cancel_agent", { cardId: entityId })
       .then(() => toast.success(t("toast.canceled")))
       .catch((e) => toast.error(String(e)));
   }, [cancelNonce, cardModalOpen, editingCard, cards, t]);
+
+  // Adaptive log cadence (P6): only the card whose modal is open has a live
+  // viewer, so tell its backend to stream that card's log lines and let every
+  // other (headless/scheduled) run go quiet. Closing the modal clears the set.
+  useEffect(() => {
+    const watched = cardModalOpen && editingCard ? [editingCard.id] : [];
+    void connectionManager.setLogWatch(watched);
+  }, [cardModalOpen, editingCard]);
 
   if (loading) {
     return (
@@ -245,7 +265,7 @@ export default function KanbanPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <KanbanBoard
-        cards={cards}
+        cards={visibleCards}
         onAddCard={handleAddCard}
         onEditCard={handleEditCard}
         onTrashCard={handleTrashCard}

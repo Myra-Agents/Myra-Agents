@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
 import { AppSidebar } from "@/app/(main)/_components/sidebar/app-sidebar";
+import { AuthBootstrap } from "@/components/auth-bootstrap";
+import { RequirePro } from "@/components/require-pro";
+import { RemoteAccessConsent } from "@/components/settings/remote-access-consent";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
@@ -69,9 +72,11 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
           </div>
         </header>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
-          {children}
+          <RequirePro>{children}</RequirePro>
         </div>
       </SidebarInset>
+      <AuthBootstrap />
+      <RemoteAccessConsent />
     </SidebarProvider>
   );
 }

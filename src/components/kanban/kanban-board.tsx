@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ColumnPreferences } from "@/hooks/use-column-preferences";
+import { connIdOf } from "@/lib/aggregate/global-id";
 import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
 import { COLUMN_STATUSES, isTransitionAllowed } from "@/types/kanban";
@@ -462,10 +463,16 @@ export function KanbanBoard({
         : null;
     if (!targetStatus) return;
 
-    // Same column reorder
+    // Same column reorder — disallowed across servers (positions are per-server).
     if (targetStatus === card.status) {
       if (!overCard || overCard.id === cardId) return;
-      const newPosition = computeInsertPosition(visibleCards, targetStatus, cardId, overCard.id);
+      if (connIdOf(overCard.id) !== connIdOf(cardId)) {
+        setInvalidDropId(cardId);
+        setTimeout(() => setInvalidDropId(null), 450);
+        return;
+      }
+      const sameServer = visibleCards.filter((c) => connIdOf(c.id) === connIdOf(cardId));
+      const newPosition = computeInsertPosition(sameServer, targetStatus, cardId, overCard.id);
       onReorderCard(cardId, newPosition);
       return;
     }

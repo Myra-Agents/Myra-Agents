@@ -1,0 +1,344 @@
+{
+  "info": {
+    "name": "Myra Hub",
+    "description": "Interact with the Myra Hub Cloudflare Worker. Set the `baseUrl` and `sessionToken` variables before use.\n\n**Auth flow:** POST /auth/login (dev only, requires MYRA_HUB_DEV_LOGIN=1 on the worker) → copy token → set `sessionToken` variable → all other requests work.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://myra-hub.<your-subdomain>.workers.dev",
+      "type": "string"
+    },
+    {
+      "key": "sessionToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "instanceId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Healthz",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/healthz",
+            "description": "Liveness check. No auth required."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Dev Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.ok && body.data?.token) {",
+                  "  pm.collectionVariables.set('sessionToken', body.data.token);",
+                  "  console.log('sessionToken saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Requires MYRA_HUB_DEV_LOGIN=1 on the worker. Auto-saves token to `sessionToken` variable.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"your-user-id\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Instances",
+      "item": [
+        {
+          "name": "List Instances",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/instances",
+            "description": "List all online instances for the authenticated user.",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sessionToken}}" }]
+          }
+        },
+        {
+          "name": "Mint Pairing Code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.ok && body.data?.code) {",
+                  "  console.log('Pairing code:', body.data.code);",
+                  "  console.log('Expires at:', new Date(body.data.expiresAt).toISOString());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/instances/pair",
+            "description": "Mint a one-time pairing code (valid 10 min). On remote machine run: `myra-server enroll <code>`.",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sessionToken}}" }]
+          }
+        },
+        {
+          "name": "Revoke Instance",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/instances/{{instanceId}}/revoke",
+            "description": "Revoke an instance credential and drop its live tunnel. Set `instanceId` variable first.",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sessionToken}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "RPC — Data Commands",
+      "description": "Commands implemented by every backend. POST to /api/i/:instanceId/rpc/:cmd",
+      "item": [
+        {
+          "name": "get_cards",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/get_cards",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "add_card",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/add_card",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My card\",\n  \"prompt\": \"Do something useful\",\n  \"agentId\": null\n}"
+            }
+          }
+        },
+        {
+          "name": "update_card",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/update_card",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"<card-id>\",\n  \"title\": \"Updated title\"\n}"
+            }
+          }
+        },
+        {
+          "name": "move_card",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/move_card",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"<card-id>\",\n  \"status\": \"todo\"\n}"
+            }
+          }
+        },
+        {
+          "name": "trash_card",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/trash_card",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"<card-id>\"\n}" }
+          }
+        },
+        {
+          "name": "restore_card",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/restore_card",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"<card-id>\"\n}" }
+          }
+        },
+        {
+          "name": "delete_card",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/delete_card",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": \"<card-id>\"\n}" }
+          }
+        },
+        {
+          "name": "answer_feedback",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/answer_feedback",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"<card-id>\",\n  \"answer\": \"Your answer here\"\n}"
+            }
+          }
+        },
+        {
+          "name": "get_settings",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/get_settings",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "list_schedules",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/list_schedules",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "RPC — Agent Commands",
+      "description": "Require `agent` capability on the instance.",
+      "item": [
+        {
+          "name": "launch_agent",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/launch_agent",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardId\": \"<card-id>\"\n}"
+            }
+          }
+        },
+        {
+          "name": "cancel_agent",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/cancel_agent",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"cardId\": \"<card-id>\"\n}" }
+          }
+        },
+        {
+          "name": "get_run_log",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/get_run_log",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"runId\": \"<run-id>\"\n}" }
+          }
+        },
+        {
+          "name": "trigger_schedule_now",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/trigger_schedule_now",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"scheduleId\": \"<schedule-id>\"\n}" }
+          }
+        },
+        {
+          "name": "plan_day",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/i/{{instanceId}}/rpc/plan_day",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{sessionToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Enrollment (instance-side)",
+      "item": [
+        {
+          "name": "Enroll Instance",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/enroll",
+            "description": "Called by `myra-server enroll <code>` on the remote machine. No session token needed — uses the one-time pairing code.",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"<pairing-code>\",\n  \"instanceId\": \"my-machine-id\",\n  \"label\": \"My Server\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

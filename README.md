@@ -34,6 +34,126 @@ Coding agents are powerful but awkward to operate at scale: you babysit a termin
 
 ---
 
+## Installation
+
+Myra Agents is three deployable pieces plus a shared library. What you install
+depends on whether you're an **end user** (run the board, add machines) or an
+**admin** (stand up the shared infrastructure).
+
+### Topology
+
+```
+   ┌─────────────────┐         ┌──────────────────┐        ┌──────────────────────┐
+   │  Desktop app     │  wss/   │  Hub (relay)      │  wss/  │  Instances            │
+   │  (dashboard)     │◀──────▶│  packages/hub     │◀──────▶│  myra-server          │
+   │  USER installs   │  https  │  Cloudflare Worker│  out   │  packages/server      │
+   │                  │         │  ADMIN deploys    │        │  on each machine      │
+   └─────────────────┘         └──────────────────┘        │  USER pairs (1-liner) │
+                                                             └──────────────────────┘
+```
+
+The **dashboard** logs into a **hub**; each remote **instance** dials the hub
+outbound (works behind NAT). Instances appear on the dashboard as board origins.
+No hub? The desktop app still runs fully **local** against its own bundled
+server sidecar — skip everything hub-related below.
+
+### Components
+
+| Package | What it is | Who installs it | How |
+|---|---|---|---|
+| Desktop app (repo root) | Next.js + Tauri dashboard | **User** | download release / `bun run tauri:build` |
+| `packages/server` | `myra-server` instance backend (self-contained binary) | **User** (per machine) | install one-liner |
+| `packages/hub` | Cloudflare Worker relay (`UserHub` Durable Object) | **Admin** | Wrangler deploy |
+| `packages/shared` | Shared TS types/protocol | — | not installed standalone; a workspace dep of the others |
+
+---
+
+### For users
+
+**1 — Install the desktop dashboard.** Download the installer for your OS from
+the project Releases (`.msi`/`.nsis` on Windows, `.dmg`/app bundle on macOS), or
+build it yourself from a checkout:
+
+```bash
+bun install
+bun run tauri:build      # bundle in src-tauri/target/release/bundle/
+```
+
+Launch it. Out of the box it runs **local only** — your board lives in
+`~/.myra-agents/`, agents run on this machine, no hub needed.
+
+**2 — (Optional) Connect to a hub.** To gather machines under one login, go to
+**Settings → Connections → Hubs**, click **Add hub**, enter the hub URL + your
+user. This stores a session token; the dashboard now talks to the hub.
+
+**3 — (Optional) Add a remote instance.** In the same panel, click **Pair
+instance** on a hub. It mints a one-time code and shows a copy-paste install
+command (toggle macOS-Linux / Windows). On the machine you want to add, run it:
+
+```bash
+# macOS / Linux
+curl -sSf https://<hub-host>/install-remote.sh | MYRA_HUB_URL=<hub> CODE=<code> sh
+
+# Windows (PowerShell)
+$env:MYRA_HUB_URL="<hub>"; $env:CODE="<code>"; iwr https://<hub-host>/install-remote.ps1 | iex
+```
+
+That one command downloads the right `myra-server` binary, verifies its
+checksum, enrolls with the code, and installs a **per-user service** (systemd
+user unit / launchd LaunchAgent / Task Scheduler) so it survives logout and
+reboot — no root/admin. The instance dials the hub and shows up on your board.
+Re-run the same command anytime to update the binary (idempotent).
+
+> First run of an unsigned downloaded binary: macOS Gatekeeper is cleared by the
+> script (`xattr`); Windows SmartScreen may warn once. Signing/notarization is
+> tracked separately.
+
+**Manage an instance** (on the machine, once installed):
+
+```bash
+myra-server status              # enrollment + running state
+myra-server unenroll            # drop the hub credential
+myra-server uninstall-service   # stop + remove the service
+```
+
+---
+
+### For admins
+
+**1 — Deploy the hub.** The hub is a Cloudflare Worker + Durable Object in
+`packages/hub`. Full runbook (Node 22, Wrangler login, KV namespace for pairing
+codes, the `MYRA_HUB_SECRET` signing secret, deploy, smoke test) is in
+[`docs/hub-deploy.md`](docs/hub-deploy.md). Short version:
+
+```bash
+cd packages/hub
+nvm use 22                                       # Wrangler needs Node ≥ 22
+bunx wrangler login
+bunx wrangler kv namespace create PAIRING        # paste id into wrangler.toml
+openssl rand -hex 32 | bunx wrangler secret put MYRA_HUB_SECRET
+bunx wrangler deploy                             # → prints the hub URL
+```
+
+Hand the printed hub URL to your users (step 2 above). In production leave dev
+login **off** and wire OIDC / Cloudflare Access — see the runbook.
+
+**2 — Publish the instance binaries.** Users' install one-liner pulls
+`myra-server` from GitHub Releases. The release CI
+([`.github/workflows/release-server.yml`](.github/workflows/release-server.yml))
+builds all five targets (Linux x64/arm64, macOS x64/arm64, Windows x64) plus
+`.sha256` checksums when you push a `v*` tag:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0       # → builds + attaches release assets
+```
+
+The install scripts (`scripts/install-remote.{sh,ps1}`) fetch from
+`releases/latest/download/`. Host the scripts where users can `curl` them (the
+hub host, or GitHub raw) and override the source repo with `MYRA_REPO` /
+`MYRA_RELEASE` env vars if needed.
+
+---
+
 ## Getting started (developers)
 
 > The fastest path is the in-repo **`onboard` skill**: if you use Claude Code, just say **"onboard me"** (or `/onboard`) and it walks you through everything below interactively — prerequisites, install, running, an architecture tour, conventions, the verification gates, and your first PR. See `.claude/skills/onboard/SKILL.md`.

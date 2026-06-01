@@ -13,6 +13,11 @@
 
 # tauri
 /src-tauri/target
+# compiled sidecar binaries (built per-platform via `bun run sidecar:build`)
+/src-tauri/binaries
+# bun build --compile scratch files
+.*.bun-build
+.claude/scheduled_tasks.lock
 
 # misc
 .DS_Store
@@ -26,7 +31,10 @@ yarn-error.log*
 # env
 .env*.local
 .env
+.env.clerk
+.env.*
 
 # vercel
 .vercel
 node_modules
+.claude/skills/validate-tauri-app/artifacts/
