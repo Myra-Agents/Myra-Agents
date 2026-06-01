@@ -407,6 +407,7 @@
       "homePage": "Default home page",
       "language": "Language",
       "theme": "Theme",
+      "themePreset": "Theme Preset",
       "themeDescription": "Theme changes apply immediately and are stored for your next launch.",
       "themeOptions": {
         "light": "Light",

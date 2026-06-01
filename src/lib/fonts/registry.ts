@@ -16,6 +16,7 @@ import {
   Raleway,
   Roboto,
   Roboto_Slab,
+  Sorts_Mill_Goudy,
 } from "next/font/google";
 
 import { GeistPixelSquare } from "geist/font/pixel";
@@ -107,7 +108,17 @@ const playfairDisplay = Playfair_Display({
   variable: "--font-playfair-display",
 });
 
+const sortsMillGoudy = Sorts_Mill_Goudy({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-sorts-mill-goudy",
+});
+
 export const fontRegistry = {
+  sortsMillGoudy: {
+    label: "Sorts Mill Goudy",
+    font: sortsMillGoudy,
+  },
   geist: {
     label: "Geist",
     font: geist,

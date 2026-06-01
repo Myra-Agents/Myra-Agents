@@ -293,6 +293,9 @@ These serve as the fallback; there is no separate default.css file. */
   html[data-font="playfairDisplay"] body {
     --font-sans: var(--font-playfair-display);
   }
+  html[data-font="sortsMillGoudy"] body {
+    --font-sans: var(--font-sorts-mill-goudy);
+  }
 }
 
 html {

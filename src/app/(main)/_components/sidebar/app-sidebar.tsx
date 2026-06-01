@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Plus } from "lucide-react";
@@ -60,13 +59,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:[&_img]:!size-6"
+              className="h-auto cursor-default hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:[&_img]:!size-8"
             >
-              <Link prefetch={false} href="/kanban">
-                <img src="/light-theme.png" alt="" aria-hidden className="size-5 object-contain dark:hidden" />
-                <img src="/dark-theme.png" alt="" aria-hidden className="hidden size-5 object-contain dark:block" />
-                <span className="font-semibold text-base">{APP_CONFIG.name}</span>
-              </Link>
+              <div className="flex items-center justify-center gap-2 text-sidebar-foreground">
+                <img src="/light-theme.png" alt="" aria-hidden className="size-8 object-contain dark:hidden" />
+                <img src="/dark-theme.png" alt="" aria-hidden className="hidden size-8 object-contain dark:block" />
+                <span className="font-semibold text-lg">{APP_CONFIG.name}</span>
+              </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

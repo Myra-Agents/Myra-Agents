@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { AccountInfo } from "@myra/shared";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+// `invoke` only powered desktop `start_login` — login is disabled for now.
+import { isTauri } from "@tauri-apps/api/core";
 
-import { isClerkConfigured, signInWithClerk } from "@/lib/auth/clerk";
+// `signInWithClerk` only powered web login — disabled for now.
+import { isClerkConfigured } from "@/lib/auth/clerk";
 import {
   getAccount,
   isAuthConfigured,
@@ -34,14 +36,15 @@ export function useAuth() {
   }, []);
 
   const signIn = useCallback(async () => {
-    setBusy(true);
-    try {
-      if (isTauri()) await invoke("start_login");
-      else await signInWithClerk();
-    } finally {
-      // Web redirects away; desktop just opened the browser — release the spinner.
-      setBusy(false);
-    }
+    // Login disabled for now — original flow commented out.
+    // setBusy(true);
+    // try {
+    //   if (isTauri()) await invoke("start_login");
+    //   else await signInWithClerk();
+    // } finally {
+    //   // Web redirects away; desktop just opened the browser — release the spinner.
+    //   setBusy(false);
+    // }
   }, []);
 
   const signOut = useCallback(async () => {

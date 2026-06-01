@@ -407,6 +407,7 @@
       "homePage": "Page d'accueil par défaut",
       "language": "Langue",
       "theme": "Thème",
+      "themePreset": "Préréglage de thème",
       "themeDescription": "Le thème s'applique immédiatement et est conservé pour le prochain lancement.",
       "themeOptions": {
         "light": "Clair",

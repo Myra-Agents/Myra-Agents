@@ -10,7 +10,8 @@ import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
 
 import { GlobalShortcuts } from "./_components/global-shortcuts";
-import { LayoutControls } from "./_components/sidebar/layout-controls";
+// Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
+// import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 import { WindowControls, WindowDragRegion } from "./_components/window-controls";
@@ -65,7 +66,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
             </div>
             <WindowDragRegion />
             <div className="flex items-center gap-2">
-              <LayoutControls />
+              {/* <LayoutControls /> */}
               <ThemeSwitcher />
               <WindowControls />
             </div>
