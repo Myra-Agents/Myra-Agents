@@ -6,7 +6,7 @@ the contribution flow.
 ## Setup
 
 ```bash
-git clone --recurse-submodules https://github.com/Gamma-Software/Myra-Agents.git
+git clone --recurse-submodules https://github.com/Myra-Agents/Myra-Agents.git
 cd Myra-Agents
 bun install
 bun run tauri:dev   # or `bun run dev` for frontend-only in a browser
@@ -24,7 +24,7 @@ to fetch `packages/shared`.
   concern in `hooks/`; shadcn-style primitives in `components/ui/`.
 - `src-tauri/` — Tauri v2 (Rust) desktop shell + sidecar supervision.
 - `packages/shared/` — submodule of
-  [Myra-Agents-Shared](https://github.com/Gamma-Software/Myra-Agents-Shared);
+  [Myra-Agents-Shared](https://github.com/Myra-Agents/Myra-Agents-Shared);
   shared types/contracts. Changes there land in that repo, then bump the
   submodule pointer here.
 - `scripts/build-sidecar.mjs` — downloads the pre-built server sidecar binary.
@@ -55,4 +55,4 @@ npx biome check
 3. Open a PR against `main`; include a screenshot for UI changes and reference
    any related issue.
 
-Report bugs and ideas via [GitHub Issues](https://github.com/Gamma-Software/Myra-Agents/issues).
+Report bugs and ideas via [GitHub Issues](https://github.com/Myra-Agents/Myra-Agents/issues).

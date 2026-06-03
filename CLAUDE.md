@@ -14,7 +14,7 @@ manual run.
 
 This is the **open-source app** repo. Two pieces live elsewhere:
 - **`packages/shared`** is a git submodule
-  ([Myra-Agents-Shared](https://github.com/Gamma-Software/Myra-Agents-Shared)) —
+  ([Myra-Agents-Shared](https://github.com/Myra-Agents/Myra-Agents-Shared)) —
   shared types, contracts, and domain helpers. Run `git submodule update --init`
   after cloning. Edit shared code in that repo, then bump the submodule pointer here.
 - **The server sidecar** (`myra-server`) is a **pre-built binary**, not source.

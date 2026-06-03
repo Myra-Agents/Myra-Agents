@@ -36,7 +36,7 @@ downloads a pre-built **server sidecar** binary at build time.
 
 ```bash
 # 1. Clone WITH submodules (or run `git submodule update --init` after cloning)
-git clone --recurse-submodules https://github.com/Gamma-Software/Myra-Agents.git
+git clone --recurse-submodules https://github.com/Myra-Agents/Myra-Agents.git
 cd Myra-Agents
 
 # 2. Install deps
@@ -81,7 +81,7 @@ enable sign-in (Clerk publishable key) and a managed hub. Everything is optional
   supervises the local **server sidecar** (spawns / adopts the `myra-server`
   binary, streams its output). Frameless window; close-to-tray.
 - **`packages/shared/`** — git submodule
-  ([Myra-Agents-Shared](https://github.com/Gamma-Software/Myra-Agents-Shared)):
+  ([Myra-Agents-Shared](https://github.com/Myra-Agents/Myra-Agents-Shared)):
   TypeScript types, API contracts, and pure domain helpers shared across the
   ecosystem.
 - **Server sidecar** — a pre-built binary downloaded by
