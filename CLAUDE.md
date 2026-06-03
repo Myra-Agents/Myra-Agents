@@ -107,3 +107,15 @@ resolves the host triple from `rustc -Vv`, reads `server-version.json`, download
 `myra-server-<triple>[.exe]` (+ verifies its `.sha256`) into `src-tauri/binaries/`,
 and caches it. Bump `server-version.json` to adopt a new sidecar release. Set
 `MYRA_SERVER_VERSION` / `MYRA_SERVER_REPO` / `MYRA_SERVER_BASE_URL` to override.
+
+## Branching
+
+GitFlow-lite, **org-wide** across all Myra-Agents repos:
+
+- `main` — stable, released code; **tagged releases only**, never commit straight to it.
+- `develop` — **default branch**; all day-to-day work integrates here.
+- `feature/<slug>` · `fix/<slug>` · `chore/<slug>` — short-lived, branch off `develop`, PR back into `develop`.
+- Release: merge `develop` → `main` + tag (`vX.Y.Z`; server uses `server-vX.Y.Z`).
+- Hotfix: branch off `main`, PR into `main`, then merge `main` back to `develop`.
+
+Open PRs against `develop`. Conventional Commit subjects. One logical change per PR.
