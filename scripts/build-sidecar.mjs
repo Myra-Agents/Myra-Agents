@@ -1,0 +1,119 @@
+#!/usr/bin/env node
+// Provision the self-contained `myra-server` binary that Tauri bundles +
+// supervises as the desktop "local" connection sidecar.
+//
+// The server source lives in a separate (private) repo; this public app repo
+// consumes a *pre-built* binary published as a GitHub Release asset. So by
+// default this script DOWNLOADS the pinned binary for the host triple.
+//
+// Fallback: if the server source is present locally (running inside the private
+// monorepo / server repo, where `packages/server/src/index.ts` exists) the
+// script COMPILES from source instead — so one script serves both worlds.
+//
+// Tauri's `externalBin` resolves a sidecar by appending the host target triple
+// (and `.exe` on Windows) to the configured base name, so the output file MUST
+// be named `myra-server-<rust-host-triple>[.exe]`. We read the triple straight
+// from `rustc -Vv` so it always matches what Tauri expects on this machine.
+
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const outDir = join(root, "src-tauri", "binaries");
+const serverEntry = join(root, "packages", "server", "src", "index.ts");
+
+function hostTriple() {
+  const out = execFileSync("rustc", ["-Vv"], { encoding: "utf8" });
+  const line = out.split("\n").find((l) => l.startsWith("host:"));
+  if (!line) throw new Error("could not parse host triple from `rustc -Vv`");
+  return line.slice("host:".length).trim();
+}
+
+function readPin() {
+  // server-version.json pins which published binary to fetch. Env overrides win
+  // (handy for CI / local testing against a fork).
+  let pin = {};
+  const pinPath = join(root, "server-version.json");
+  if (existsSync(pinPath)) pin = JSON.parse(readFileSync(pinPath, "utf8"));
+  const version = process.env.MYRA_SERVER_VERSION || pin.version;
+  const repo = process.env.MYRA_SERVER_REPO || pin.repo;
+  const baseUrl =
+    process.env.MYRA_SERVER_BASE_URL ||
+    pin.baseUrl ||
+    (repo && version ? `https://github.com/${repo}/releases/download/${version}` : null);
+  if (!baseUrl) {
+    throw new Error(
+      "[build-sidecar] no download source: set server-version.json {repo,version} or MYRA_SERVER_BASE_URL",
+    );
+  }
+  return { version: version ?? "unknown", baseUrl };
+}
+
+async function download(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`[build-sidecar] GET ${url} -> ${res.status} ${res.statusText}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+function sha256(buf) {
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+const triple = hostTriple();
+const isWindows = triple.includes("windows");
+const assetName = `myra-server-${triple}${isWindows ? ".exe" : ""}`;
+const outfile = join(outDir, assetName);
+const stamp = join(outDir, `.${assetName}.version`);
+
+mkdirSync(outDir, { recursive: true });
+
+// --- compile path (server source present) ---------------------------------
+if (existsSync(serverEntry)) {
+  console.log(`[build-sidecar] server source found, compiling\n            -> ${outfile}`);
+  const res = spawnSync("bun", ["build", "--compile", serverEntry, "--outfile", outfile], {
+    stdio: "inherit",
+    cwd: root,
+  });
+  if (res.status !== 0) {
+    console.error("[build-sidecar] bun build --compile failed");
+    process.exit(res.status ?? 1);
+  }
+  console.log("[build-sidecar] done (compiled)");
+  process.exit(0);
+}
+
+// --- download path (public app) --------------------------------------------
+const { version, baseUrl } = readPin();
+
+// Cache: skip if the on-disk binary already matches the pinned version.
+if (existsSync(outfile) && existsSync(stamp) && readFileSync(stamp, "utf8").trim() === version) {
+  console.log(`[build-sidecar] ${assetName} already at ${version}, skipping`);
+  process.exit(0);
+}
+
+console.log(`[build-sidecar] downloading ${assetName} @ ${version}\n            from ${baseUrl}`);
+
+const bin = await download(`${baseUrl}/${assetName}`);
+
+// Verify checksum when the .sha256 sidecar asset is available.
+try {
+  const sumText = (await download(`${baseUrl}/${assetName}.sha256`)).toString("utf8");
+  const expected = sumText.trim().split(/\s+/)[0].toLowerCase();
+  const actual = sha256(bin);
+  if (expected !== actual) {
+    console.error(`[build-sidecar] checksum mismatch\n  expected ${expected}\n  actual   ${actual}`);
+    process.exit(1);
+  }
+  console.log("[build-sidecar] checksum ok");
+} catch (e) {
+  console.warn(`[build-sidecar] checksum skipped: ${e.message}`);
+}
+
+writeFileSync(outfile, bin);
+if (!isWindows) chmodSync(outfile, 0o755);
+writeFileSync(stamp, `${version}\n`);
+
+console.log("[build-sidecar] done (downloaded)");

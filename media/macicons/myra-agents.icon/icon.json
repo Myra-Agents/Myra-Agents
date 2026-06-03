@@ -1,0 +1,51 @@
+{
+  "fill-specializations" : [
+    {
+      "value" : "system-light"
+    },
+    {
+      "appearance" : "dark",
+      "value" : "system-dark"
+    }
+  ],
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "image-name-specializations" : [
+            {
+              "value" : "light-theme.png"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "dark-theme.png"
+            }
+          ],
+          "name" : "dark-theme",
+          "position" : {
+            "scale" : 0.6,
+            "translation-in-points" : [
+              1.1999999999999886,
+              12.600000000000023
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
