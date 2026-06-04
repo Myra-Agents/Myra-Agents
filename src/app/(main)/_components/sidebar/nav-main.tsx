@@ -146,8 +146,12 @@ const NavItemCollapsed = ({
 };
 
 export function NavMain({ items }: NavMainProps) {
-  const path = usePathname();
+  const rawPath = usePathname();
   const { state, isMobile } = useSidebar();
+
+  // Static export sets trailingSlash:true, so usePathname() yields "/schedules/".
+  // Strip the trailing slash so strict url comparisons still match.
+  const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
