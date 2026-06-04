@@ -32,7 +32,7 @@ interface NavMainProps {
 
 // Bigger, centered icons when the rail is collapsed (the wider WhatsApp-style rail).
 const collapsedIconClass =
-  "group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:[&>svg]:!size-5";
+  "group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:[&>span]:hidden group-data-[collapsible=icon]:[&>svg]:!size-6";
 
 const IsComingSoon = () => (
   <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">Soon</span>

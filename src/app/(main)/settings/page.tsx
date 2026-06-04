@@ -31,8 +31,6 @@ import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
-import { THEME_PRESET_OPTIONS, type ThemePreset } from "@/lib/preferences/theme";
-import { applyThemePreset } from "@/lib/preferences/theme-utils";
 import { invoke } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import type { AgentPreset, AppSettings } from "@/types/settings";
@@ -50,9 +48,6 @@ export default function SettingsPage() {
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
-  const themePreset = usePreferencesStore((state) => state.themePreset);
-  const setThemePreset = usePreferencesStore((state) => state.setThemePreset);
-  const resolvedThemeMode = usePreferencesStore((state) => state.resolvedThemeMode);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dataAction, setDataAction] = useState<DataAction | null>(null);
@@ -93,13 +88,6 @@ export default function SettingsPage() {
     setTheme(nextTheme);
     setThemeMode(nextTheme);
     void persistPreference("theme_mode", nextTheme);
-  };
-
-  const handleThemePresetChange = (preset: string) => {
-    const nextPreset = preset as ThemePreset;
-    applyThemePreset(nextPreset);
-    setThemePreset(nextPreset);
-    void persistPreference("theme_preset", nextPreset);
   };
 
   const handleExportBoard = useCallback(async () => {
@@ -271,29 +259,6 @@ export default function SettingsPage() {
                       <SelectItem value="light">{t("preferences.themeOptions.light")}</SelectItem>
                       <SelectItem value="dark">{t("preferences.themeOptions.dark")}</SelectItem>
                       <SelectItem value="system">{t("preferences.themeOptions.system")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("preferences.themePreset")}</Label>
-                  <Select value={themePreset} onValueChange={handleThemePresetChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {THEME_PRESET_OPTIONS.map((preset) => (
-                        <SelectItem key={preset.value} value={preset.value}>
-                          <span
-                            className="size-2.5 rounded-full"
-                            style={{
-                              backgroundColor:
-                                (resolvedThemeMode ?? "light") === "dark" ? preset.primary.dark : preset.primary.light,
-                            }}
-                          />
-                          {preset.label}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>

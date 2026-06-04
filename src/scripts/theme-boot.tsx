@@ -71,8 +71,10 @@ export function ThemeBootScript() {
         }
 
         var rawMode = readPreference("theme_mode", DEFAULTS.theme_mode);
-        var rawPreset = readPreference("theme_preset", DEFAULTS.theme_preset);
-        var rawFont = readPreference("font", DEFAULTS.font);
+        // Theme preset and font are mandatory (the Myra theme) — always use
+        // defaults, ignore any persisted cookie.
+        var rawPreset = DEFAULTS.theme_preset;
+        var rawFont = DEFAULTS.font;
         // Forced (non-configurable) layout values — always use defaults, ignore cookies.
         var rawContentLayout = DEFAULTS.content_layout;
         var rawNavbarStyle = DEFAULTS.navbar_style;

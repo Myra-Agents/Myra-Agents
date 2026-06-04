@@ -13,6 +13,7 @@ import { ThemeBootScript } from "@/scripts/theme-boot";
 import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
 
 import "./globals.css";
+import "../styles/presets/myra.css";
 import "../styles/presets/tangerine.css";
 import "../styles/presets/caffeine.css";
 import "../styles/presets/claude.css";

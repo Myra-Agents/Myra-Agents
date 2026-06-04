@@ -45,6 +45,7 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
+  --font-mono: var(--font-sans);
 }
 
 /* Default theme styles (used when no data-theme-preset is set or when 'default' is selected).
@@ -196,6 +197,16 @@ These serve as the fallback; there is no separate default.css file. */
     border-radius: 20px;
     overflow: hidden;
   }
+
+  /* Full-viewport overlay backdrops render in a body-level portal, outside the
+     rounded wrapper, so their square corners would poke past the window's
+     rounded corners. Match the window radius so the blur stays inside. */
+  html[data-tauri] [data-slot="dialog-overlay"],
+  html[data-tauri] [data-slot="alert-dialog-overlay"],
+  html[data-tauri] [data-slot="sheet-overlay"],
+  html[data-tauri] [data-slot="drawer-overlay"] {
+    border-radius: 20px;
+  }
 }
 
 @layer utilities {
@@ -295,6 +306,12 @@ These serve as the fallback; there is no separate default.css file. */
   }
   html[data-font="sortsMillGoudy"] body {
     --font-sans: var(--font-sorts-mill-goudy);
+  }
+  html[data-font="lato"] body {
+    --font-sans: var(--font-lato);
+  }
+  html[data-font="crimsonText"] body {
+    --font-sans: var(--font-crimson-text);
   }
 }
 
