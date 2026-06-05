@@ -96,6 +96,15 @@ export default function SettingsPage() {
     [current.disabledPlugins, update],
   );
 
+  const updatePluginConfig = useCallback(
+    (plugin: string, key: string, value: string | number | boolean) => {
+      const next = { ...(current.pluginConfig ?? {}) };
+      next[plugin] = { ...(next[plugin] ?? {}), [key]: value };
+      update({ pluginConfig: next });
+    },
+    [current.pluginConfig, update],
+  );
+
   const handleThemeChange = (theme: string) => {
     const nextTheme = theme as AppSettings["theme"];
     update({ theme: nextTheme });
@@ -382,7 +391,12 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="plugins" className="space-y-6">
-          <PluginsPanel disabledPlugins={current.disabledPlugins ?? []} onToggle={togglePlugin} />
+          <PluginsPanel
+            disabledPlugins={current.disabledPlugins ?? []}
+            pluginConfig={current.pluginConfig ?? {}}
+            onToggle={togglePlugin}
+            onConfigChange={updatePluginConfig}
+          />
         </TabsContent>
 
         <TabsContent value="data" className="space-y-6">
