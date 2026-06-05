@@ -55,6 +55,8 @@
 - Avoir la possibilité de voir le détail d'une carte pour voir plus de choses
 - Pour des taches dont l'agent créer des sous-taches (todo dans le prompt par ex) quand on clique sur la carte on peut voir les sous-taches sous-formes de diagramme de flux avec des ronds comme sur le git tree, il faudrait aussi voir les taches de fond ou subagents d'une autre manière.
 - En utilisant le playground skill (installé par défaut par l'app par ex) générer des interfaces artifacts qu'on puisse voir dans l'application
+- Lancer une carte dans un git worktree isolé puis ouvrir une PR automatiquement à la fin.
+  → Carte lancée → agent bosse dans un worktree dédié (branche `feature/<carte>`), aucun conflit avec le repo principal ni avec les autres cartes en parallèle ; run done → commit + push + PR ouverte tout seul, prête à review.
 
 ## Schedules / automation
 - Schedules conditionnels (git changé, CI rouge, issue ouverte, websocket).
