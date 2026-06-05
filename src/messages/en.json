@@ -307,6 +307,7 @@
       "hub": "Hub",
       "preferences": "Preferences",
       "agents": "Agents",
+      "plugins": "Plugins",
       "data": "Data"
     },
     "connections": {
@@ -381,6 +382,16 @@
         "signedOut": "Not signed in",
         "signOut": "Sign out",
         "signIn": "Sign in"
+      }
+    },
+    "plugins": {
+      "title": "Plugins",
+      "description": "Plugins installed under ~/.myra-agents/plugins. Switch one off to drop its agents from the picker; changes apply after Save and a restart.",
+      "empty": "No plugins installed. Drop one under ~/.myra-agents/plugins and restart.",
+      "toggleAria": "Toggle {name}",
+      "role": {
+        "agent": "{count, plural, one {# agent} other {# agents}}: {agents}",
+        "event": "Reacts to {events}"
       }
     },
     "agents": {
