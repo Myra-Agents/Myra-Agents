@@ -392,6 +392,11 @@
       "role": {
         "agent": "{count, plural, one {# agent} other {# agents}} : {agents}",
         "event": "Réagit à {events}"
+      },
+      "group": {
+        "agent": "Agents",
+        "event": "Gestionnaires d’événements",
+        "other": "Autres"
       }
     },
     "agents": {
