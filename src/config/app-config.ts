@@ -8,6 +8,8 @@ export const APP_CONFIG = {
   copyright: `© ${currentYear}, Myra Agents.`,
   /** Public repo — surfaced in the sidebar support card ("open an issue"). */
   repoUrl: "https://github.com/myra-agents/myra-agents",
+  /** Direct link to open a new issue on the tracker. */
+  issuesUrl: "https://github.com/myra-agents/myra-agents/issues/new",
   meta: {
     title: "Myra Agents — AI-Powered Task Automation",
     description:

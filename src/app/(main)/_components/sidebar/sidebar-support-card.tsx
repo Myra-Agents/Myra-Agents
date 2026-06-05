@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
-import { XIcon } from "lucide-react";
+import { StarIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { siGithub } from "simple-icons";
 
@@ -48,7 +48,19 @@ export function SidebarSupportCard() {
       <CardHeader className="px-4">
         <CardTitle className="text-sm">{t("title")}</CardTitle>
         <CardDescription>
-          {t("body")}&nbsp;
+          {t.rich("body", {
+            issue: (chunks) => (
+              <Link
+                href={APP_CONFIG.issuesUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground underline-offset-2 hover:underline"
+              >
+                {chunks}
+              </Link>
+            ),
+          })}
+          &nbsp;
           <Link
             href={APP_CONFIG.repoUrl}
             target="_blank"
@@ -60,6 +72,15 @@ export function SidebarSupportCard() {
           </Link>
           .
         </CardDescription>
+        <Link
+          href={APP_CONFIG.repoUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <StarIcon className="size-3.5" />
+          {t("star")}
+        </Link>
       </CardHeader>
     </Card>
   );

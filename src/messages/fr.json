@@ -34,8 +34,9 @@
     },
     "support": {
       "title": "Besoin de plus ?",
-      "body": "Ouvrez une issue ou contactez-nous sur",
+      "body": "Ouvrez une <issue>issue</issue> ou contactez-nous sur",
       "repo": "Ouvrir le dépôt",
+      "star": "Mettre une étoile sur GitHub",
       "dismiss": "Masquer"
     }
   },
@@ -391,12 +392,24 @@
       "toggleAria": "Activer/désactiver {name}",
       "role": {
         "agent": "{count, plural, one {# agent} other {# agents}} : {agents}",
-        "event": "Réagit à {events}"
+        "event": "Réagit à {events}",
+        "webhook": "{count, plural, one {# webhook} other {# webhooks}}"
       },
       "group": {
         "agent": "Agents",
         "event": "Gestionnaires d’événements",
-        "other": "Autres"
+        "other": "Autres",
+        "webhook": "Webhooks"
+      },
+      "inboundUrl": "URL entrante — à coller chez l'émetteur (ex. webhook GitHub).",
+      "webhookWarning": {
+        "title": "Les webhooks tournent dans le serveur local",
+        "body": "Ils ne se déclenchent que pendant l'exécution de Myra et s'arrêtent à la fermeture de l'app ou à l'extinction. Pour une diffusion 24/7, installez le service en arrière-plan ou utilisez une instance distante."
+      },
+      "secret": {
+        "save": "Enregistrer",
+        "clear": "Effacer",
+        "configured": "Configuré"
       }
     },
     "agents": {

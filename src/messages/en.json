@@ -34,8 +34,9 @@
     },
     "support": {
       "title": "Looking for something more?",
-      "body": "Open an issue or reach out on",
+      "body": "Open an <issue>issue</issue> or reach out on",
       "repo": "Open the repository",
+      "star": "Star on GitHub",
       "dismiss": "Dismiss"
     }
   },
@@ -391,12 +392,24 @@
       "toggleAria": "Toggle {name}",
       "role": {
         "agent": "{count, plural, one {# agent} other {# agents}}: {agents}",
-        "event": "Reacts to {events}"
+        "event": "Reacts to {events}",
+        "webhook": "{count, plural, one {# webhook} other {# webhooks}}"
       },
       "group": {
         "agent": "Agents",
         "event": "Event handlers",
-        "other": "Other"
+        "other": "Other",
+        "webhook": "Webhooks"
+      },
+      "inboundUrl": "Inbound URL — paste this into the sender (e.g. GitHub webhook).",
+      "webhookWarning": {
+        "title": "Webhooks run in the local server",
+        "body": "They only fire while Myra is running and stop when you quit the app or shut down. For 24/7 delivery, install the background service or use a remote instance."
+      },
+      "secret": {
+        "save": "Save",
+        "clear": "Clear",
+        "configured": "Configured"
       }
     },
     "agents": {
