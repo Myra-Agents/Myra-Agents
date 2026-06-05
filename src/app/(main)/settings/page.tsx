@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { HubStatusCard } from "@/components/settings/hub-status-card";
+import { PluginsPanel } from "@/components/settings/plugins-panel";
 import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,6 +82,19 @@ export default function SettingsPage() {
     update({ locale: locale as AppSettings["locale"] });
     setAppLocale(locale);
   };
+
+  const togglePlugin = useCallback(
+    (name: string, enabled: boolean) => {
+      const disabled = new Set(current.disabledPlugins ?? []);
+      if (enabled) {
+        disabled.delete(name);
+      } else {
+        disabled.add(name);
+      }
+      update({ disabledPlugins: [...disabled] });
+    },
+    [current.disabledPlugins, update],
+  );
 
   const handleThemeChange = (theme: string) => {
     const nextTheme = theme as AppSettings["theme"];
@@ -201,6 +215,7 @@ export default function SettingsPage() {
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
+          <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
 
@@ -364,6 +379,10 @@ export default function SettingsPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="plugins" className="space-y-6">
+          <PluginsPanel disabledPlugins={current.disabledPlugins ?? []} onToggle={togglePlugin} />
         </TabsContent>
 
         <TabsContent value="data" className="space-y-6">
