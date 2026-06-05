@@ -34,8 +34,9 @@
     },
     "support": {
       "title": "Besoin de plus ?",
-      "body": "Ouvrez une issue ou contactez-nous sur",
+      "body": "Ouvrez une <issue>issue</issue> ou contactez-nous sur",
       "repo": "Ouvrir le dépôt",
+      "star": "Mettre une étoile sur GitHub",
       "dismiss": "Masquer"
     }
   },

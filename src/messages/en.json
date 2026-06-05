@@ -34,8 +34,9 @@
     },
     "support": {
       "title": "Looking for something more?",
-      "body": "Open an issue or reach out on",
+      "body": "Open an <issue>issue</issue> or reach out on",
       "repo": "Open the repository",
+      "star": "Star on GitHub",
       "dismiss": "Dismiss"
     }
   },
