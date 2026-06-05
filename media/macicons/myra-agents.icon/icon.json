@@ -15,19 +15,19 @@
           "glass" : false,
           "image-name-specializations" : [
             {
-              "value" : "light-theme.png"
+              "value" : "logo-light.png"
             },
             {
               "appearance" : "dark",
-              "value" : "dark-theme.png"
+              "value" : "logo-dark.png"
             }
           ],
           "name" : "dark-theme",
           "position" : {
-            "scale" : 0.6,
+            "scale" : 0.4,
             "translation-in-points" : [
-              1.1999999999999886,
-              12.600000000000023
+              -5.684341886080802e-14,
+              11.671841266407
             ]
           }
         }

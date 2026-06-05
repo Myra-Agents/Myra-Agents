@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Ship the Icon Composer (.icon) asset so macOS 26 (Tahoe) renders the
+	     authored composition (glass:false) instead of auto-applying Liquid Glass
+	     to a legacy .icns. Assets.car is bundled via tauri.conf bundle.resources;
+	     it is compiled from media/macicons/myra-agents.icon by scripts/build-app-icon.sh. -->
+	<key>CFBundleIconName</key>
+	<string>myra-agents</string>
+	<key>CFBundleIconFile</key>
+	<string>icon.icns</string>
+</dict>
+</plist>

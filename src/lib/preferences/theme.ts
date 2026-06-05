@@ -20,14 +20,6 @@ export const THEME_PRESET_OPTIONS = [
     },
   },
   {
-    label: "Tangerine",
-    value: "tangerine",
-    primary: {
-      light: "oklch(0.64 0.17 36.44)",
-      dark: "oklch(0.64 0.17 36.44)",
-    },
-  },
-  {
     label: "Caffeine",
     value: "caffeine",
     primary: {
@@ -44,11 +36,27 @@ export const THEME_PRESET_OPTIONS = [
     },
   },
   {
+    label: "Myra",
+    value: "myra",
+    primary: {
+      light: "oklch(0.6231 0.188 259.8145)",
+      dark: "oklch(0.6231 0.188 259.8145)",
+    },
+  },
+  {
     label: "Supabase",
     value: "supabase",
     primary: {
       light: "oklch(0.8348 0.1302 160.908)",
       dark: "oklch(0.4365 0.1044 156.7556)",
+    },
+  },
+  {
+    label: "Tangerine",
+    value: "tangerine",
+    primary: {
+      light: "oklch(0.64 0.17 36.44)",
+      dark: "oklch(0.64 0.17 36.44)",
     },
   },
 ] as const;

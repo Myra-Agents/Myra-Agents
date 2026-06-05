@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { HubStatusCard } from "@/components/settings/hub-status-card";
+import { PluginsPanel } from "@/components/settings/plugins-panel";
 import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,8 +32,6 @@ import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
-import { THEME_PRESET_OPTIONS, type ThemePreset } from "@/lib/preferences/theme";
-import { applyThemePreset } from "@/lib/preferences/theme-utils";
 import { invoke } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import type { AgentPreset, AppSettings } from "@/types/settings";
@@ -50,9 +49,6 @@ export default function SettingsPage() {
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
-  const themePreset = usePreferencesStore((state) => state.themePreset);
-  const setThemePreset = usePreferencesStore((state) => state.setThemePreset);
-  const resolvedThemeMode = usePreferencesStore((state) => state.resolvedThemeMode);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dataAction, setDataAction] = useState<DataAction | null>(null);
@@ -87,19 +83,34 @@ export default function SettingsPage() {
     setAppLocale(locale);
   };
 
+  const togglePlugin = useCallback(
+    (name: string, enabled: boolean) => {
+      const disabled = new Set(current.disabledPlugins ?? []);
+      if (enabled) {
+        disabled.delete(name);
+      } else {
+        disabled.add(name);
+      }
+      update({ disabledPlugins: [...disabled] });
+    },
+    [current.disabledPlugins, update],
+  );
+
+  const updatePluginConfig = useCallback(
+    (plugin: string, key: string, value: string | number | boolean) => {
+      const next = { ...(current.pluginConfig ?? {}) };
+      next[plugin] = { ...(next[plugin] ?? {}), [key]: value };
+      update({ pluginConfig: next });
+    },
+    [current.pluginConfig, update],
+  );
+
   const handleThemeChange = (theme: string) => {
     const nextTheme = theme as AppSettings["theme"];
     update({ theme: nextTheme });
     setTheme(nextTheme);
     setThemeMode(nextTheme);
     void persistPreference("theme_mode", nextTheme);
-  };
-
-  const handleThemePresetChange = (preset: string) => {
-    const nextPreset = preset as ThemePreset;
-    applyThemePreset(nextPreset);
-    setThemePreset(nextPreset);
-    void persistPreference("theme_preset", nextPreset);
   };
 
   const handleExportBoard = useCallback(async () => {
@@ -213,6 +224,7 @@ export default function SettingsPage() {
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
+          <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
 
@@ -271,29 +283,6 @@ export default function SettingsPage() {
                       <SelectItem value="light">{t("preferences.themeOptions.light")}</SelectItem>
                       <SelectItem value="dark">{t("preferences.themeOptions.dark")}</SelectItem>
                       <SelectItem value="system">{t("preferences.themeOptions.system")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("preferences.themePreset")}</Label>
-                  <Select value={themePreset} onValueChange={handleThemePresetChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {THEME_PRESET_OPTIONS.map((preset) => (
-                        <SelectItem key={preset.value} value={preset.value}>
-                          <span
-                            className="size-2.5 rounded-full"
-                            style={{
-                              backgroundColor:
-                                (resolvedThemeMode ?? "light") === "dark" ? preset.primary.dark : preset.primary.light,
-                            }}
-                          />
-                          {preset.label}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -399,6 +388,15 @@ export default function SettingsPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="plugins" className="space-y-6">
+          <PluginsPanel
+            disabledPlugins={current.disabledPlugins ?? []}
+            pluginConfig={current.pluginConfig ?? {}}
+            onToggle={togglePlugin}
+            onConfigChange={updatePluginConfig}
+          />
         </TabsContent>
 
         <TabsContent value="data" className="space-y-6">
