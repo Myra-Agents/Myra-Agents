@@ -69,7 +69,8 @@
       "running": "En cours",
       "waitingForOutput": "En attente de sortie…",
       "agent": "Agent",
-      "queued": "En file"
+      "queued": "En file",
+      "moveTo": "Déplacer vers"
     },
     "empty": {
       "draft": "Posez vos idées…",

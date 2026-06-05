@@ -1,10 +1,12 @@
 import {
+  Crimson_Text,
   DM_Sans,
   Figtree,
   Geist,
   Geist_Mono,
   Inter,
   JetBrains_Mono,
+  Lato,
   Lora,
   Merriweather,
   Noto_Sans,
@@ -114,10 +116,30 @@ const sortsMillGoudy = Sorts_Mill_Goudy({
   variable: "--font-sorts-mill-goudy",
 });
 
+const lato = Lato({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-lato",
+});
+
+const crimsonText = Crimson_Text({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-crimson-text",
+});
+
 export const fontRegistry = {
   sortsMillGoudy: {
     label: "Sorts Mill Goudy",
     font: sortsMillGoudy,
+  },
+  lato: {
+    label: "Lato",
+    font: lato,
+  },
+  crimsonText: {
+    label: "Crimson Text",
+    font: crimsonText,
   },
   geist: {
     label: "Geist",

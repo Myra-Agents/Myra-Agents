@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
@@ -303,13 +304,23 @@ async fn remote_access_status(app: AppHandle) -> Result<RemoteStatus, String> {
 #[tauri::command]
 async fn start_login(app: AppHandle) -> Result<(), String> {
     let url = format!("{}/auth/desktop/", web_app_url().trim_end_matches('/'));
-    app.shell().open(url, None).map_err(|e| e.to_string())
+    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
 
 /// Drain any auth code buffered before the frontend's deep-link listener mounted.
 #[tauri::command]
 fn take_pending_auth_code(state: tauri::State<'_, PendingAuth>) -> Option<String> {
     state.0.lock().ok().and_then(|mut c| c.take())
+}
+
+/// Open the webview's devtools, invoked by the frontend's dev-only "Inspect
+/// Element" context-menu item (the native WebKit menu — and its Inspect entry —
+/// are suppressed by the frontend). `open_devtools` only exists in debug builds
+/// (or with the `devtools` feature), so this is a no-op in release.
+#[tauri::command]
+fn open_devtools(#[allow(unused_variables)] window: tauri::WebviewWindow) {
+    #[cfg(debug_assertions)]
+    window.open_devtools();
 }
 
 /// Wire the `myra://` deep-link handler: buffer the auth code, notify the
@@ -348,6 +359,7 @@ fn setup_deep_link(handle: &AppHandle) {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
         .manage(TrayState::default())
         .manage(PendingAuth::default())
@@ -371,7 +383,8 @@ pub fn run() {
             disable_remote_access,
             remote_access_status,
             start_login,
-            take_pending_auth_code
+            take_pending_auth_code,
+            open_devtools
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

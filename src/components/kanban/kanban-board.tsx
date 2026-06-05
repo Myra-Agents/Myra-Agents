@@ -499,15 +499,16 @@ export function KanbanBoard({
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="flex h-full min-h-0 min-w-0 flex-col">
         <div className="space-y-3 px-4 pt-4">
-          <div className="grid gap-2 md:grid-cols-[minmax(16rem,1fr)_10rem_10rem_10rem_auto_auto]">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               id="card-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("filters.searchPlaceholder")}
+              className="w-full sm:w-auto sm:min-w-[16rem] sm:flex-1"
             />
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder={t("filters.status")} />
               </SelectTrigger>
               <SelectContent>
@@ -520,7 +521,7 @@ export function KanbanBoard({
               </SelectContent>
             </Select>
             <Select value={agentFilter} onValueChange={setAgentFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder={t("filters.agent")} />
               </SelectTrigger>
               <SelectContent>
@@ -533,7 +534,7 @@ export function KanbanBoard({
               </SelectContent>
             </Select>
             <Select value={dateFilter} onValueChange={(value) => setDateFilter(value as DateFilter)}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder={t("filters.date")} />
               </SelectTrigger>
               <SelectContent>
@@ -545,7 +546,9 @@ export function KanbanBoard({
             </Select>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline">{t("columnsMenu.title")}</Button>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  {t("columnsMenu.title")}
+                </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-80 space-y-3">
                 <div>
@@ -584,7 +587,7 @@ export function KanbanBoard({
                 </Button>
               </PopoverContent>
             </Popover>
-            <Button variant="outline" onClick={resetFilters} disabled={!hasFilters}>
+            <Button variant="outline" onClick={resetFilters} disabled={!hasFilters} className="w-full sm:w-auto">
               {t("filters.clear")}
             </Button>
           </div>
@@ -690,6 +693,9 @@ export function KanbanBoard({
               onEditCard={onEditCard}
               onTrashCard={onTrashCard}
               onReviewCard={onReviewCard}
+              onLaunchCard={onBulkLaunch}
+              onMoveCard={onMoveCard}
+              columnLabel={getColumnLabel}
               selectedIds={selectedIds}
               onSelectedChange={setCardSelected}
               onViewLogs={onViewLogs}
