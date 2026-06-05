@@ -225,3 +225,5 @@
   → En réunion, dicter "ajoute un endpoint health" → carte créée.
 - Mobile companion (read-only + approve feedback) via hub.
   → Approuver une carte en attente depuis son tel pendant un café.
+- App mobile en Tauri (iOS/Android, Tauri v2 supporte le mobile) pour voir le board sur smartphone — réutilise le frontend Next.js, se connecte au hub cloud.
+  → Consulter l'état du board et les runs en cours depuis son tel, sans ouvrir le laptop.
