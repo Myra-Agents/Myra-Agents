@@ -194,7 +194,7 @@ These serve as the fallback; there is no separate default.css file. */
   }
   html[data-tauri] [data-slot="sidebar-wrapper"] {
     background: var(--sidebar);
-    border-radius: 20px;
+    border-radius: 18px;
     overflow: hidden;
   }
 
