@@ -33,9 +33,11 @@ case "$TARGET" in
 esac
 
 # --- pre-place the target-matching sidecar (build-sidecar.mjs only fetches host) ---
-read -r SIDECAR_REPO SIDECAR_VER < <(
-  node -e 'const p=require("./server-version.json");process.stdout.write(`${p.repo} ${p.version}`)'
-)
+# `$(...)` strips the trailing newline; avoid `read` here because node emits no
+# newline and `read` would return non-zero under `set -e`, killing the script.
+sidecar_meta="$(node -e 'const p=require("./server-version.json");process.stdout.write(`${p.repo} ${p.version}`)')"
+SIDECAR_REPO="${sidecar_meta% *}"
+SIDECAR_VER="${sidecar_meta##* }"
 sidecar_url="https://github.com/${SIDECAR_REPO}/releases/download/${SIDECAR_VER}/myra-server-${TARGET}"
 sidecar_out="src-tauri/binaries/myra-server-${TARGET}"
 echo "==> fetching sidecar  $sidecar_url"
