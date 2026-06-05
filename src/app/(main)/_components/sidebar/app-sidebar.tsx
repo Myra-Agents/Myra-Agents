@@ -62,8 +62,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="h-auto cursor-default hover:bg-transparent hover:text-sidebar-foreground active:bg-transparent active:text-sidebar-foreground group-data-[collapsible=icon]:!size-12 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&>div]:gap-0 group-data-[collapsible=icon]:[&_span]:hidden group-data-[collapsible=icon]:[&_img]:!size-11"
             >
               <div className="flex items-center justify-center gap-2 text-sidebar-foreground">
-                <img src="/light-theme.png" alt="" aria-hidden className="size-8 object-contain dark:hidden" />
-                <img src="/dark-theme.png" alt="" aria-hidden className="hidden size-8 object-contain dark:block" />
+                <img src="/logo-light.png" alt="" aria-hidden className="size-8 object-contain dark:hidden" />
+                <img src="/logo-dark.png" alt="" aria-hidden className="hidden size-8 object-contain dark:block" />
                 <span className="font-semibold text-lg" style={{ fontFamily: "var(--font-sorts-mill-goudy)" }}>
                   {APP_CONFIG.name}
                 </span>

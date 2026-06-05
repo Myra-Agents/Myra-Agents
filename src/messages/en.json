@@ -69,7 +69,8 @@
       "running": "Running",
       "waitingForOutput": "Waiting for output…",
       "agent": "Agent",
-      "queued": "Queued"
+      "queued": "Queued",
+      "moveTo": "Move to"
     },
     "empty": {
       "draft": "Draft your ideas…",

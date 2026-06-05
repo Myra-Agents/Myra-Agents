@@ -12,6 +12,7 @@ import { COLUMN_CONFIG } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
 
 import { KanbanCardComponent } from "./kanban-card";
+import { KanbanCardContextMenu } from "./kanban-card-context-menu";
 
 interface KanbanColumnProps {
   status: KanbanStatus;
@@ -21,6 +22,9 @@ interface KanbanColumnProps {
   onEditCard: (card: KanbanCard) => void;
   onTrashCard: (id: string) => void;
   onReviewCard: (card: KanbanCard) => void;
+  onLaunchCard: (card: KanbanCard) => void;
+  onMoveCard: (id: string, status: KanbanStatus) => void;
+  columnLabel: (status: KanbanStatus) => string;
   selectedIds?: Set<string>;
   onSelectedChange?: (id: string, selected: boolean) => void;
   onViewLogs?: (card: KanbanCard) => void;
@@ -37,6 +41,9 @@ export function KanbanColumn({
   onEditCard,
   onTrashCard,
   onReviewCard,
+  onLaunchCard,
+  onMoveCard,
+  columnLabel,
   selectedIds,
   onSelectedChange,
   onViewLogs,
@@ -90,19 +97,30 @@ export function KanbanColumn({
         )}
         <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
-            <KanbanCardComponent
+            <KanbanCardContextMenu
               key={card.id}
               card={card}
+              columnLabel={columnLabel}
               onEdit={() => onEditCard(card)}
-              onTrash={() => onTrashCard(card.id)}
+              onLaunch={() => onLaunchCard(card)}
+              onMove={(target) => onMoveCard(card.id, target)}
               onReview={() => onReviewCard(card)}
-              selected={selectedIds?.has(card.id)}
-              onSelectedChange={onSelectedChange ? (selected) => onSelectedChange(card.id, selected) : undefined}
               onViewLogs={onViewLogs ? () => onViewLogs(card) : undefined}
-              logLines={logsByCard?.get(card.id)}
-              schedule={getSchedule?.(card.linkedTaskId)}
-              isShaking={invalidDropCardId === card.id}
-            />
+              onTrash={() => onTrashCard(card.id)}
+            >
+              <KanbanCardComponent
+                card={card}
+                onEdit={() => onEditCard(card)}
+                onTrash={() => onTrashCard(card.id)}
+                onReview={() => onReviewCard(card)}
+                selected={selectedIds?.has(card.id)}
+                onSelectedChange={onSelectedChange ? (selected) => onSelectedChange(card.id, selected) : undefined}
+                onViewLogs={onViewLogs ? () => onViewLogs(card) : undefined}
+                logLines={logsByCard?.get(card.id)}
+                schedule={getSchedule?.(card.linkedTaskId)}
+                isShaking={invalidDropCardId === card.id}
+              />
+            </KanbanCardContextMenu>
           ))}
         </SortableContext>
       </div>

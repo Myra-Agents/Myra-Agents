@@ -313,6 +313,16 @@ fn take_pending_auth_code(state: tauri::State<'_, PendingAuth>) -> Option<String
     state.0.lock().ok().and_then(|mut c| c.take())
 }
 
+/// Open the webview's devtools, invoked by the frontend's dev-only "Inspect
+/// Element" context-menu item (the native WebKit menu — and its Inspect entry —
+/// are suppressed by the frontend). `open_devtools` only exists in debug builds
+/// (or with the `devtools` feature), so this is a no-op in release.
+#[tauri::command]
+fn open_devtools(#[allow(unused_variables)] window: tauri::WebviewWindow) {
+    #[cfg(debug_assertions)]
+    window.open_devtools();
+}
+
 /// Wire the `myra://` deep-link handler: buffer the auth code, notify the
 /// frontend, and bring the window forward.
 fn setup_deep_link(handle: &AppHandle) {
@@ -373,7 +383,8 @@ pub fn run() {
             disable_remote_access,
             remote_access_status,
             start_login,
-            take_pending_auth_code
+            take_pending_auth_code,
+            open_devtools
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

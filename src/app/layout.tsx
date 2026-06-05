@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import type { Metadata } from "next";
 
+import { DevContextMenu } from "@/components/system/dev-context-menu";
+import { DisableNativeContextMenu } from "@/components/system/disable-native-context-menu";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP_CONFIG } from "@/config/app-config";
@@ -45,6 +47,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <ThemeInitScript />
       </head>
       <body className={`${fontVars} min-h-screen antialiased`}>
+        <DisableNativeContextMenu />
         <ThemeProvider>
           <TooltipProvider>
             <PreferencesStoreProvider
@@ -54,7 +57,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
               navbarStyle={navbar_style}
               font={font}
             >
-              <I18nProvider>{children}</I18nProvider>
+              <I18nProvider>
+                <DevContextMenu>{children}</DevContextMenu>
+              </I18nProvider>
               <Toaster />
             </PreferencesStoreProvider>
           </TooltipProvider>
