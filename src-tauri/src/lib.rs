@@ -158,10 +158,10 @@ fn start_local_backend(app: &AppHandle) -> u16 {
                 while let Some(event) = rx.recv().await {
                     match event {
                         CommandEvent::Stdout(bytes) | CommandEvent::Stderr(bytes) => {
-                            print!("[myra-server] {}", String::from_utf8_lossy(&bytes));
+                            log::info!(target: "myra-server", "{}", String::from_utf8_lossy(&bytes).trim_end());
                         }
                         CommandEvent::Terminated(payload) => {
-                            eprintln!("[myra-server] terminated: {:?}", payload.code);
+                            log::warn!(target: "myra-server", "terminated: {:?}", payload.code);
                         }
                         _ => {}
                     }
@@ -170,7 +170,7 @@ fn start_local_backend(app: &AppHandle) -> u16 {
             set_sidecar_state(app, port, Some(child), false);
         }
         Err(e) => {
-            eprintln!("[myra-server] spawn failed: {e}");
+            log::error!(target: "myra-server", "spawn failed: {e}");
             set_sidecar_state(app, port, None, false);
         }
     }
@@ -358,6 +358,21 @@ fn setup_deep_link(handle: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .targets([
+                    // Console (visible when launched from a terminal).
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    // Persistent file: ~/Library/Logs/com.myra-agents.app/Myra Agents.log
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: None,
+                    }),
+                    // Forward into the webview devtools console too.
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+                ])
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())

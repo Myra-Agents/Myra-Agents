@@ -128,6 +128,27 @@ secrets are set; without them, builds stay unsigned. Full reference:
 
 ---
 
+## Logs
+
+The desktop shell logs through [`tauri-plugin-log`](https://github.com/tauri-apps/tauri-plugin-log).
+Output goes to stdout (visible when launched from a terminal), the webview
+devtools console, **and a persistent log file**. Sidecar output is captured
+under the `myra-server` target.
+
+| OS      | Log file                                                            |
+|---------|---------------------------------------------------------------------|
+| macOS   | `~/Library/Logs/com.myra-agents.app/Myra Agents.log`                |
+| Linux   | `~/.config/com.myra-agents.app/logs/Myra Agents.log`                |
+| Windows | `%LOCALAPPDATA%\com.myra-agents.app\logs\Myra Agents.log`           |
+
+Tail it live (macOS):
+
+```bash
+tail -f ~/Library/Logs/com.myra-agents.app/"Myra Agents.log"
+```
+
+---
+
 ## Verification gates
 
 ```bash
