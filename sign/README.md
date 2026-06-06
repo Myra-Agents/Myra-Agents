@@ -1,0 +1,1 @@
+Add your Certificates.p12 for signing MacOS apps here

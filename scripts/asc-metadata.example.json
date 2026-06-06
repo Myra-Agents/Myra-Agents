@@ -1,0 +1,17 @@
+{
+  "bundleId": "com.myra-agents.app",
+  "platforms": ["IOS", "MAC_OS"],
+  "info": {
+    "en-US": { "name": "Myra Agents", "subtitle": "Kanban board for CLI agents", "privacyPolicyUrl": "https://myra-agents.ai/privacy" }
+  },
+  "version": {
+    "en-US": {
+      "description": "Myra Agents is a desktop Kanban board that launches and supervises CLI coding agents. Each card carries a prompt; running it streams the agent's output back to the board.",
+      "keywords": "kanban,agents,cli,coding,automation,developer,tasks",
+      "promotionalText": "Run your coding agents from a board.",
+      "supportUrl": "https://myra-agents.ai/support",
+      "marketingUrl": "https://myra-agents.ai",
+      "whatsNew": "Initial release."
+    }
+  }
+}

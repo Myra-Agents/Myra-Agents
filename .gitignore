@@ -41,3 +41,5 @@ node_modules
 .claude/skills/validate-tauri-app/artifacts/
 # exported signing identity (private key) — never commit
 sign/*.p12
+# working App Store metadata copy (asc-metadata.example.json is the template)
+scripts/asc-metadata.json

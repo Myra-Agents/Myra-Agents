@@ -13,6 +13,38 @@ below are the manual reference.
 Identity in use: `Developer ID Application: VALENTIN DANIEL* RUDLOFF (76AKU4UJH2)`
 (Team ID `76AKU4UJH2`).
 
+## App ID / App Store (future iOS + macOS track)
+
+Direct Developer ID distribution (above) needs **no App ID**. The App Store
+track does. `scripts/asc-register-bundle-id.mjs` registers the Bundle ID +
+capabilities via the App Store Connect API (no deps; ES256 JWT via Node crypto):
+
+```bash
+export ASC_ISSUER_ID=…  ASC_KEY_ID=…  ASC_KEY_PATH=AuthKey_XXXX.p8
+node scripts/asc-register-bundle-id.mjs                 # com.myra-agents.app, UNIVERSAL
+node scripts/asc-register-bundle-id.mjs --capabilities ASSOCIATED_DOMAINS
+```
+
+Get the API key at App Store Connect → Users and Access → Integrations →
+App Store Connect API (downloads the `.p8` once). **The App Store *app record*
+itself can't be created via API** — Apple's `apps` resource is GET/UPDATE only;
+make it by hand (Apps → New App, pick the bundle ID, check iOS + macOS).
+
+Once the app record exists, push product-page metadata (description, keywords,
+promo text, URLs, name/subtitle, privacy URL) per platform + locale from a JSON
+file (same API key; shared auth in `asc-client.mjs`):
+
+```bash
+cp scripts/asc-metadata.example.json scripts/asc-metadata.json   # then edit
+node scripts/asc-update-metadata.mjs --dry-run                   # preview
+node scripts/asc-update-metadata.mjs                             # apply
+```
+
+Idempotent (patches existing localizations, creates missing). It does **not**
+upload screenshots/previews, the binary, or submit for review — those are a
+multi-step upload / Transporter / `reviewSubmissions` job, best handled by
+**fastlane `deliver`** if/when an iOS build target actually exists.
+
 ## Local signed build
 
 The cert + private key must be in your login keychain (they already are if
