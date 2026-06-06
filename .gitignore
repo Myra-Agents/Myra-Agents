@@ -39,3 +39,5 @@ yarn-error.log*
 .vercel
 node_modules
 .claude/skills/validate-tauri-app/artifacts/
+# exported signing identity (private key) — never commit
+sign/*.p12
