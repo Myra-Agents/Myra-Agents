@@ -21,60 +21,11 @@
 //
 // Defaults: identifier com.myra-agents.app, name "Myra Agents", platform
 // UNIVERSAL (covers iOS + macOS), no capabilities.
-import { createPrivateKey, sign as cryptoSign } from "node:crypto";
-import { readFileSync } from "node:fs";
-
-const HOST = "https://api.appstoreconnect.apple.com";
+import { api, die, errStr } from "./asc-client.mjs";
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
-}
-function die(msg) {
-  console.error(`error: ${msg}`);
-  process.exit(1);
-}
-const b64url = (buf) =>
-  Buffer.from(buf).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-// ---- credentials -----------------------------------------------------------
-const ISSUER = process.env.ASC_ISSUER_ID || die("set ASC_ISSUER_ID");
-const KEY_ID = process.env.ASC_KEY_ID || die("set ASC_KEY_ID");
-const P8 =
-  process.env.ASC_KEY_P8 ||
-  (process.env.ASC_KEY_PATH
-    ? readFileSync(process.env.ASC_KEY_PATH, "utf8")
-    : die("set ASC_KEY_PATH or ASC_KEY_P8"));
-
-// ---- ES256 JWT (valid <=20 min) --------------------------------------------
-function makeJwt() {
-  const header = { alg: "ES256", kid: KEY_ID, typ: "JWT" };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = { iss: ISSUER, iat: now, exp: now + 15 * 60, aud: "appstoreconnect-v1" };
-  const signingInput = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
-  const key = createPrivateKey(P8);
-  // dsaEncoding ieee-p1363 yields the raw r||s signature JOSE/ES256 expects.
-  const signature = cryptoSign("sha256", Buffer.from(signingInput), { key, dsaEncoding: "ieee-p1363" });
-  return `${signingInput}.${b64url(signature)}`;
-}
-
-async function api(method, path, body) {
-  const res = await fetch(`${HOST}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${makeJwt()}`,
-      "Content-Type": "application/json",
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  let json;
-  try {
-    json = text ? JSON.parse(text) : {};
-  } catch {
-    json = { raw: text };
-  }
-  return { status: res.status, json };
 }
 
 // ---- main ------------------------------------------------------------------
@@ -98,7 +49,7 @@ const existing = await api(
   "GET",
   `/v1/bundleIds?filter[identifier]=${encodeURIComponent(identifier)}&limit=200`,
 );
-if (existing.status >= 400) die(`auth/list failed (HTTP ${existing.status}): ${JSON.stringify(existing.json)}`);
+if (existing.status >= 400) die(`auth/list failed (${errStr(existing)})`);
 bundleId = (existing.json.data || []).find((b) => b.attributes?.identifier === identifier);
 
 if (bundleId) {
@@ -107,7 +58,7 @@ if (bundleId) {
   const created = await api("POST", "/v1/bundleIds", {
     data: { type: "bundleIds", attributes: { identifier, name, platform, seedId: undefined } },
   });
-  if (created.status !== 201) die(`create failed (HTTP ${created.status}): ${JSON.stringify(created.json)}`);
+  if (created.status !== 201) die(`create failed (${errStr(created)})`);
   bundleId = created.json.data;
   console.log(`✓ created bundle ID (id ${bundleId.id}).`);
 }
@@ -119,7 +70,7 @@ for (const cap of capabilities) {
   });
   if (r.status === 201) console.log(`  + enabled ${cap}`);
   else if (r.status === 409) console.log(`  = ${cap} already enabled`);
-  else console.warn(`  ! ${cap} failed (HTTP ${r.status}): ${JSON.stringify(r.json)}`);
+  else console.warn(`  ! ${cap} failed (${errStr(r)})`);
 }
 
 console.log(`

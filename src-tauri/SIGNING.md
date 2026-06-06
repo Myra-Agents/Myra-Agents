@@ -30,6 +30,21 @@ App Store Connect API (downloads the `.p8` once). **The App Store *app record*
 itself can't be created via API** — Apple's `apps` resource is GET/UPDATE only;
 make it by hand (Apps → New App, pick the bundle ID, check iOS + macOS).
 
+Once the app record exists, push product-page metadata (description, keywords,
+promo text, URLs, name/subtitle, privacy URL) per platform + locale from a JSON
+file (same API key; shared auth in `asc-client.mjs`):
+
+```bash
+cp scripts/asc-metadata.example.json scripts/asc-metadata.json   # then edit
+node scripts/asc-update-metadata.mjs --dry-run                   # preview
+node scripts/asc-update-metadata.mjs                             # apply
+```
+
+Idempotent (patches existing localizations, creates missing). It does **not**
+upload screenshots/previews, the binary, or submit for review — those are a
+multi-step upload / Transporter / `reviewSubmissions` job, best handled by
+**fastlane `deliver`** if/when an iOS build target actually exists.
+
 ## Local signed build
 
 The cert + private key must be in your login keychain (they already are if
