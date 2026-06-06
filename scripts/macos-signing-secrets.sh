@@ -27,7 +27,13 @@ read -r -s -p "p12 export password: " P12_PASS; echo
 read -r -p "Signing identity [${DEFAULT_IDENTITY}]: " IDENTITY
 IDENTITY="${IDENTITY:-$DEFAULT_IDENTITY}"
 read -r -p "Apple ID (notarization email): " APPLE_ID
-read -r -s -p "App-specific password (appleid.apple.com → App-Specific Passwords): " APPLE_PW; echo
+cat <<'TXT'
+App-specific password (NOT your Apple ID login password). Mint one at:
+  appleid.apple.com → Sign-In & Security → App-Specific Passwords → +
+Format: xxxx-xxxx-xxxx-xxxx. Required because the account has 2FA.
+Also accept any pending agreements at appstoreconnect.apple.com (else 401).
+TXT
+read -r -s -p "App-specific password: " APPLE_PW; echo
 read -r -p "Apple Team ID [76AKU4UJH2]: " TEAM_ID
 TEAM_ID="${TEAM_ID:-76AKU4UJH2}"
 

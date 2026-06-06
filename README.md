@@ -80,9 +80,29 @@ without warnings), use the helper:
 ./scripts/macos-sign.sh release  # push a v* tag → signed build in CI
 ```
 
+**One-time prerequisites** (just a Developer ID Application cert — no App Store /
+App ID / provisioning profile for direct distribution):
+
+1. **App-specific password** for notarization — log in at
+   [appleid.apple.com](https://appleid.apple.com) → **Sign-In & Security →
+   App-Specific Passwords → +** → name it (e.g. "myra notarization") → copy the
+   16-char code (`xxxx-xxxx-xxxx-xxxx`). This is **not** your Apple ID login
+   password; the notary API requires it because the account has 2FA.
+2. **Accept agreements** once at
+   [App Store Connect](https://appstoreconnect.apple.com) (notarization 401s
+   until the latest Program License Agreement is accepted).
+3. **Export the cert** as a `.p12` (cert + private key): Keychain Access → login
+   → My Certificates → right-click *Developer ID Application: …* → Export → set
+   a password.
+
+Then `./scripts/macos-sign.sh ci` pushes six repo secrets
+(`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
+`APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`). To rotate just the notarization
+password later: `printf %s 'xxxx-xxxx-xxxx-xxxx' | gh secret set APPLE_PASSWORD`.
+
 CI (`.github/workflows/release.yml`) signs + notarizes automatically when the
-`APPLE_*` repo secrets are set; without them, builds stay unsigned. Full
-reference: [`src-tauri/SIGNING.md`](src-tauri/SIGNING.md).
+secrets are set; without them, builds stay unsigned. Full reference:
+[`src-tauri/SIGNING.md`](src-tauri/SIGNING.md).
 
 ---
 

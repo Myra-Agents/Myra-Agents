@@ -33,6 +33,13 @@ do_build() {
 
   read -r -p "Notarize + staple this build too? [y/N]: " NOTARIZE
   if [[ "$NOTARIZE" =~ ^[Yy]$ ]]; then
+    cat <<'TXT'
+  Notarization signs you in to Apple's notary service. Needs an APP-SPECIFIC
+  password (not your Apple ID login). Mint one at:
+    appleid.apple.com -> Sign-In & Security -> App-Specific Passwords -> +
+  (format xxxx-xxxx-xxxx-xxxx). Accept pending agreements at
+  appstoreconnect.apple.com first, or notarization returns HTTP 401.
+TXT
     read -r -p "  Apple ID (email): " APPLE_ID
     read -r -s -p "  App-specific password: " APPLE_PASSWORD; echo
     read -r -p "  Team ID [${DEFAULT_TEAM_ID}]: " APPLE_TEAM_ID
