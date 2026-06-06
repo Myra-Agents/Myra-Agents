@@ -1,13 +1,11 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { isTauri } from "@/lib/tauri";
-
-const USE_NATIVE_WINDOW_FRAME = false;
 
 async function getCurrentTauriWindow() {
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -35,7 +33,12 @@ function useWindowControls() {
 
     getCurrentTauriWindow()
       .then(async (appWindow) => {
-        await appWindow.setDecorations(USE_NATIVE_WINDOW_FRAME);
+        // macOS uses the native Overlay title bar (real traffic lights, set in
+        // tauri.conf.json). Windows/Linux stay decoration-less and use the
+        // custom WindowControls rendered in the header.
+        if (!detectMac()) {
+          await appWindow.setDecorations(false);
+        }
 
         const syncMaximized = () => {
           appWindow
@@ -92,31 +95,6 @@ function useWindowControls() {
   return { isAvailable, isMac, isMaximized, minimize, toggleMaximize, close };
 }
 
-function TrafficLight({
-  color,
-  label,
-  onClick,
-  children,
-}: {
-  color: string;
-  label: string;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      aria-label={label}
-      className="flex size-3 items-center justify-center rounded-full text-black/60 transition-opacity hover:brightness-95 active:brightness-90 [&_svg]:size-2 [&_svg]:opacity-0 group-hover/traffic:[&_svg]:opacity-100"
-      onClick={onClick}
-      style={{ backgroundColor: color }}
-      title={label}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
 export function WindowDragRegion() {
   const [isAvailable, setIsAvailable] = useState(false);
 
@@ -124,8 +102,11 @@ export function WindowDragRegion() {
     const tauri = isTauri();
     setIsAvailable(tauri);
     if (!tauri) return;
-    // Flag the document so CSS can round/clip the window to match the
-    // decoration-less, transparent native window.
+    // Flag the document so CSS can round/clip the decoration-less, transparent
+    // window — but only on Windows/Linux. macOS keeps native decorations (the
+    // Overlay title bar with real traffic lights), so the OS draws the rounded
+    // corners and shadow; the CSS hack would leave a transparent sliver there.
+    if (detectMac()) return;
     document.documentElement.setAttribute("data-tauri", "true");
     return () => {
       document.documentElement.removeAttribute("data-tauri");
@@ -168,17 +149,20 @@ export function WindowDragRegion() {
 }
 
 /**
- * macOS traffic-light controls rendered inside the sidebar rail (WhatsApp-style).
- * Renders only inside the Tauri webview on macOS. The strip is draggable so the
- * window can be moved by grabbing the empty space around the buttons.
+ * Reserves the top-left of the sidebar rail for the *native* macOS traffic
+ * lights. The buttons themselves are real AppKit controls drawn by the Overlay
+ * title bar (configured in `tauri.conf.json`: `titleBarStyle: "Overlay"`,
+ * `hiddenTitle`, `trafficLightPosition`) — not HTML. This spacer just keeps the
+ * sidebar content clear of them and stays draggable so the window can be moved
+ * by grabbing the area around the native buttons. macOS + Tauri only.
  */
 export function MacSidebarControls() {
-  const { isAvailable, isMac, isMaximized, minimize, toggleMaximize, close } = useWindowControls();
+  const { isAvailable, isMac, toggleMaximize } = useWindowControls();
 
   if (!isAvailable || !isMac) return null;
 
   const startDragging = async (event: React.MouseEvent) => {
-    if (event.button !== 0 || event.target !== event.currentTarget) return;
+    if (event.button !== 0) return;
     try {
       const appWindow = await getCurrentTauriWindow();
       await appWindow.startDragging();
@@ -188,25 +172,7 @@ export function MacSidebarControls() {
   };
 
   return (
-    <div
-      className="group/traffic flex h-7 items-center gap-2 px-1"
-      onMouseDown={startDragging}
-      onDoubleClick={() => void toggleMaximize()}
-    >
-      <TrafficLight color="#ff5f57" label="Close" onClick={close}>
-        <X />
-      </TrafficLight>
-      <TrafficLight color="#febc2e" label="Minimize" onClick={minimize}>
-        <Minus />
-      </TrafficLight>
-      <TrafficLight
-        color="#28c840"
-        label={isMaximized ? "Restore" : "Zoom"}
-        onClick={toggleMaximize}
-      >
-        {isMaximized ? <Minimize2 /> : <Maximize2 />}
-      </TrafficLight>
-    </div>
+    <div aria-hidden="true" className="h-9" onMouseDown={startDragging} onDoubleClick={() => void toggleMaximize()} />
   );
 }
 
