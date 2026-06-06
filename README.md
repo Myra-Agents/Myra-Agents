@@ -67,6 +67,23 @@ Copy `.env.example` → `.env.local` and fill in the `NEXT_PUBLIC_*` values to
 enable sign-in (Clerk publishable key) and a managed hub. Everything is optional
 — leave them empty to run app-only.
 
+### macOS code signing & notarization
+
+`bun run tauri:build` produces an unsigned bundle by default. To sign it with a
+**Developer ID Application** certificate (and notarize it so Gatekeeper opens it
+without warnings), use the helper:
+
+```bash
+./scripts/macos-sign.sh          # interactive menu
+./scripts/macos-sign.sh build    # local signed (optionally notarized) build
+./scripts/macos-sign.sh ci       # one-time: export .p12 + push GitHub secrets
+./scripts/macos-sign.sh release  # push a v* tag → signed build in CI
+```
+
+CI (`.github/workflows/release.yml`) signs + notarizes automatically when the
+`APPLE_*` repo secrets are set; without them, builds stay unsigned. Full
+reference: [`src-tauri/SIGNING.md`](src-tauri/SIGNING.md).
+
 ---
 
 ## Architecture
