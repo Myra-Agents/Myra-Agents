@@ -26,6 +26,13 @@ const outDir = join(root, "src-tauri", "binaries");
 const serverEntry = join(root, "packages", "server", "src", "index.ts");
 
 function hostTriple() {
+  // CI cross-compile override: when building for an arch other than the host
+  // (e.g. x86_64 on an Apple Silicon self-hosted runner), the bundled sidecar
+  // must match the BUILD target, not the host. The Release workflow sets
+  // MYRA_SERVER_TRIPLE to the cargo `--target` so Tauri's externalBin resolves
+  // the right `myra-server-<triple>` asset.
+  const override = process.env.MYRA_SERVER_TRIPLE;
+  if (override) return override.trim();
   const out = execFileSync("rustc", ["-Vv"], { encoding: "utf8" });
   const line = out.split("\n").find((l) => l.startsWith("host:"));
   if (!line) throw new Error("could not parse host triple from `rustc -Vv`");
