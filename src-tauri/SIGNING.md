@@ -6,6 +6,10 @@ prompt. Config lives in `tauri.conf.json` (`bundle.macOS`) + `entitlements.plist
 the actual signing identity and credentials are supplied via **environment
 variables** (never committed).
 
+**Quick start:** `./scripts/macos-sign.sh` — interactive menu for a local signed
+build, the one-time CI secret setup, and cutting a tagged release. The sections
+below are the manual reference.
+
 Identity in use: `Developer ID Application: VALENTIN DANIEL* RUDLOFF (76AKU4UJH2)`
 (Team ID `76AKU4UJH2`).
 
