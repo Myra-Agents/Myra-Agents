@@ -78,6 +78,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # build-sidecar.mjs reads server-version.json; override here if needed.
+          #
+          # macOS code signing + notarization (no-ops on Linux/Windows and on
+          # forks where the secrets are absent — the build just stays unsigned).
+          # tauri-action imports APPLE_CERTIFICATE into a temp keychain, signs
+          # with APPLE_SIGNING_IDENTITY, then notarizes + staples via the Apple
+          # ID + app-specific password. See SIGNING.md for how to mint these.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "Myra Agents __VERSION__"
