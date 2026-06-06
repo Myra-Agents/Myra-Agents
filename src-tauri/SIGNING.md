@@ -13,6 +13,23 @@ below are the manual reference.
 Identity in use: `Developer ID Application: VALENTIN DANIEL* RUDLOFF (76AKU4UJH2)`
 (Team ID `76AKU4UJH2`).
 
+## App ID / App Store (future iOS + macOS track)
+
+Direct Developer ID distribution (above) needs **no App ID**. The App Store
+track does. `scripts/asc-register-bundle-id.mjs` registers the Bundle ID +
+capabilities via the App Store Connect API (no deps; ES256 JWT via Node crypto):
+
+```bash
+export ASC_ISSUER_ID=…  ASC_KEY_ID=…  ASC_KEY_PATH=AuthKey_XXXX.p8
+node scripts/asc-register-bundle-id.mjs                 # com.myra-agents.app, UNIVERSAL
+node scripts/asc-register-bundle-id.mjs --capabilities ASSOCIATED_DOMAINS
+```
+
+Get the API key at App Store Connect → Users and Access → Integrations →
+App Store Connect API (downloads the `.p8` once). **The App Store *app record*
+itself can't be created via API** — Apple's `apps` resource is GET/UPDATE only;
+make it by hand (Apps → New App, pick the bundle ID, check iOS + macOS).
+
 ## Local signed build
 
 The cert + private key must be in your login keychain (they already are if
