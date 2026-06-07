@@ -445,7 +445,7 @@
         "events": "Triggers",
         "eventsHint": "Card statuses that fire this integration's outbound webhook.",
         "template": "Message template",
-        "templateHint": "Mustache-lite — {{card.title}}, {{card.status}}. Leave blank for the plugin default.",
+        "templateHint": "Mustache-lite — use card.title and card.status placeholders. Leave blank for the plugin default.",
         "pickMachines": "Pick which of your linked machines run this integration.",
         "offline": "offline",
         "inboundUrl": "Inbound URL (per machine) — paste into the sender",
