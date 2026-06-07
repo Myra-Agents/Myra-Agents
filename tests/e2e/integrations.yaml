@@ -1,0 +1,71 @@
+# Maestro web e2e — Integrations (plugin instances + connect wizard).
+#
+# Validates Phase 1: the Integrations panel renders configured plugin
+# *instances* (the multi-instance model), and the 3-step Connect wizard
+# (Plugin → Configure → Machines) authors one — including the Slack config
+# field, the trigger-event chips, the message template, and the per-instance
+# machine targeting (fan-out).
+#
+# Non-mutating: walks the wizard and closes it without deploying, so it leaves
+# no instance behind and is safe to re-run / run in CI.
+#
+# Prereqs: dev server on http://localhost:1420 (cd app && bun dev) against a
+# backend that has the `slack` plugin installed (~/.myra-agents/plugins/slack).
+#
+#   maestro test app/tests/e2e/integrations.yaml
+url: http://localhost:1420
+tags:
+  - integrations
+---
+- openLink: http://localhost:1420/settings
+- tapOn: "Integrations"
+
+# Panel chrome — the instance-oriented description + the local-server caveat.
+- assertVisible: "Integrations"
+- assertVisible: "Configured integration instances.*"
+- assertVisible: "Webhooks run in the local server"
+- takeScreenshot: integrations-panel
+
+# Open the Connect wizard (the header button, not the empty-state tile).
+- tapOn:
+    text: "New integration"
+    index: 0
+
+# Step 1 — Plugin. The 3-step stepper is present and slack is pickable.
+- assertVisible: "Plugin"
+- assertVisible: "Configure"
+- assertVisible: "Machines"
+- assertVisible: "Pick a plugin to configure."
+- assertVisible: "slack"
+- takeScreenshot: integrations-wizard-plugin
+
+# Pick slack — the wizard auto-advances to the Configure step.
+- tapOn:
+    text: "slack"
+    index: 1
+- waitForAnimationToEnd
+
+# Step 2 — Configure. The plugin's config field, the trigger chips, and the
+# outbound message template all render. (The Slack webhook URL is a plain,
+# visible text field — not a masked secret.)
+- assertVisible: "Label"
+- assertVisible: "Slack incoming webhook URL"
+- assertVisible: "https://hooks.slack.com/services/.*"
+- assertVisible: "Triggers"
+- assertVisible: "Draft"
+- assertVisible: "Review"
+- assertVisible: "Done"
+- assertVisible: "Message template"
+- takeScreenshot: integrations-wizard-configure
+
+# Step 3 — Machines. Per-instance machine targeting (direct fan-out) lists the
+# linked backends and offers Deploy.
+- tapOn: "Next"
+- waitForAnimationToEnd
+- assertVisible: "Pick which of your linked machines run this integration."
+- assertVisible: "Deploy"
+- takeScreenshot: integrations-wizard-machines
+
+# Close without deploying — no state mutation.
+- tapOn: "Close"
+- assertVisible: "Configured integration instances.*"

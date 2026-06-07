@@ -1,0 +1,38 @@
+# Maestro web e2e — Edit an existing integration instance.
+#
+# Validates the edit path of the multi-instance model: opening an existing
+# instance reuses the Connect wizard pre-populated with that instance's label,
+# config, and triggers (the "Edit integration" variant). Complements
+# integrations.yaml, which covers the create path.
+#
+# Non-mutating: opens the editor and cancels without saving.
+#
+# Prereqs: dev server on http://localhost:1420 (cd app && bun dev) with at least
+# one configured integration instance (e.g. a deployed `slack` instance). If the
+# panel is empty, run integrations.yaml's create path first.
+#
+#   maestro test app/tests/e2e/integrations-edit.yaml
+url: http://localhost:1420
+tags:
+  - integrations
+---
+- openLink: http://localhost:1420/settings
+- tapOn: "Integrations"
+- assertVisible: "Edit"
+
+# Open the editor for the first instance.
+- tapOn: "Edit"
+- waitForAnimationToEnd
+
+# The wizard opens in edit mode, pre-filled on the Configure step.
+- assertVisible: "Edit integration"
+- assertVisible: "Configure a plugin instance and deploy it to your machines."
+- assertVisible: "Label"
+- assertVisible: "Triggers"
+- assertVisible: "Message template"
+- takeScreenshot: integrations-edit
+
+# Cancel — no changes saved.
+- tapOn: "Close"
+- waitForAnimationToEnd
+- assertVisible: "Configured integration instances.*"

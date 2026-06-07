@@ -1,0 +1,43 @@
+# Maestro web e2e — Connections (multi-machine board aggregation / fan-out).
+#
+# Validates Phase 1's connection layer: the board aggregates multiple backends,
+# the local connection is permanent + Primary, and a remote can be added and
+# removed. Reads fan out to every active connection; this exercises the add /
+# remove topology that drives that fan-out.
+#
+# Self-cleaning: the remote it adds is removed at the end (remove is a direct
+# action, no confirm dialog), so the flow is idempotent.
+#
+# Prereqs: dev server on http://localhost:1420 (cd app && bun dev).
+#
+#   maestro test app/tests/e2e/connections.yaml
+url: http://localhost:1420
+tags:
+  - connections
+---
+- openLink: http://localhost:1420/settings
+# Connections lives on the Hub tab (the default landing tab).
+- tapOn: "Hub"
+
+- assertVisible: "Connections"
+- assertVisible: "Backends this board aggregates.*"
+# The permanent local connection, flagged Primary.
+- assertVisible: "Primary"
+- takeScreenshot: connections-panel
+
+# Add a remote backend via the inline Label + Server URL form.
+- tapOn: "http://127.0.0.1:4317"   # the URL input (matched by its placeholder)
+- inputText: "http://127.0.0.1:4988"
+- tapOn: "Add"
+- waitForAnimationToEnd
+
+# The new origin shows up in the list (unreachable is expected — nothing's
+# listening on 4988; we're asserting topology, not reachability).
+- assertVisible: "http://127.0.0.1:4988.*"
+- takeScreenshot: connections-added
+
+# Remove it again — leaves the registry as we found it.
+- tapOn:
+    id: "Remove"
+- waitForAnimationToEnd
+- assertNotVisible: "http://127.0.0.1:4988.*"
