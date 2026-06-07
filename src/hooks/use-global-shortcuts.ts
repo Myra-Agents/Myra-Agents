@@ -16,7 +16,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
  * App-wide (in-app) keyboard shortcuts. Detection lives here once; the actions
  * are executed by KanbanPage via the shortcut store nonces.
  *
- *  - Mod+N  → new card (routes to /kanban first so it works from any page)
+ *  - Mod+N  → new task (routes to /kanban first so it works from any page)
  *  - Mod+F  → focus the board card-search input
  *  - Mod+.  → cancel the agent of the card currently open in the modal
  */

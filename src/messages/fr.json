@@ -15,7 +15,7 @@
     "version": "Version"
   },
   "nav": {
-    "newCard": "Nouvelle carte",
+    "newCard": "Nouvelle tâche",
     "workspace": "Espace de travail",
     "configuration": "Configuration",
     "kanban": "Kanban",
@@ -53,10 +53,10 @@
       "trashed": "Corbeille"
     },
     "card": {
-      "addCard": "Ajouter une carte",
-      "editCard": "Modifier la carte",
-      "deleteCard": "Supprimer la carte",
-      "restoreCard": "Restaurer la carte",
+      "addCard": "Ajouter une tâche",
+      "editCard": "Modifier la tâche",
+      "deleteCard": "Supprimer la tâche",
+      "restoreCard": "Restaurer la tâche",
       "moveToTrash": "Mettre à la corbeille",
       "launchAgent": "Lancer l'agent",
       "cancelAgent": "Annuler l'agent",
@@ -93,7 +93,7 @@
     },
     "loading": "Chargement du tableau…",
     "filters": {
-      "searchPlaceholder": "Rechercher cartes, prompts, étiquettes...",
+      "searchPlaceholder": "Rechercher tâches, prompts, étiquettes...",
       "status": "Statut",
       "allStatuses": "Toutes les colonnes",
       "agent": "Agent",
@@ -107,13 +107,13 @@
       "activeOnly": "Agents actifs",
       "tagsMatchAny": "Étiquettes",
       "clear": "Effacer",
-      "showing": "{visible} carte(s) sur {total}"
+      "showing": "{visible} tâche(s) sur {total}"
     },
     "cardModal": {
-      "newTitle": "Nouvelle carte",
-      "editTitle": "Modifier la carte",
+      "newTitle": "Nouvelle tâche",
+      "editTitle": "Modifier la tâche",
       "newDescription": "Ajoutez une nouvelle tâche au tableau.",
-      "editDescription": "Mettez à jour les détails de la carte.",
+      "editDescription": "Mettez à jour les détails de la tâche.",
       "title": "Titre",
       "titlePlaceholder": "ex. Mettre à jour les dépendances npm",
       "column": "Colonne",
@@ -160,25 +160,25 @@
       "export": "Exporter",
       "trash": "Corbeille",
       "clear": "Effacer",
-      "noMovable": "Aucune carte sélectionnée ne peut aller dans cette colonne.",
-      "noLaunchable": "Aucune carte sélectionnée ne peut être lancée.",
-      "moved": "{count} carte(s) déplacée(s). {skipped} ignorée(s).",
-      "tagged": "{count} carte(s) étiquetée(s) avec {tag}.",
-      "launched": "{count} carte(s) lancée(s). {skipped} ignorée(s).",
-      "trashed": "{count} carte(s) déplacée(s) vers la corbeille."
+      "noMovable": "Aucune tâche sélectionnée ne peut aller dans cette colonne.",
+      "noLaunchable": "Aucune tâche sélectionnée ne peut être lancée.",
+      "moved": "{count} tâche(s) déplacée(s). {skipped} ignorée(s).",
+      "tagged": "{count} tâche(s) étiquetée(s) avec {tag}.",
+      "launched": "{count} tâche(s) lancée(s). {skipped} ignorée(s).",
+      "trashed": "{count} tâche(s) déplacée(s) vers la corbeille."
     },
     "columnsMenu": {
       "title": "Colonnes",
       "description": "Afficher, masquer ou renommer les colonnes.",
       "showColumn": "Afficher {column}",
       "labelPlaceholder": "Libellé {column}",
-      "attentionProtected": "Les colonnes avec des cartes nécessitant une attention restent visibles.",
+      "attentionProtected": "Les colonnes avec des tâches nécessitant une attention restent visibles.",
       "reset": "Réinitialiser les colonnes"
     },
     "toast": {
       "queued": "Agent mis en file — en attente d’un créneau libre.",
       "canceled": "Agent annulé.",
-      "trashed": "Carte mise à la corbeille.",
+      "trashed": "Tâche mise à la corbeille.",
       "undo": "Annuler"
     }
   },
@@ -202,8 +202,8 @@
     },
     "form": {
       "name": "Nom",
-      "cardTitle": "Titre de la carte",
-      "cardDescription": "Description de la carte",
+      "cardTitle": "Titre de la tâche",
+      "cardDescription": "Description de la tâche",
       "agentPrompt": "Prompt de l'agent",
       "tags": "Étiquettes",
       "scheduleKind": "Type de planification",
@@ -216,7 +216,7 @@
       "scheduleName": "Nom de la planification",
       "scheduleNamePlaceholder": "ex. Revue de code quotidienne",
       "description": "Description",
-      "cardTitlePlaceholder": "Titre de la carte générée",
+      "cardTitlePlaceholder": "Titre de la tâche générée",
       "tagsPlaceholder": "infra, quotidien",
       "cronPlaceholder": "0 9 * * 1-5"
     },
@@ -249,7 +249,7 @@
     "objectivesPlaceholder": "Décrivez vos objectifs du jour en langage naturel...",
     "generatePlan": "Générer le plan",
     "generating": "Génération…",
-    "createAll": "Créer toutes les cartes",
+    "createAll": "Créer toutes les tâches",
     "editTask": "Modifier la tâche",
     "removeTask": "Supprimer la tâche",
     "addTask": "Ajouter manuellement",
@@ -258,7 +258,7 @@
     "workingDirectory": "Répertoire de travail",
     "optional": "facultatif",
     "generatedTasks": "Tâches générées ({selected}/{total} sélectionnées)",
-    "createCards": "Créer {count, plural, one {# carte} other {# cartes}}"
+    "createCards": "Créer {count, plural, one {# tâche} other {# tâches}}"
   },
   "logs": {
     "title": "Journaux et historique",
@@ -315,7 +315,7 @@
     },
     "connections": {
       "title": "Connexions",
-      "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les cartes de chacun portent une étiquette d'origine. La connexion locale est permanente.",
+      "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les tâches de chacun portent une étiquette d'origine. La connexion locale est permanente.",
       "primary": "Principal",
       "inProcess": "En interne",
       "labelField": "Libellé",
@@ -418,7 +418,7 @@
       "title": "Intégrations",
       "description": "Instances d'intégration configurées. Utilisez un plugin plusieurs fois — chacune avec sa config, son secret, ses déclencheurs et les machines où elle est déployée.",
       "new": "Nouvelle intégration",
-      "empty": "Aucune intégration pour l'instant. Créez-en une pour envoyer les mises à jour de cartes vers Slack, recevoir des webhooks, et plus.",
+      "empty": "Aucune intégration pour l'instant. Créez-en une pour envoyer les mises à jour de tâches vers Slack, recevoir des webhooks, et plus.",
       "edit": "Modifier",
       "delete": "Supprimer",
       "toggleAria": "Activer/désactiver {label}",
@@ -443,7 +443,7 @@
         "label": "Libellé",
         "labelPlaceholder": "ex. #eng-alerts",
         "events": "Déclencheurs",
-        "eventsHint": "Statuts de carte qui déclenchent le webhook sortant de cette intégration.",
+        "eventsHint": "Statuts de tâche qui déclenchent le webhook sortant de cette intégration.",
         "template": "Modèle de message",
         "templateHint": "Mustache simplifié — utilisez les variables card.title et card.status. Laissez vide pour le modèle par défaut du plugin.",
         "pickMachines": "Choisissez les machines liées qui exécutent cette intégration.",
@@ -539,7 +539,7 @@
       "exportBoard": "Exporter le tableau",
       "exportDescription": "Télécharger le tableau actuel au format JSON.",
       "importBoard": "Importer un tableau",
-      "importDescription": "Restaurer des cartes depuis un fichier JSON exporté précédemment.",
+      "importDescription": "Restaurer des tâches depuis un fichier JSON exporté précédemment.",
       "clearLogs": "Effacer les logs",
       "clearLogsDescription": "Supprimer les journaux d'exécution après confirmation.",
       "clearLogsConfirm": "Effacer tous les logs ? Cette action est irréversible."

@@ -15,7 +15,7 @@
     "version": "Version"
   },
   "nav": {
-    "newCard": "New Card",
+    "newCard": "New Task",
     "workspace": "Workspace",
     "configuration": "Configuration",
     "kanban": "Kanban",
@@ -53,10 +53,10 @@
       "trashed": "Trash"
     },
     "card": {
-      "addCard": "Add card",
-      "editCard": "Edit card",
-      "deleteCard": "Delete card",
-      "restoreCard": "Restore card",
+      "addCard": "Add task",
+      "editCard": "Edit task",
+      "deleteCard": "Delete task",
+      "restoreCard": "Restore task",
       "moveToTrash": "Move to trash",
       "launchAgent": "Launch agent",
       "cancelAgent": "Cancel agent",
@@ -93,7 +93,7 @@
     },
     "loading": "Loading board…",
     "filters": {
-      "searchPlaceholder": "Search cards, prompts, tags...",
+      "searchPlaceholder": "Search tasks, prompts, tags...",
       "status": "Status",
       "allStatuses": "All columns",
       "agent": "Agent",
@@ -107,13 +107,13 @@
       "activeOnly": "Active agents",
       "tagsMatchAny": "Tags",
       "clear": "Clear",
-      "showing": "Showing {visible} of {total} cards"
+      "showing": "Showing {visible} of {total} tasks"
     },
     "cardModal": {
-      "newTitle": "New Card",
-      "editTitle": "Edit Card",
+      "newTitle": "New Task",
+      "editTitle": "Edit Task",
       "newDescription": "Add a new task to the board.",
-      "editDescription": "Update card details.",
+      "editDescription": "Update task details.",
       "title": "Title",
       "titlePlaceholder": "e.g. Update npm dependencies",
       "column": "Column",
@@ -160,25 +160,25 @@
       "export": "Export",
       "trash": "Trash",
       "clear": "Clear",
-      "noMovable": "No selected cards can move to that column.",
-      "noLaunchable": "No selected cards can be launched.",
-      "moved": "Moved {count} card(s). {skipped} skipped.",
-      "tagged": "Tagged {count} card(s) with {tag}.",
-      "launched": "Launched {count} card(s). {skipped} skipped.",
-      "trashed": "Moved {count} card(s) to trash."
+      "noMovable": "No selected tasks can move to that column.",
+      "noLaunchable": "No selected tasks can be launched.",
+      "moved": "Moved {count} task(s). {skipped} skipped.",
+      "tagged": "Tagged {count} task(s) with {tag}.",
+      "launched": "Launched {count} task(s). {skipped} skipped.",
+      "trashed": "Moved {count} task(s) to trash."
     },
     "columnsMenu": {
       "title": "Columns",
       "description": "Show, hide, or rename board columns.",
       "showColumn": "Show {column}",
       "labelPlaceholder": "{column} label",
-      "attentionProtected": "Columns with cards needing attention stay visible.",
+      "attentionProtected": "Columns with tasks needing attention stay visible.",
       "reset": "Reset columns"
     },
     "toast": {
       "queued": "Agent queued — waiting for a free slot.",
       "canceled": "Agent canceled.",
-      "trashed": "Card moved to trash.",
+      "trashed": "Task moved to trash.",
       "undo": "Undo"
     }
   },
@@ -202,8 +202,8 @@
     },
     "form": {
       "name": "Name",
-      "cardTitle": "Card title",
-      "cardDescription": "Card description",
+      "cardTitle": "Task title",
+      "cardDescription": "Task description",
       "agentPrompt": "Agent prompt",
       "tags": "Tags",
       "scheduleKind": "Schedule type",
@@ -216,7 +216,7 @@
       "scheduleName": "Schedule Name",
       "scheduleNamePlaceholder": "e.g. Daily code review",
       "description": "Description",
-      "cardTitlePlaceholder": "Title of the generated card",
+      "cardTitlePlaceholder": "Title of the generated task",
       "tagsPlaceholder": "infra, daily",
       "cronPlaceholder": "0 9 * * 1-5"
     },
@@ -249,7 +249,7 @@
     "objectivesPlaceholder": "Describe your goals for today in plain language...",
     "generatePlan": "Generate plan",
     "generating": "Generating…",
-    "createAll": "Create all cards",
+    "createAll": "Create all tasks",
     "editTask": "Edit task",
     "removeTask": "Remove task",
     "addTask": "Add task manually",
@@ -258,7 +258,7 @@
     "workingDirectory": "Working Directory",
     "optional": "optional",
     "generatedTasks": "Generated Tasks ({selected}/{total} selected)",
-    "createCards": "Create {count, plural, one {# Card} other {# Cards}}"
+    "createCards": "Create {count, plural, one {# Task} other {# Tasks}}"
   },
   "logs": {
     "title": "Logs & History",
@@ -315,7 +315,7 @@
     },
     "connections": {
       "title": "Connections",
-      "description": "Backends this board aggregates. Add remote servers; cards from each are tagged by origin. The local connection is permanent.",
+      "description": "Backends this board aggregates. Add remote servers; tasks from each are tagged by origin. The local connection is permanent.",
       "primary": "Primary",
       "inProcess": "In-process",
       "labelField": "Label",
@@ -418,7 +418,7 @@
       "title": "Integrations",
       "description": "Configured integration instances. Run a plugin more than once — each with its own config, secret, triggers, and the machines it's deployed to.",
       "new": "New integration",
-      "empty": "No integrations yet. Create one to send card updates to Slack, receive webhooks, and more.",
+      "empty": "No integrations yet. Create one to send task updates to Slack, receive webhooks, and more.",
       "edit": "Edit",
       "delete": "Delete",
       "toggleAria": "Toggle {label}",
@@ -443,7 +443,7 @@
         "label": "Label",
         "labelPlaceholder": "e.g. #eng-alerts",
         "events": "Triggers",
-        "eventsHint": "Card statuses that fire this integration's outbound webhook.",
+        "eventsHint": "Task statuses that fire this integration's outbound webhook.",
         "template": "Message template",
         "templateHint": "Mustache-lite — use card.title and card.status placeholders. Leave blank for the plugin default.",
         "pickMachines": "Pick which of your linked machines run this integration.",
@@ -539,7 +539,7 @@
       "exportBoard": "Export board",
       "exportDescription": "Download the current board as a JSON backup.",
       "importBoard": "Import board",
-      "importDescription": "Restore cards from a previously exported JSON file.",
+      "importDescription": "Restore tasks from a previously exported JSON file.",
       "clearLogs": "Clear logs",
       "clearLogsDescription": "Remove stored execution logs after confirmation.",
       "clearLogsConfirm": "Clear all logs? This action cannot be undone."
