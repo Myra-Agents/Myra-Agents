@@ -1,0 +1,46 @@
+# Maestro web e2e — Kanban card composer.
+#
+# Validates the New Card composer: the sidebar "New Card" button opens the
+# create dialog with its Title field, Column picker, and Create action. This is
+# the front of the card-creation path (add_card → board render → Primary-routed
+# fan-out) that mutations depend on.
+#
+# Non-mutating: fills the form then Cancels, so no card is written. For an
+# end-to-end create-and-verify, see the note at the bottom.
+#
+# Prereqs: dev server on http://localhost:1420 (cd app && bun dev).
+#
+#   maestro test app/tests/e2e/kanban.yaml
+url: http://localhost:1420
+tags:
+  - kanban
+---
+- openLink: http://localhost:1420/kanban
+- assertVisible: "To Do"          # a board column header
+- takeScreenshot: kanban-board
+
+# Open the composer from the sidebar.
+- tapOn: "New Card"
+- waitForAnimationToEnd
+- assertVisible: "Add a new task to the board."   # dialog description (unique)
+- assertVisible: "Title"
+- assertVisible: "Column"
+- assertVisible: "Create"
+
+# Type a title; Create stays available (it's disabled only while the title is
+# empty).
+- tapOn: "e.g. Update npm dependencies"   # the Title input (its placeholder)
+- inputText: "[e2e] composer check"
+- assertVisible: "Create"
+- takeScreenshot: kanban-composer
+
+# Cancel — leaves the board unchanged.
+- tapOn: "Cancel"
+- waitForAnimationToEnd
+- assertNotVisible: "Add a new task to the board."
+
+# To turn this into a true end-to-end create test, replace the Cancel with:
+#   - tapOn: "Create"
+#   - assertVisible: "[e2e] composer check"
+# …then clean up by right-clicking the card → "Move to trash". The right-click
+# context-menu step needs interactive verification before committing.
