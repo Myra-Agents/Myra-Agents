@@ -17,6 +17,9 @@ tags:
   - integrations
 ---
 - openLink: http://localhost:1420/settings
+- extendedWaitUntil:               # let the settings shell hydrate before tapping
+    visible: "Settings"
+    timeout: 15000
 - tapOn: "Integrations"
 - assertVisible: "Edit"
 
