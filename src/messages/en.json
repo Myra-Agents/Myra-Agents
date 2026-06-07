@@ -308,6 +308,7 @@
       "hub": "Hub",
       "preferences": "Preferences",
       "agents": "Agents",
+      "integrations": "Integrations",
       "plugins": "Plugins",
       "data": "Data"
     },
@@ -410,6 +411,52 @@
         "save": "Save",
         "clear": "Clear",
         "configured": "Configured"
+      }
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Configured integration instances. Run a plugin more than once — each with its own config, secret, triggers, and the machines it's deployed to.",
+      "new": "New integration",
+      "empty": "No integrations yet. Create one to send card updates to Slack, receive webhooks, and more.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "toggleAria": "Toggle {label}",
+      "firesOn": "Fires on: {events}",
+      "noTriggers": "No triggers",
+      "noMachines": "No machines",
+      "deleteConfirm": "Delete the “{label}” integration from every machine?",
+      "deletePartial": "Some machines couldn't be updated — try again.",
+      "webhookWarning": {
+        "title": "Webhooks run in the local server",
+        "body": "They only fire while Myra is running and stop when you quit the app or shut down. For 24/7 delivery, install the background service or use a remote instance."
+      },
+      "wizard": {
+        "titleNew": "New integration",
+        "titleEdit": "Edit integration",
+        "subtitle": "Configure a plugin instance and deploy it to your machines.",
+        "stepPlugin": "Plugin",
+        "stepConfigure": "Configure",
+        "stepMachines": "Machines",
+        "pickPlugin": "Pick a plugin to configure.",
+        "noPlugins": "No webhook plugins installed. Drop one under ~/.myra-agents/plugins.",
+        "label": "Label",
+        "labelPlaceholder": "e.g. #eng-alerts",
+        "events": "Triggers",
+        "eventsHint": "Card statuses that fire this integration's outbound webhook.",
+        "template": "Message template",
+        "templateHint": "Mustache-lite — {{card.title}}, {{card.status}}. Leave blank for the plugin default.",
+        "pickMachines": "Pick which of your linked machines run this integration.",
+        "offline": "offline",
+        "inboundUrl": "Inbound URL (per machine) — paste into the sender",
+        "secretNote": "Secrets are pushed to each selected machine's keychain now. Keychains can't be copied between machines, so a machine added later will prompt for the secret again.",
+        "secretSet": "Set",
+        "cancel": "Cancel",
+        "back": "Back",
+        "next": "Next",
+        "deploy": "Deploy",
+        "save": "Save",
+        "deployOk": "“{label}” deployed.",
+        "deployPartial": "Deployed, but {count} machine(s) failed — check connections and retry."
       }
     },
     "agents": {

@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { HubStatusCard } from "@/components/settings/hub-status-card";
+import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
 import { PluginsPanel } from "@/components/settings/plugins-panel";
 import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 import { Button } from "@/components/ui/button";
@@ -224,6 +225,7 @@ export default function SettingsPage() {
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
+          <TabsTrigger value="integrations">{t("tabs.integrations")}</TabsTrigger>
           <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
@@ -388,6 +390,10 @@ export default function SettingsPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="integrations" className="space-y-6">
+          <IntegrationsPanel />
         </TabsContent>
 
         <TabsContent value="plugins" className="space-y-6">
