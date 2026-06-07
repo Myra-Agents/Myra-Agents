@@ -1,3 +1,4 @@
+#[cfg(desktop)]
 mod tray;
 
 use std::io::{Read, Write};
@@ -13,6 +14,7 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
+#[cfg(desktop)]
 use tray::TrayState;
 
 /// Buffer for a `myra://auth/callback?code=…` that arrives before the webview's
@@ -357,13 +359,21 @@ fn setup_deep_link(handle: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app = tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
-        .manage(TrayState::default())
-        .manage(PendingAuth::default())
+        .manage(PendingAuth::default());
+
+    #[cfg(desktop)]
+    {
+        builder = builder.manage(TrayState::default());
+    }
+
+    let app = builder
         .setup(|app| {
+            #[cfg(desktop)]
             tray::setup_tray(app.handle())?;
             start_local_backend(app.handle());
             setup_deep_link(app.handle());
