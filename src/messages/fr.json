@@ -444,7 +444,7 @@
         "events": "Déclencheurs",
         "eventsHint": "Statuts de carte qui déclenchent le webhook sortant de cette intégration.",
         "template": "Modèle de message",
-        "templateHint": "Mustache simplifié — {{card.title}}, {{card.status}}. Laissez vide pour le modèle par défaut du plugin.",
+        "templateHint": "Mustache simplifié — utilisez les variables card.title et card.status. Laissez vide pour le modèle par défaut du plugin.",
         "pickMachines": "Choisissez les machines liées qui exécutent cette intégration.",
         "offline": "hors ligne",
         "inboundUrl": "URL entrante (par machine) — à coller chez l'émetteur",
