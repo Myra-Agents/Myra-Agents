@@ -1,3 +1,4 @@
+mod keychain;
 mod tray;
 
 use std::io::{Read, Write};
@@ -384,7 +385,10 @@ pub fn run() {
             remote_access_status,
             start_login,
             take_pending_auth_code,
-            open_devtools
+            open_devtools,
+            keychain::keychain_set,
+            keychain::keychain_get,
+            keychain::keychain_delete
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

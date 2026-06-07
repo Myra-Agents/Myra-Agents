@@ -21,6 +21,7 @@ import { HubStatusCard } from "@/components/settings/hub-status-card";
 import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
 import { PluginsPanel } from "@/components/settings/plugins-panel";
 import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
+import { SyncPanel } from "@/components/settings/sync-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -226,6 +227,7 @@ export default function SettingsPage() {
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
           <TabsTrigger value="integrations">{t("tabs.integrations")}</TabsTrigger>
+          <TabsTrigger value="sync">{t("tabs.sync")}</TabsTrigger>
           <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
@@ -394,6 +396,10 @@ export default function SettingsPage() {
 
         <TabsContent value="integrations" className="space-y-6">
           <IntegrationsPanel />
+        </TabsContent>
+
+        <TabsContent value="sync" className="space-y-6">
+          <SyncPanel />
         </TabsContent>
 
         <TabsContent value="plugins" className="space-y-6">

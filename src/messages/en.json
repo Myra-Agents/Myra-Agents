@@ -309,6 +309,7 @@
       "preferences": "Preferences",
       "agents": "Agents",
       "integrations": "Integrations",
+      "sync": "Sync",
       "plugins": "Plugins",
       "data": "Data"
     },
@@ -458,6 +459,35 @@
         "deployOk": "“{label}” deployed.",
         "deployPartial": "Deployed, but {count} machine(s) failed — check connections and retry."
       }
+    },
+    "sync": {
+      "title": "Encrypted sync",
+      "description": "Sync your integrations and their secrets across your devices, end-to-end encrypted. The cloud never sees your secrets or keys.",
+      "unavailable": "Sync needs the Myra cloud. Configure a hub URL to enable it.",
+      "signInRequired": "Sign in to set up encrypted sync across your devices.",
+      "deviceLabel": "This device's name",
+      "deviceLabelPlaceholder": "e.g. MacBook Pro",
+      "setUp": "Set up sync",
+      "setUpHint": "Generates this device's key and a recovery code, then encrypts a vault key only your devices can open.",
+      "joinTitle": "Already syncing on another device?",
+      "join": "Join with recovery code",
+      "joinHint": "Enter the recovery code from your first device to decrypt the vault here — works even if your other devices are offline.",
+      "recoveryPlaceholder": "XXXX-XXXX-XXXX-…",
+      "thisDevice": "This device",
+      "lockedHint": "This device is enrolled but locked. Unlock to sync.",
+      "unlock": "Unlock",
+      "e2eTitle": "End-to-end encrypted",
+      "e2eBody": "Integrations and secrets are encrypted on this device before they reach the cloud. The hub only relays ciphertext.",
+      "devices": "Devices",
+      "revoke": "Revoke",
+      "revokeConfirm": "Revoke “{label}”? This rotates the vault key so the removed device can't read future changes — you'll get a new recovery code.",
+      "revoked": "“{label}” revoked — vault key rotated.",
+      "leave": "Leave sync on this device",
+      "syncNow": "Sync now",
+      "recoveryTitle": "Save your recovery code",
+      "recoveryWarning": "This is shown once. It's the only way to recover your vault from a new device if all your other devices are offline. Store it somewhere safe — we can't show it again.",
+      "recoveryAck": "I've saved my recovery code somewhere safe.",
+      "recoveryDone": "Done"
     },
     "agents": {
       "title": "Agent Presets",
