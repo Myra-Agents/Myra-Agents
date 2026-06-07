@@ -1,4 +1,4 @@
-import { isTauri as tauriIsTauri } from "@tauri-apps/api/core";
+import { invoke as coreInvoke, isTauri as tauriIsTauri } from "@tauri-apps/api/core";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
 import { connectionManager } from "@/lib/connections/manager";
@@ -22,6 +22,22 @@ export function isTauri(): boolean {
 /** Check if an error is the dev-mode "not in Tauri" message. */
 export function isDevModeError(e: unknown): boolean {
   return e instanceof Error && e.message.includes("[Dev Mode]");
+}
+
+/**
+ * Open a URL in the user's default browser. Inside the Tauri webview a plain
+ * `<a target="_blank">` never reaches the OS browser, so route through the
+ * opener plugin (capability `opener:allow-open-url`); in a plain browser fall
+ * back to opening a new tab.
+ */
+export async function openExternal(url: string): Promise<void> {
+  if (tauriIsTauri()) {
+    await coreInvoke("plugin:opener|open_url", { url });
+    return;
+  }
+  if (typeof window !== "undefined") {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 }
 
 /**

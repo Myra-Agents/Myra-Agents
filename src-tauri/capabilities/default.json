@@ -16,6 +16,7 @@
     "core:window:allow-set-focus",
     "deep-link:default",
     "opener:allow-open-url",
+    "opener:allow-default-urls",
     {
       "identifier": "shell:allow-execute",
       "allow": [{ "name": "binaries/myra-server", "sidecar": true, "args": true }]
