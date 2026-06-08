@@ -316,6 +316,7 @@
     "connections": {
       "title": "Connexions",
       "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les tâches de chacun portent une étiquette d'origine. La connexion locale est permanente.",
+      "refresh": "Actualiser",
       "primary": "Principal",
       "inProcess": "En interne",
       "labelField": "Libellé",
