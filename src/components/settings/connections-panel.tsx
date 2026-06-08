@@ -10,6 +10,7 @@ import {
   KeyRoundIcon,
   NetworkIcon,
   PlusIcon,
+  RefreshCwIcon,
   ServerIcon,
   TrashIcon,
 } from "lucide-react";
@@ -61,6 +62,7 @@ export function ConnectionsPanel() {
     pairHub,
     revokeHubInstance,
     setPrimary,
+    refresh,
     toggleVisible,
     isVisible,
   } = useConnections();
@@ -72,6 +74,16 @@ export function ConnectionsPanel() {
   const [pairing, setPairing] = useState<{ hubId: string; code: string; expiresAt: number } | null>(null);
   const [pairBusy, setPairBusy] = useState(false);
   const [installOs, setInstallOs] = useState<"unix" | "windows">("unix");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handlePair = async (hubId: string) => {
     setPairBusy(true);
@@ -114,11 +126,21 @@ export function ConnectionsPanel() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="flex items-center gap-2 text-base">
           <ServerIcon className="size-4 text-muted-foreground" />
           {t("title")}
         </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => void handleRefresh()}
+          disabled={refreshing}
+          title={t("refresh")}
+        >
+          <RefreshCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
+          {t("refresh")}
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-muted-foreground text-sm">{t("description")}</p>

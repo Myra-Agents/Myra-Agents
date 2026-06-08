@@ -1,3 +1,4 @@
+import { HUB_ROUTES } from "@myra/shared";
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 
 import { parseGlobalId } from "@/lib/aggregate/global-id";
@@ -342,6 +343,39 @@ class ConnectionManager {
       this.pointLocalAtPort(port, await this.localToken());
     } catch (e) {
       console.error("[ConnectionManager] refreshLocal failed:", e);
+    }
+  }
+
+  /**
+   * Re-probe every connection's health on demand (the Settings refresh button).
+   * Each HTTP-backed connection flips to `connecting`, then `connected`/`error`
+   * by its unauthenticated `/healthz` probe (same seam as the version probe).
+   * Hubs are re-expanded so newly online/offline instances appear. In-process
+   * connections (no `baseUrl`) and hub-instances (driven by presence) are left
+   * to their own status. Never rejects — a dead backend just lands as `error`.
+   */
+  async refresh(): Promise<void> {
+    await this.ready();
+    // Re-expand hubs so instance presence (online/offline) is current.
+    this.hubsReady = undefined;
+    await this.ensureHubs();
+    this.emitTopology();
+    await Promise.all(
+      this.list().map(async (conn) => {
+        if (conn.kind === "hub-instance" || !conn.baseUrl) return;
+        this.setStatus(conn.id, "connecting");
+        this.setStatus(conn.id, (await this.probeHealth(conn.baseUrl)) ? "connected" : "error");
+      }),
+    );
+  }
+
+  /** A lightweight liveness check: a connection is reachable if its `/healthz` answers 2xx. */
+  private async probeHealth(baseUrl: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${baseUrl}${HUB_ROUTES.health}`, { method: "GET" });
+      return res.ok;
+    } catch {
+      return false;
     }
   }
 

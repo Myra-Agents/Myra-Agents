@@ -316,6 +316,7 @@
     "connections": {
       "title": "Connections",
       "description": "Backends this board aggregates. Add remote servers; tasks from each are tagged by origin. The local connection is permanent.",
+      "refresh": "Refresh",
       "primary": "Primary",
       "inProcess": "In-process",
       "labelField": "Label",
