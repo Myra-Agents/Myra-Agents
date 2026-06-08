@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { serverUpdateState } from "@myra/shared";
 import {
@@ -67,7 +67,7 @@ export function ConnectionsPanel() {
     isVisible,
   } = useConnections();
   const versions = useServerVersions();
-  const latest = useLatestServerVersion();
+  const { latest, refresh: refreshLatest } = useLatestServerVersion();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
   // The freshly minted pairing code for one hub (cleared when another is paired).
@@ -79,11 +79,28 @@ export function ConnectionsPanel() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refresh();
+      // Force a latest-release re-check (bypass the 6h cache) alongside the
+      // connection refresh, so a manual click can't leave a stale badge.
+      await Promise.all([refresh(), refreshLatest(true)]);
     } finally {
       setRefreshing(false);
     }
   };
+
+  // Poll every 30s while the panel is open so statuses, reported versions and
+  // the update badge stay live without a manual click. The latest-release check
+  // honors its own 6h cache (won't blow GitHub's 60 req/hr limit); only the
+  // connection refresh actually runs every tick. Pause while the window is
+  // hidden (e.g. minimized to the tray) to avoid needless work.
+  useEffect(() => {
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void refresh();
+      void refreshLatest();
+    };
+    const id = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(id);
+  }, [refresh, refreshLatest]);
 
   const handlePair = async (hubId: string) => {
     setPairBusy(true);

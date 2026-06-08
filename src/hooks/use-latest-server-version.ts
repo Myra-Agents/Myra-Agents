@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { stripServerTag } from "@myra/shared";
 
@@ -29,44 +29,61 @@ function readCache(): Cached | null {
   }
 }
 
+export interface LatestServerVersion {
+  /** Latest published server version (bare `X.Y.Z`), or `null` while unknown. */
+  latest: string | null;
+  /**
+   * Re-check the latest release. Honors the {@link TTL_MS} cache by default, so
+   * it is safe to call on a short timer; pass `force` (e.g. the user clicked
+   * Refresh) to bypass the cache and hit GitHub immediately. Never throws.
+   */
+  refresh: (force?: boolean) => Promise<void>;
+}
+
 /**
  * The latest published server version (bare `X.Y.Z`), or `null` while unknown
  * (first load, offline, rate-limited). Cached in `localStorage` for {@link TTL_MS}
  * and never throws — a `null` result means "don't render an up-to-date badge".
  * `releases/latest` already excludes prereleases and drafts.
  */
-export function useLatestServerVersion(): string | null {
+export function useLatestServerVersion(): LatestServerVersion {
   const [latest, setLatest] = useState<string | null>(() => readCache()?.version ?? null);
-
+  const mounted = useRef(true);
   useEffect(() => {
-    const cached = readCache();
-    if (cached && Date.now() - cached.fetchedAt < TTL_MS) {
-      setLatest(cached.version);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(LATEST_URL, { headers: { Accept: "application/vnd.github+json" } });
-        if (!res.ok) return; // keep cached/null; retry after TTL
-        const body = (await res.json()) as { tag_name?: string };
-        if (!body.tag_name) return;
-        const version = stripServerTag(body.tag_name);
-        if (cancelled) return;
-        setLatest(version);
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify({ version, fetchedAt: Date.now() } satisfies Cached));
-        } catch {
-          // localStorage unavailable — fine, we just won't cache.
-        }
-      } catch {
-        // offline / network error — keep whatever we had.
-      }
-    })();
+    mounted.current = true;
     return () => {
-      cancelled = true;
+      mounted.current = false;
     };
   }, []);
 
-  return latest;
+  const refresh = useCallback(async (force = false) => {
+    const cached = readCache();
+    if (cached) {
+      if (mounted.current) setLatest(cached.version);
+      // Cache still warm and not forced: skip the network round-trip.
+      if (!force && Date.now() - cached.fetchedAt < TTL_MS) return;
+    }
+    try {
+      const res = await fetch(LATEST_URL, { headers: { Accept: "application/vnd.github+json" } });
+      if (!res.ok) return; // keep cached/null; retry later
+      const body = (await res.json()) as { tag_name?: string };
+      if (!body.tag_name) return;
+      const version = stripServerTag(body.tag_name);
+      if (mounted.current) setLatest(version);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ version, fetchedAt: Date.now() } satisfies Cached));
+      } catch {
+        // localStorage unavailable — fine, we just won't cache.
+      }
+    } catch {
+      // offline / network error — keep whatever we had.
+    }
+  }, []);
+
+  // Initial load: respects the TTL cache (no GitHub hit if a fresh value exists).
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return { latest, refresh };
 }
