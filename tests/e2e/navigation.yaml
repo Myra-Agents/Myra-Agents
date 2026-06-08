@@ -1,0 +1,46 @@
+# Maestro web e2e — Workspace sidebar navigation.
+#
+# Walks the four Workspace destinations from the sidebar — Kanban, Schedules,
+# Day Planner, Logs — and asserts each route mounts its own view (a unique body
+# string per page), then returns to Kanban. This guards the app-shell routing
+# and the sidebar links as a set; the individual panels have their own flows.
+#
+# Non-mutating: pure navigation, no writes.
+#
+# Prereqs: dev server on http://localhost:1420 (cd app && bun dev).
+#
+#   maestro test app/tests/e2e/navigation.yaml
+url: http://localhost:1420
+tags:
+  - navigation
+---
+- openLink: http://localhost:1420/kanban
+- extendedWaitUntil:               # absorb a cold route compile before asserting
+    visible: "To Do"              # a kanban board column header (renders first)
+    timeout: 15000
+
+# Schedules — empty-state list + create affordance.
+- tapOn: "Schedules"
+- waitForAnimationToEnd
+- assertVisible: "New Schedule"
+- assertVisible: "No schedules yet. Create one to get started."
+- takeScreenshot: nav-schedules
+
+# Day Planner — the natural-language objectives composer.
+- tapOn: "Day Planner"
+- waitForAnimationToEnd
+- assertVisible: "What do you want to accomplish today?"
+- assertVisible: "Generate plan"
+- takeScreenshot: nav-day-planner
+
+# Logs — run history (empty until an agent runs).
+- tapOn: "Logs"
+- waitForAnimationToEnd
+- assertVisible: "Logs & History"
+- assertVisible: "No agent runs yet."
+- takeScreenshot: nav-logs
+
+# Back to the board.
+- tapOn: "Kanban"
+- waitForAnimationToEnd
+- assertVisible: "To Do"

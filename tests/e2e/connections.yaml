@@ -16,6 +16,9 @@ tags:
   - connections
 ---
 - openLink: http://localhost:1420/settings
+- extendedWaitUntil:               # let the settings shell hydrate before tapping
+    visible: "Settings"
+    timeout: 15000
 # Connections lives on the Hub tab (the default landing tab).
 - tapOn: "Hub"
 

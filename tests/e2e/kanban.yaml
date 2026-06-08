@@ -1,6 +1,6 @@
 # Maestro web e2e — Kanban card composer.
 #
-# Validates the New Card composer: the sidebar "New Card" button opens the
+# Validates the New Task composer: the sidebar "New Task" button opens the
 # create dialog with its Title field, Column picker, and Create action. This is
 # the front of the card-creation path (add_card → board render → Primary-routed
 # fan-out) that mutations depend on.
@@ -16,14 +16,16 @@ tags:
   - kanban
 ---
 - openLink: http://localhost:1420/kanban
-- assertVisible: "To Do"          # a board column header
+- extendedWaitUntil:              # absorb a cold route compile before asserting
+    visible: "To Do"             # a board column header
+    timeout: 15000
 - takeScreenshot: kanban-board
 
 # Open the composer from the sidebar.
-- tapOn: "New Card"
+- tapOn: "New Task"
 - waitForAnimationToEnd
 - assertVisible: "Add a new task to the board."   # dialog description (unique)
-- assertVisible: "Title"
+- assertVisible: "Title.*"                        # required field label ("Title *")
 - assertVisible: "Column"
 - assertVisible: "Create"
 
