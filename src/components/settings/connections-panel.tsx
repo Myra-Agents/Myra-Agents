@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { serverUpdateState } from "@myra/shared";
 import {
   CheckCircle2Icon,
   CircleIcon,
@@ -22,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { useConnections } from "@/hooks/use-connections";
 import { useEntitlement } from "@/hooks/use-entitlement";
+import { useLatestServerVersion } from "@/hooks/use-latest-server-version";
+import { useServerVersions } from "@/hooks/use-server-versions";
 import type { ConnectionStatus } from "@/lib/connections/types";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +33,13 @@ const STATUS_COLOR: Record<ConnectionStatus, string> = {
   connecting: "text-amber-500",
   error: "text-destructive",
   disabled: "text-muted-foreground",
+};
+
+/** Chip color per "is this server current?" state (`unknown` renders no chip). */
+const VERSION_BADGE: Record<"current" | "outdated" | "ahead", string> = {
+  current: "bg-green-500/10 text-green-600 dark:text-green-400",
+  outdated: "bg-amber-500/10 text-amber-600 dark:text-amber-500",
+  ahead: "bg-muted text-muted-foreground",
 };
 
 /**
@@ -54,6 +64,8 @@ export function ConnectionsPanel() {
     toggleVisible,
     isVisible,
   } = useConnections();
+  const versions = useServerVersions();
+  const latest = useLatestServerVersion();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
   // The freshly minted pairing code for one hub (cleared when another is paired).
@@ -116,6 +128,8 @@ export function ConnectionsPanel() {
             const isPrimary = conn.id === primaryId;
             const visible = isVisible(conn.id);
             const isLocal = conn.id === "local";
+            const version = versions[conn.id];
+            const vstate = serverUpdateState(version, latest);
             return (
               <div key={conn.id} className="flex items-center gap-2 rounded-md border p-3">
                 <CircleIcon className={cn("size-3 shrink-0 fill-current", STATUS_COLOR[conn.status])} />
@@ -130,7 +144,25 @@ export function ConnectionsPanel() {
                   </div>
                   <p className="truncate font-mono text-muted-foreground text-xs">
                     {conn.baseUrl || t("inProcess")} · {t(`status.${conn.status}`)}
+                    {version && ` · v${version}`}
                   </p>
+                  {version && vstate !== "unknown" && (
+                    <span
+                      className={cn(
+                        "mt-1 inline-block rounded px-1.5 py-0.5 font-medium text-[10px]",
+                        VERSION_BADGE[vstate],
+                      )}
+                      title={
+                        vstate === "outdated"
+                          ? t("version.outdatedHint", { latest: latest ?? "" })
+                          : vstate === "ahead"
+                            ? t("version.aheadHint", { latest: latest ?? "" })
+                            : undefined
+                      }
+                    >
+                      {t(`version.${vstate}`)}
+                    </span>
+                  )}
                 </div>
 
                 <Button
