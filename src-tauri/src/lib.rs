@@ -57,10 +57,21 @@ fn parse_auth_code(url: &url::Url) -> Option<String> {
         .filter(|c| !c.is_empty())
 }
 
-/// The stable port the persistent (hub-enrolled) service listens on. When a
-/// service is running here we *adopt* it instead of spawning a duplicate writer
-/// on `~/.myra-agents`.
+/// The stable port the persistent local service listens on. When a service is
+/// running here we *adopt* it instead of spawning a duplicate writer on
+/// `~/.myra-agents`.
 const SERVICE_PORT: u16 = 4319;
+
+/// Keychain account holding the bearer that gates the local HTTP interface, so
+/// other local processes (or a stray webpage hitting `127.0.0.1`) can't drive the
+/// agent. Shared by the persistent service (baked into its env) and the ephemeral
+/// fallback, and handed to the frontend transport via `get_local_server_token`.
+const LOCAL_TOKEN_KEY: &str = "local:server:token";
+
+/// The server version this app build ships embedded (pinned in
+/// `../server-version.json`, baked by `build.rs`). The runtime stamps it beside
+/// the installed copy and re-installs when an app update carries a newer server.
+const EMBEDDED_SERVER_VERSION: &str = env!("MYRA_EMBEDDED_SERVER_VERSION");
 
 /// Backs the desktop's "local" connection. Either an ephemeral child sidecar we
 /// spawned on a free port (killed on exit) or an *adopted* persistent service on
@@ -110,6 +121,137 @@ fn stable_bin_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(home.join(".myra-agents").join("bin").join(name))
 }
 
+/// Version stamp written next to the installed binary, so we can tell a stale
+/// install (older server than this app embeds) without running the binary.
+fn version_stamp_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(stable_bin_path(app)?.with_file_name(".version"))
+}
+
+fn installed_version(app: &AppHandle) -> Option<String> {
+    let p = version_stamp_path(app).ok()?;
+    std::fs::read_to_string(p).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+fn write_version_stamp(app: &AppHandle) {
+    if let Ok(p) = version_stamp_path(app) {
+        let _ = std::fs::write(p, format!("{EMBEDDED_SERVER_VERSION}\n"));
+    }
+}
+
+/// True when the installed copy is older than what this app embeds (or has no
+/// stamp). `"unknown"` embedded version (build couldn't read the pin) disables
+/// forced upgrades — we only install-if-absent then.
+fn install_is_stale(app: &AppHandle) -> bool {
+    if EMBEDDED_SERVER_VERSION == "unknown" {
+        return false;
+    }
+    match installed_version(app) {
+        Some(v) => v != EMBEDDED_SERVER_VERSION,
+        None => true,
+    }
+}
+
+fn is_demo() -> bool {
+    std::env::var("DEMO").map(|v| v == "1" || v == "true").unwrap_or(false)
+}
+
+/// 32 random bytes, hex-encoded. Used once to mint the localhost bearer.
+fn gen_token() -> String {
+    let mut buf = [0u8; 32];
+    if getrandom::getrandom(&mut buf).is_err() {
+        let nanos =
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        return format!("myra{nanos:032x}");
+    }
+    let mut s = String::with_capacity(64);
+    for b in buf {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
+}
+
+/// Best-effort: return the localhost bearer, minting + persisting one in the OS
+/// keychain on first need. `None` when no keychain backend is available — the
+/// server then runs ungated, which is acceptable on a loopback-only interface.
+fn ensure_token() -> Option<String> {
+    match keychain::keychain_get(LOCAL_TOKEN_KEY.into()) {
+        Ok(Some(t)) if !t.is_empty() => return Some(t),
+        Ok(_) => {}
+        Err(_) => return None, // no keychain backend → run ungated
+    }
+    let token = gen_token();
+    keychain::keychain_set(LOCAL_TOKEN_KEY.into(), token.clone()).ok().map(|_| token)
+}
+
+/// Copy the bundled sidecar to the stable path (overwrite = upgrade), stamp the
+/// version, and (re)install the per-user OS service on `SERVICE_PORT` with the
+/// localhost token baked in. Idempotent — reused by first-time setup, the upgrade
+/// check, and remote-access enroll.
+async fn ensure_local_service(app: &AppHandle) -> Result<(), String> {
+    let token = ensure_token();
+    let dest = stable_bin_path(app)?;
+    run_sidecar(app, vec!["install-self".into(), dest.to_string_lossy().to_string()], vec![]).await?;
+    write_version_stamp(app);
+    let port = SERVICE_PORT.to_string();
+    let myra_dir = std::env::var("MYRA_DIR").ok();
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let mut envs: Vec<(&str, &str)> = vec![("PORT", port.as_str())];
+        if let Some(d) = myra_dir.as_deref() {
+            envs.push(("MYRA_DIR", d));
+        }
+        if let Some(t) = token.as_deref() {
+            envs.push(("MYRA_SERVER_TOKEN", t));
+        }
+        run_binary(&dest, &["install-service"], &envs)?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// (Re)start the already-installed service via its own idempotent
+/// `install-service` (reloads the launchd/systemd/schtasks definition and starts
+/// it), then wait for it to answer on the stable port. Returns whether it came up.
+fn start_installed_service(dest: &std::path::Path, token: Option<&str>) -> bool {
+    let port = SERVICE_PORT.to_string();
+    let myra_dir = std::env::var("MYRA_DIR").ok();
+    let mut envs: Vec<(&str, &str)> = vec![("PORT", port.as_str())];
+    if let Some(d) = myra_dir.as_deref() {
+        envs.push(("MYRA_DIR", d));
+    }
+    if let Some(t) = token {
+        envs.push(("MYRA_SERVER_TOKEN", t));
+    }
+    if run_binary(dest, &["install-service"], &envs).is_err() {
+        return false;
+    }
+    for _ in 0..100 {
+        if health_ok(SERVICE_PORT) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    health_ok(SERVICE_PORT)
+}
+
+/// Best-effort background upgrade: when this app embeds a newer server than the
+/// installed copy, overwrite the stable binary and reload the service.
+fn spawn_upgrade_check(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        if !install_is_stale(&app) {
+            return;
+        }
+        let Ok(dest) = stable_bin_path(&app) else { return };
+        if !dest.exists() {
+            return;
+        }
+        match ensure_local_service(&app).await {
+            Ok(()) => println!("[myra-server] upgraded local service to {EMBEDDED_SERVER_VERSION}"),
+            Err(e) => eprintln!("[myra-server] upgrade skipped: {e}"),
+        }
+    });
+}
+
 /// Update the managed `SidecarState`, or manage it on first call.
 fn set_sidecar_state(app: &AppHandle, port: u16, child: Option<CommandChild>, adopted: bool) {
     if let Some(state) = app.try_state::<SidecarState>() {
@@ -125,16 +267,41 @@ fn set_sidecar_state(app: &AppHandle, port: u16, child: Option<CommandChild>, ad
     }
 }
 
-/// Resolve the local backend: adopt a persistent service on `SERVICE_PORT` if one
-/// is already running, otherwise spawn an ephemeral sidecar on a free port. The
-/// adopt branch guarantees a single writer on `~/.myra-agents` (no duplicate
-/// process). Returns the resolved port.
+/// Resolve the local backend in three steps, guaranteeing a single writer on
+/// `~/.myra-agents`:
+///   1. Adopt a persistent service already listening on `SERVICE_PORT`.
+///   2. Else, if one was set up before but is down, (re)start and adopt it.
+///   3. Else, spawn an ephemeral sidecar on a free port for this session.
+/// All three are token-gated. The persistent service is never installed silently
+/// here — that's an explicit user action (`install_local_server`); steps 2–3 only
+/// adopt/restart an existing install or run the ephemeral fallback. Returns the
+/// resolved port.
 fn start_local_backend(app: &AppHandle) -> u16 {
+    let token = ensure_token();
+
+    // 1. Adopt a running persistent service.
     if health_ok(SERVICE_PORT) {
         set_sidecar_state(app, SERVICE_PORT, None, true);
+        spawn_upgrade_check(app.clone());
         return SERVICE_PORT;
     }
 
+    // 2. A service was set up before but isn't up (login service disabled,
+    //    crashed, just installed): start it and adopt. Skipped in demo, which
+    //    runs an isolated data dir and never installs a service.
+    if !is_demo() {
+        if let Ok(dest) = stable_bin_path(app) {
+            if dest.exists() && start_installed_service(&dest, token.as_deref()) {
+                set_sidecar_state(app, SERVICE_PORT, None, true);
+                spawn_upgrade_check(app.clone());
+                return SERVICE_PORT;
+            }
+        }
+    }
+
+    // 3. Ephemeral fallback: spawn the bundled sidecar on a free port. Keeps the
+    //    board working before the user opts into the persistent local server, and
+    //    on boxes that can't host a login service.
     let port = pick_free_port();
     let mut command = app
         .shell()
@@ -146,6 +313,9 @@ fn start_local_backend(app: &AppHandle) -> u16 {
         .sidecar("myra-server")
         .expect("sidecar myra-server should resolve")
         .env("PORT", port.to_string());
+    if let Some(t) = token.as_deref() {
+        command = command.env("MYRA_SERVER_TOKEN", t);
+    }
     if let Ok(demo) = std::env::var("DEMO") {
         command = command.env("DEMO", demo);
     }
@@ -253,24 +423,144 @@ struct RemoteStatus {
     running: bool,
 }
 
-/// Make this computer reachable: copy the sidecar to a stable path, enroll it to
-/// the hub with the pairing code, and install the per-user OS service on
-/// `SERVICE_PORT`. The frontend then calls `refresh_local_backend` to adopt it.
+/// Make this computer reachable from the hub. Remote access *layers on top of* the
+/// local server: ensure the binary is installed, enroll it with the pairing code,
+/// then (re)install the token-gated service so it dials the hub on start. The
+/// frontend then calls `refresh_local_backend` to adopt it. Local-direct access
+/// keeps working with or without this.
 #[tauri::command]
 async fn enable_remote_access(app: AppHandle, hub_url: String, code: String, label: String) -> Result<(), String> {
+    let token = ensure_token();
     let dest = stable_bin_path(&app)?;
     run_sidecar(&app, vec!["install-self".into(), dest.to_string_lossy().to_string()], vec![]).await?;
+    write_version_stamp(&app);
+    let port = SERVICE_PORT.to_string();
+    let myra_dir = std::env::var("MYRA_DIR").ok();
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        // Enroll first so the service is already paired when it starts + dials out.
         run_binary(
             &dest,
             &["enroll", &code],
             &[("MYRA_HUB_URL", hub_url.as_str()), ("MYRA_INSTANCE_LABEL", label.as_str())],
         )?;
-        run_binary(&dest, &["install-service"], &[("PORT", "4319")])?;
+        let mut envs: Vec<(&str, &str)> = vec![("PORT", port.as_str())];
+        if let Some(d) = myra_dir.as_deref() {
+            envs.push(("MYRA_DIR", d));
+        }
+        if let Some(t) = token.as_deref() {
+            envs.push(("MYRA_SERVER_TOKEN", t));
+        }
+        run_binary(&dest, &["install-service"], &envs)?;
         Ok(())
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Combined health/identity of this machine's local server, for the Local Server
+/// settings panel: whether the binary is installed, its stamped version vs. what
+/// the app embeds, whether it's answering, and any hub enrollment layered on top.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalServerStatus {
+    /// Persistent copy present at the stable path.
+    installed: bool,
+    /// Version stamped beside the installed copy (`None` if absent/unstamped).
+    version: Option<String>,
+    /// Server version this app build ships embedded.
+    embedded_version: String,
+    /// Answering `GET /healthz` on its port right now.
+    running: bool,
+    /// Port the local connection should target.
+    port: u16,
+    /// Hub enrollment layered on top (remote access).
+    enrolled: bool,
+    hub_url: Option<String>,
+    label: Option<String>,
+}
+
+/// Report the local server's install + run + enrollment state.
+#[tauri::command]
+async fn local_server_status(app: AppHandle) -> Result<LocalServerStatus, String> {
+    let installed = stable_bin_path(&app).map(|p| p.exists()).unwrap_or(false);
+    let version = installed_version(&app);
+    let port = app.try_state::<SidecarState>().map(|s| *s.port.lock().unwrap()).unwrap_or(SERVICE_PORT);
+    let running = health_ok(port) || health_ok(SERVICE_PORT);
+
+    // Enrollment comes from the sidecar's own `status` (reads the credential file).
+    let (enrolled, hub_url, label) = match run_sidecar(&app, vec!["status".into(), "--json".into()], vec![]).await {
+        Ok(out) => {
+            let line = out.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("").trim();
+            match serde_json::from_str::<RemoteStatus>(line) {
+                Ok(s) => (s.enrolled, s.hub_url, s.label),
+                Err(_) => (false, None, None),
+            }
+        }
+        Err(_) => (false, None, None),
+    };
+
+    Ok(LocalServerStatus {
+        installed,
+        version,
+        embedded_version: EMBEDDED_SERVER_VERSION.to_string(),
+        running,
+        port,
+        enrolled,
+        hub_url,
+        label,
+    })
+}
+
+/// Set up the persistent local server: install the binary to the stable path and
+/// register the token-gated per-user OS service on `SERVICE_PORT`, then adopt it.
+/// Explicit user action (a login service is a system change — never silent).
+#[tauri::command]
+async fn install_local_server(app: AppHandle) -> Result<LocalServerStatus, String> {
+    ensure_local_service(&app).await?;
+    let up = tauri::async_runtime::spawn_blocking(|| {
+        for _ in 0..100 {
+            if health_ok(SERVICE_PORT) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        false
+    })
+    .await
+    .unwrap_or(false);
+    if up {
+        set_sidecar_state(&app, SERVICE_PORT, None, true);
+    }
+    local_server_status(app).await
+}
+
+/// Tear down the persistent local server: remove the OS service, delete the
+/// installed binary + stamp, then fall back to the ephemeral/offline backend for
+/// this session. The localhost token is kept (reused on reinstall).
+#[tauri::command]
+async fn uninstall_local_server(app: AppHandle) -> Result<LocalServerStatus, String> {
+    let dest = stable_bin_path(&app)?;
+    let stamp = version_stamp_path(&app).ok();
+    tauri::async_runtime::spawn_blocking(move || {
+        if dest.exists() {
+            let _ = run_binary(&dest, &["uninstall-service"], &[]);
+        }
+        let _ = std::fs::remove_file(&dest);
+        if let Some(s) = stamp {
+            let _ = std::fs::remove_file(s);
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    refresh_local_backend(app.clone());
+    local_server_status(app).await
+}
+
+/// The localhost bearer for the frontend HTTP transport. `None` = run ungated
+/// (no keychain backend). Minted on first need, shared with the server's env.
+#[tauri::command]
+fn get_local_server_token() -> Option<String> {
+    ensure_token()
 }
 
 /// Stop remote access: remove the OS service and drop the hub credential.
@@ -380,6 +670,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_sidecar_port,
             refresh_local_backend,
+            local_server_status,
+            install_local_server,
+            uninstall_local_server,
+            get_local_server_token,
             enable_remote_access,
             disable_remote_access,
             remote_access_status,

@@ -336,6 +336,13 @@
         "error": "Injoignable",
         "disabled": "Désactivé"
       },
+      "version": {
+        "current": "À jour",
+        "outdated": "Mise à jour disponible",
+        "ahead": "En avance",
+        "outdatedHint": "Ce serveur est en retard sur la dernière version ({latest}). Relancez l’installateur pour le mettre à jour.",
+        "aheadHint": "Ce serveur est plus récent que la dernière version publiée ({latest})."
+      },
       "hub": {
         "title": "Hubs",
         "description": "Connectez-vous à un hub pour réunir toutes vos instances distantes sous une seule connexion. Chaque instance apparaît comme une origine du tableau.",
@@ -358,9 +365,24 @@
         "osUnix": "macOS / Linux",
         "osWindows": "Windows"
       },
+      "localServer": {
+        "title": "Serveur local",
+        "description": "Exécutez le serveur Myra sur cet ordinateur et connectez-vous-y directement en localhost — sans hub ni connexion Internet.",
+        "installedRunning": "Installé et actif sur le port {port}",
+        "installedStopped": "Installé (version {version}) — arrêté",
+        "notInstalled": "Pas encore configuré — un serveur temporaire tourne pour cette session.",
+        "secured": "Protégé par un jeton d'accès local",
+        "setUp": "Configurer le serveur local",
+        "update": "Mettre à jour vers {version}",
+        "uninstall": "Supprimer le serveur local",
+        "setupDone": "Serveur local configuré.",
+        "setupFailed": "Configuration du serveur local impossible.",
+        "removed": "Serveur local supprimé.",
+        "removeFailed": "Suppression du serveur local impossible."
+      },
       "remote": {
         "title": "Accès distant",
-        "description": "Rendez cet ordinateur accessible depuis l'application web, où que vous soyez. Myra tourne en arrière-plan comme service par utilisateur, rattaché à votre hub.",
+        "description": "Accédez au serveur local de cet ordinateur depuis l'application web, où que vous soyez. Ajoute votre hub par-dessus le serveur local, en exécutant Myra en arrière-plan comme service par utilisateur rattaché à votre hub.",
         "reachable": "Cet ordinateur est accessible via {hub} en tant que {label}",
         "localOnly": "Local uniquement — cet ordinateur n'est pas accessible à distance.",
         "enable": "Rendre cet ordinateur accessible",

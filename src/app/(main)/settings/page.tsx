@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { HubStatusCard } from "@/components/settings/hub-status-card";
 import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
+import { LocalServerPanel } from "@/components/settings/local-server-panel";
 import { PluginsPanel } from "@/components/settings/plugins-panel";
 import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 import { SyncPanel } from "@/components/settings/sync-panel";
@@ -235,6 +236,7 @@ export default function SettingsPage() {
         <TabsContent value="hub" className="space-y-6">
           {isPro && <HubStatusCard />}
           <ConnectionsPanel />
+          {isTauri() && <LocalServerPanel />}
           {isTauri() && isPro && <RemoteAccessPanel />}
         </TabsContent>
 

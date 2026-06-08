@@ -336,6 +336,13 @@
         "error": "Unreachable",
         "disabled": "Disabled"
       },
+      "version": {
+        "current": "Up to date",
+        "outdated": "Update available",
+        "ahead": "Ahead",
+        "outdatedHint": "This server is behind the latest release ({latest}). Re-run the installer to update it.",
+        "aheadHint": "This server is newer than the latest published release ({latest})."
+      },
       "hub": {
         "title": "Hubs",
         "description": "Connect to a hub to gather all of your remote instances under one login. Each instance appears as its own board origin.",
@@ -358,9 +365,24 @@
         "osUnix": "macOS / Linux",
         "osWindows": "Windows"
       },
+      "localServer": {
+        "title": "Local Server",
+        "description": "Run Myra's server on this computer and connect to it directly over localhost — no hub or internet needed.",
+        "installedRunning": "Installed and running on port {port}",
+        "installedStopped": "Installed (version {version}) — not running",
+        "notInstalled": "Not set up yet — running a temporary server for this session.",
+        "secured": "Secured with a local access token",
+        "setUp": "Set up local server",
+        "update": "Update to {version}",
+        "uninstall": "Remove local server",
+        "setupDone": "Local server set up.",
+        "setupFailed": "Could not set up the local server.",
+        "removed": "Local server removed.",
+        "removeFailed": "Could not remove the local server."
+      },
       "remote": {
         "title": "Remote Access",
-        "description": "Make this computer reachable from the web app anywhere. It runs Myra in the background as a per-user service enrolled to your hub.",
+        "description": "Reach this computer's local server from the web app anywhere. Layers your hub on top of the local server, running Myra in the background as a per-user service enrolled to your hub.",
         "reachable": "This computer is reachable via {hub} as {label}",
         "localOnly": "Local only — this computer isn't reachable remotely.",
         "enable": "Make this computer reachable",
