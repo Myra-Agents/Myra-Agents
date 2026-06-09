@@ -18,11 +18,12 @@ import { toast } from "sonner";
 
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { HubStatusCard } from "@/components/settings/hub-status-card";
-import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
+// Integrations, Plugins and Sync are parked for now — restore the imports with their tabs below.
+// import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
 import { LocalServerPanel } from "@/components/settings/local-server-panel";
-import { PluginsPanel } from "@/components/settings/plugins-panel";
+// import { PluginsPanel } from "@/components/settings/plugins-panel";
 import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
-import { SyncPanel } from "@/components/settings/sync-panel";
+// import { SyncPanel } from "@/components/settings/sync-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -86,27 +87,28 @@ export default function SettingsPage() {
     setAppLocale(locale);
   };
 
-  const togglePlugin = useCallback(
-    (name: string, enabled: boolean) => {
-      const disabled = new Set(current.disabledPlugins ?? []);
-      if (enabled) {
-        disabled.delete(name);
-      } else {
-        disabled.add(name);
-      }
-      update({ disabledPlugins: [...disabled] });
-    },
-    [current.disabledPlugins, update],
-  );
+  // Plugins tab is parked for now — restore these callbacks with it.
+  // const togglePlugin = useCallback(
+  //   (name: string, enabled: boolean) => {
+  //     const disabled = new Set(current.disabledPlugins ?? []);
+  //     if (enabled) {
+  //       disabled.delete(name);
+  //     } else {
+  //       disabled.add(name);
+  //     }
+  //     update({ disabledPlugins: [...disabled] });
+  //   },
+  //   [current.disabledPlugins, update],
+  // );
 
-  const updatePluginConfig = useCallback(
-    (plugin: string, key: string, value: string | number | boolean) => {
-      const next = { ...(current.pluginConfig ?? {}) };
-      next[plugin] = { ...(next[plugin] ?? {}), [key]: value };
-      update({ pluginConfig: next });
-    },
-    [current.pluginConfig, update],
-  );
+  // const updatePluginConfig = useCallback(
+  //   (plugin: string, key: string, value: string | number | boolean) => {
+  //     const next = { ...(current.pluginConfig ?? {}) };
+  //     next[plugin] = { ...(next[plugin] ?? {}), [key]: value };
+  //     update({ pluginConfig: next });
+  //   },
+  //   [current.pluginConfig, update],
+  // );
 
   const handleThemeChange = (theme: string) => {
     const nextTheme = theme as AppSettings["theme"];
@@ -227,9 +229,11 @@ export default function SettingsPage() {
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
+          {/* Integrations, Sync and Plugins are parked for now.
           <TabsTrigger value="integrations">{t("tabs.integrations")}</TabsTrigger>
           <TabsTrigger value="sync">{t("tabs.sync")}</TabsTrigger>
           <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
+          */}
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
 
@@ -273,7 +277,9 @@ export default function SettingsPage() {
                     <SelectContent>
                       <SelectItem value="kanban">{t("preferences.pageOptions.kanban")}</SelectItem>
                       <SelectItem value="schedules">{t("preferences.pageOptions.schedules")}</SelectItem>
+                      {/* Day Planner is parked for now.
                       <SelectItem value="planner">{t("preferences.pageOptions.planner")}</SelectItem>
+                      */}
                       <SelectItem value="logs">{t("preferences.pageOptions.logs")}</SelectItem>
                     </SelectContent>
                   </Select>
@@ -396,6 +402,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Integrations, Sync and Plugins are parked for now.
         <TabsContent value="integrations" className="space-y-6">
           <IntegrationsPanel />
         </TabsContent>
@@ -412,6 +419,7 @@ export default function SettingsPage() {
             onConfigChange={updatePluginConfig}
           />
         </TabsContent>
+        */}
 
         <TabsContent value="data" className="space-y-6">
           <Card>

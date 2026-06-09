@@ -1,4 +1,4 @@
-import { Calendar, ClipboardList, Kanban, type LucideIcon, ScrollText } from "lucide-react";
+import { Calendar, Kanban, type LucideIcon, ScrollText } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -40,11 +40,12 @@ export const sidebarItems: NavGroup[] = [
         url: "/schedules",
         icon: Calendar,
       },
-      {
-        title: "Day Planner",
-        url: "/planner",
-        icon: ClipboardList,
-      },
+      // Day Planner is parked for now — re-enable with the ClipboardList icon import.
+      // {
+      //   title: "Day Planner",
+      //   url: "/planner",
+      //   icon: ClipboardList,
+      // },
       {
         title: "Logs",
         url: "/logs",
