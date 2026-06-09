@@ -121,6 +121,8 @@ export default function KanbanPage() {
             agentPrompt: data.agentPrompt || undefined,
             agentPresetId,
             workingDir: data.workingDir,
+            agentFlags: data.agentFlags,
+            useWorktree: data.useWorktree,
             tags: parsedTags,
             status,
           },
@@ -134,6 +136,8 @@ export default function KanbanPage() {
           agentPrompt: data.agentPrompt || undefined,
           agentPresetId,
           workingDir: data.workingDir,
+          agentFlags: data.agentFlags,
+          useWorktree: data.useWorktree,
           tags: parsedTags,
         });
       }

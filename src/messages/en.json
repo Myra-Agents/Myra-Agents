@@ -530,7 +530,8 @@
       "customAgent": "Custom Agent",
       "workingDirPlaceholder": "Default directory (optional)",
       "maxConcurrent": "Max concurrent agents",
-      "maxConcurrentHint": "How many agents may run at once. 0 = unlimited; extra launches are queued."
+      "maxConcurrentHint": "How many agents may run at once. 0 = unlimited; extra launches are queued.",
+      "options": "Options"
     },
     "preferences": {
       "title": "Preferences",
@@ -591,5 +592,33 @@
     "body": "Myra Pro lets you reach your agents from anywhere. The free app is desktop-only — upgrade to use the web app and observe your machines remotely.",
     "signInTitle": "Already Pro? Sign in to your hub",
     "signIn": "Sign in"
+  },
+  "agents": {
+    "checking": "Checking…",
+    "installed": "Installed",
+    "installedVersion": "Installed · v{version}",
+    "notInstalled": "Not installed",
+    "install": "Install",
+    "installing": "Installing…",
+    "howToInstall": "How to install",
+    "installTitle": "Install {binary}",
+    "installDescription": "Run one of these commands in a terminal, or use the one-click install. Then restart the agent check.",
+    "installSucceeded": "{binary} installed successfully",
+    "installFailed": "Failed to install {binary}",
+    "commandCopied": "Command copied to clipboard",
+    "copyCommand": "Copy command",
+    "openDocs": "Open documentation",
+    "recheck": "Check again",
+    "pickWorkingDir": "Choose a folder",
+    "optionWorktree": "Run in a git worktree",
+    "allOptions": "All options",
+    "searchOptions": "Search options…",
+    "noOptionFound": "No option found",
+    "customFlag": "Custom flag",
+    "flags": {
+      "--dangerously-skip-permissions": "Skip permissions (dangerous)",
+      "--share": "Share the session",
+      "--thinking": "Show thinking"
+    }
   }
 }

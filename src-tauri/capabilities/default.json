@@ -15,11 +15,18 @@
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "deep-link:default",
+    "dialog:default",
     "opener:allow-open-url",
     "opener:allow-default-urls",
     {
       "identifier": "shell:allow-execute",
-      "allow": [{ "name": "binaries/myra-server", "sidecar": true, "args": true }]
+      "allow": [
+        {
+          "name": "binaries/myra-server",
+          "sidecar": true,
+          "args": true
+        }
+      ]
     }
   ]
 }
