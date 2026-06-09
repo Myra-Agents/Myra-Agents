@@ -582,7 +582,8 @@
       "customAgent": "Agent personnalisé",
       "workingDirPlaceholder": "Répertoire par défaut (optionnel)",
       "maxConcurrent": "Agents simultanés max",
-      "maxConcurrentHint": "Nombre d’agents pouvant s’exécuter en même temps. 0 = illimité ; les lancements en trop sont mis en file."
+      "maxConcurrentHint": "Nombre d’agents pouvant s’exécuter en même temps. 0 = illimité ; les lancements en trop sont mis en file.",
+      "options": "Options"
     },
     "preferences": {
       "title": "Préférences",
@@ -643,5 +644,33 @@
     "body": "Myra Pro vous permet d'accéder à vos agents où que vous soyez. L'application gratuite est réservée au bureau — passez à Pro pour utiliser l'application web et superviser vos machines à distance.",
     "signInTitle": "Déjà Pro ? Connectez-vous à votre hub",
     "signIn": "Se connecter"
+  },
+  "agents": {
+    "checking": "Vérification…",
+    "installed": "Installé",
+    "installedVersion": "Installé · v{version}",
+    "notInstalled": "Non installé",
+    "install": "Installer",
+    "installing": "Installation…",
+    "howToInstall": "Comment l'installer",
+    "installTitle": "Installer {binary}",
+    "installDescription": "Exécutez l'une de ces commandes dans un terminal, ou utilisez l'installation en un clic. Relancez ensuite la vérification.",
+    "installSucceeded": "{binary} installé avec succès",
+    "installFailed": "Échec de l'installation de {binary}",
+    "commandCopied": "Commande copiée dans le presse-papiers",
+    "copyCommand": "Copier la commande",
+    "openDocs": "Ouvrir la documentation",
+    "recheck": "Vérifier à nouveau",
+    "pickWorkingDir": "Choisir un dossier",
+    "optionWorktree": "Exécuter dans un git worktree",
+    "allOptions": "Toutes les options",
+    "searchOptions": "Rechercher une option…",
+    "noOptionFound": "Aucune option trouvée",
+    "customFlag": "Option personnalisée",
+    "flags": {
+      "--dangerously-skip-permissions": "Ignorer les permissions (dangereux)",
+      "--share": "Partager la session",
+      "--thinking": "Afficher la réflexion"
+    }
   }
 }

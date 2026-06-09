@@ -16,6 +16,9 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { AgentOptions } from "@/components/agents/agent-options";
+import { AgentBinaryStatus } from "@/components/agents/binary-status";
+import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
 // User connection disabled — hub status, remote access and cloud sync are off.
 // import { HubStatusCard } from "@/components/settings/hub-status-card";
@@ -355,7 +358,10 @@ export default function SettingsPage() {
               {current.agents.map((preset, idx) => (
                 <div key={preset.id} className="space-y-2 rounded-md border p-3">
                   <div className="flex items-center justify-between">
-                    <Label className="font-semibold text-sm">{preset.name}</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="font-semibold text-sm">{preset.name}</Label>
+                      <AgentBinaryStatus binary={preset.binary} />
+                    </div>
                     {!DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id) && (
                       <Button variant="ghost" size="icon-xs" onClick={() => removePreset(idx)}>
                         <TrashIcon />
@@ -391,11 +397,22 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("agents.workingDir")}</Label>
-                    <Input
+                    <WorkingDirField
                       value={preset.workingDir ?? ""}
-                      onChange={(event) => updatePreset(idx, { workingDir: event.target.value || undefined })}
+                      onChange={(value) => updatePreset(idx, { workingDir: value || undefined })}
                       placeholder={t("agents.workingDirPlaceholder")}
-                      className="h-7 font-mono text-xs"
+                      inputClassName="h-7"
+                      compact
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("agents.options")}</Label>
+                    <AgentOptions
+                      binary={preset.binary}
+                      flags={preset.flags ?? []}
+                      useWorktree={preset.useWorktree ?? false}
+                      onFlagsChange={(flags) => updatePreset(idx, { flags })}
+                      onWorktreeChange={(useWorktree) => updatePreset(idx, { useWorktree })}
                     />
                   </div>
                 </div>
