@@ -58,9 +58,9 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
           )}
         >
           <div className="flex h-full w-full items-center gap-2 px-3">
-            <div className="flex items-center gap-1 lg:gap-2">
+            <div className="flex items-center gap-2">
               <MacHeaderControlsSpacer />
-              <SidebarTrigger className="-ml-1" />
+              <SidebarTrigger />
               <Separator
                 orientation="vertical"
                 className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"

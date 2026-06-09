@@ -192,7 +192,9 @@ export function MacHeaderControlsSpacer() {
   // content header, so reserve their footprint here.
   if (!isMobile && state === "expanded") return null;
 
-  return <div aria-hidden="true" className="w-14 shrink-0" />;
+  // Lights span x:18 -> ~70px from the window edge; the header has 12px of
+  // padding, so 72px here puts the first control at ~84px with clear margin.
+  return <div aria-hidden="true" className="w-18 shrink-0" />;
 }
 
 /** Windows/Linux window controls, rendered on the right of the header. Hidden on macOS. */
