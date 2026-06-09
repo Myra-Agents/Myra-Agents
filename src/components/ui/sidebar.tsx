@@ -29,6 +29,8 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
+// Hover-peek floats a narrower, denser panel than the docked sidebar.
+const SIDEBAR_WIDTH_PEEK = "14rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
@@ -133,6 +135,7 @@ function SidebarProvider({
           {
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+            "--sidebar-width-peek": SIDEBAR_WIDTH_PEEK,
             ...style,
           } as React.CSSProperties
         }
@@ -284,8 +287,8 @@ function Sidebar({
         onClickCapture={isPeeking ? closePeek : undefined}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
-          // Hover-peek: float the offcanvas sidebar back in, above the content.
-          "group-data-[peek=true]:z-[60] data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
+          // Hover-peek: float a narrower panel back in, above the content.
+          "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -299,7 +302,12 @@ function Sidebar({
           data-slot="sidebar-inner"
           className={cn(
             "flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
-            "group-data-[peek=true]:rounded-lg group-data-[peek=true]:shadow-lg group-data-[peek=true]:ring-1 group-data-[peek=true]:ring-sidebar-border"
+            "group-data-[peek=true]:rounded-lg group-data-[peek=true]:shadow-lg group-data-[peek=true]:ring-1 group-data-[peek=true]:ring-sidebar-border",
+            // Condensed density while peeking: tighter rows, smaller text/icons.
+            "group-data-[peek=true]:text-[13px]",
+            "group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:h-8 group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:gap-2 group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:p-1.5 group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:text-[13px]",
+            "group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]_svg]:size-4",
+            "group-data-[peek=true]:[&_[data-slot=sidebar-header]]:gap-1 group-data-[peek=true]:[&_[data-slot=sidebar-content]]:gap-1 group-data-[peek=true]:[&_[data-slot=sidebar-group]]:p-1.5"
           )}
         >
           {children}
