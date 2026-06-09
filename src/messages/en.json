@@ -44,6 +44,17 @@
       "title": "Recent activity",
       "empty": "No runs yet."
     },
+    "stats": {
+      "title": "Statistics",
+      "runs": "Runs ({days}d)",
+      "successRate": "Success rate ({days}d)",
+      "cost": "Cost ({days}d)",
+      "avgDuration": "Avg duration ({days}d)",
+      "runsPerDay": "Runs per day — last {days} days",
+      "costPerDay": "Cost per day — last {days} days",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
     "health": {
       "server": "Server",
       "serverRunning": "Local server running on port {port}",

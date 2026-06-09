@@ -8,6 +8,7 @@ import { formatHm } from "@myra/shared/types/schedule";
 import {
   ActivityIcon,
   AlarmClockIcon,
+  BarChart3Icon,
   CircleAlertIcon,
   CloudIcon,
   CloudOffIcon,
@@ -17,10 +18,12 @@ import {
   ServerOffIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { Area, AreaChart, Bar, BarChart, XAxis } from "recharts";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useHubStatus } from "@/hooks/use-hub-status";
 import { useKanban } from "@/hooks/use-kanban";
 import { useLocalServer } from "@/hooks/use-local-server";
@@ -201,10 +204,176 @@ export default function HomePage() {
               )}
             </Section>
           </div>
+
+          <StatsSection cards={cards} />
         </>
       )}
     </div>
   );
+}
+
+/** Number of days charted; KPIs cover the last `KPI_DAYS` of that window. */
+const CHART_DAYS = 14;
+const KPI_DAYS = 7;
+
+interface DayStat {
+  label: string;
+  completed: number;
+  failed: number;
+  cost: number;
+}
+
+function localDayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function buildStats(cards: KanbanCard[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const byKey = new Map<string, DayStat>();
+  const daily: DayStat[] = [];
+  for (let i = CHART_DAYS - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const stat: DayStat = {
+      label: d.toLocaleDateString(undefined, { day: "numeric", month: "numeric" }),
+      completed: 0,
+      failed: 0,
+      cost: 0,
+    };
+    byKey.set(localDayKey(d), stat);
+    daily.push(stat);
+  }
+
+  const kpiCutoff = new Date(today);
+  kpiCutoff.setDate(kpiCutoff.getDate() - (KPI_DAYS - 1));
+  let runs = 0;
+  let completed = 0;
+  let cost = 0;
+  let durationMs = 0;
+  let durationCount = 0;
+
+  for (const card of cards) {
+    for (const run of card.runHistory ?? []) {
+      if (run.status !== "completed" && run.status !== "failed") continue;
+      const started = new Date(run.startedAt);
+      const slot = byKey.get(localDayKey(started));
+      if (slot) {
+        if (run.status === "completed") slot.completed++;
+        else slot.failed++;
+        slot.cost += run.cost ?? 0;
+      }
+      if (started >= kpiCutoff) {
+        runs++;
+        if (run.status === "completed") completed++;
+        cost += run.cost ?? 0;
+        if (run.endedAt) {
+          const ms = Date.parse(run.endedAt) - Date.parse(run.startedAt);
+          if (ms > 0) {
+            durationMs += ms;
+            durationCount++;
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    daily,
+    kpis: {
+      runs,
+      successRate: runs > 0 ? completed / runs : null,
+      cost,
+      avgDurationMs: durationCount > 0 ? durationMs / durationCount : null,
+    },
+  };
+}
+
+function StatsSection({ cards }: { cards: KanbanCard[] }) {
+  const t = useTranslations("home.stats");
+  const { daily, kpis } = useMemo(() => buildStats(cards), [cards]);
+
+  // No finished run in the chart window → nothing worth plotting.
+  if (!daily.some((d) => d.completed + d.failed > 0)) return null;
+
+  const runsConfig = {
+    completed: { label: t("completed"), color: "var(--chart-1)" },
+    failed: { label: t("failed"), color: "var(--destructive)" },
+  } satisfies ChartConfig;
+  const costConfig = {
+    cost: { label: t("cost"), color: "var(--chart-2)" },
+  } satisfies ChartConfig;
+
+  return (
+    <Section icon={BarChart3Icon} title={t("title")} count={0}>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <KpiTile label={t("runs", { days: KPI_DAYS })} value={String(kpis.runs)} />
+        <KpiTile
+          label={t("successRate", { days: KPI_DAYS })}
+          value={kpis.successRate === null ? "—" : `${Math.round(kpis.successRate * 100)}%`}
+        />
+        <KpiTile label={t("cost", { days: KPI_DAYS })} value={`$${kpis.cost.toFixed(2)}`} />
+        <KpiTile
+          label={t("avgDuration", { days: KPI_DAYS })}
+          value={kpis.avgDurationMs === null ? "—" : formatMs(kpis.avgDurationMs)}
+        />
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-2">
+        <Card className="rounded-lg py-0">
+          <CardContent className="px-3 py-2">
+            <p className="text-[11px] text-muted-foreground mb-1">{t("runsPerDay", { days: CHART_DAYS })}</p>
+            <ChartContainer config={runsConfig} className="h-[120px] w-full">
+              <BarChart data={daily} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} interval="preserveStartEnd" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="completed" stackId="runs" fill="var(--color-completed)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="failed" stackId="runs" fill="var(--color-failed)" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+        <Card className="rounded-lg py-0">
+          <CardContent className="px-3 py-2">
+            <p className="text-[11px] text-muted-foreground mb-1">{t("costPerDay", { days: CHART_DAYS })}</p>
+            <ChartContainer config={costConfig} className="h-[120px] w-full">
+              <AreaChart data={daily} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} interval="preserveStartEnd" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  dataKey="cost"
+                  type="monotone"
+                  stroke="var(--color-cost)"
+                  fill="var(--color-cost)"
+                  fillOpacity={0.2}
+                />
+              </AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+    </Section>
+  );
+}
+
+function KpiTile({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="rounded-lg py-0">
+      <CardContent className="px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className="text-lg font-semibold tabular-nums">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatMs(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
 }
 
 function Section({

@@ -44,6 +44,17 @@
       "title": "Activité récente",
       "empty": "Aucune exécution pour l'instant."
     },
+    "stats": {
+      "title": "Statistiques",
+      "runs": "Exécutions ({days} j)",
+      "successRate": "Taux de succès ({days} j)",
+      "cost": "Coût ({days} j)",
+      "avgDuration": "Durée moyenne ({days} j)",
+      "runsPerDay": "Exécutions par jour — {days} derniers jours",
+      "costPerDay": "Coût par jour — {days} derniers jours",
+      "completed": "Réussies",
+      "failed": "Échouées"
+    },
     "health": {
       "server": "Serveur",
       "serverRunning": "Serveur local actif sur le port {port}",
