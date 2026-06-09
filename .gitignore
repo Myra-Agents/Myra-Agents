@@ -43,3 +43,4 @@ node_modules
 sign/*.p12
 # working App Store metadata copy (asc-metadata.example.json is the template)
 scripts/asc-metadata.json
+.playwright-cli
