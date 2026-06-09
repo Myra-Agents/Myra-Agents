@@ -33,7 +33,7 @@ const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_WIDTH_PEEK = "14rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 // Below this window width the sidebar auto-collapses (Linear-style); the
-// hover-peek overlay remains available for navigation.
+// trigger then toggles the floating peek overlay instead of the dock.
 const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1023px)"
 
 type SidebarContextProps = {
@@ -43,6 +43,9 @@ type SidebarContextProps = {
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
+  isNarrow: boolean
+  peek: boolean
+  setPeek: (peek: boolean) => void
   toggleSidebar: () => void
 }
 
@@ -92,10 +95,27 @@ function SidebarProvider({
     [setOpenProp, open]
   )
 
-  // Helper to toggle the sidebar.
+  // Window too narrow to dock the sidebar next to the content?
+  const [isNarrow, setIsNarrow] = React.useState(false)
+  React.useEffect(() => {
+    const mql = window.matchMedia(SIDEBAR_AUTO_COLLAPSE_QUERY)
+    const update = () => setIsNarrow(mql.matches)
+    update()
+    mql.addEventListener("change", update)
+    return () => mql.removeEventListener("change", update)
+  }, [])
+
+  // Peek: the sidebar floats over the content while staying "collapsed".
+  // Opened by the trigger when the window is too narrow to dock.
+  const [peek, setPeek] = React.useState(false)
+
+  // Helper to toggle the sidebar. On a narrow window the dock is forced
+  // collapsed, so the trigger toggles the peek overlay instead.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+    if (isMobile) return setOpenMobile((open) => !open)
+    if (isNarrow) return setPeek((peek) => !peek)
+    return setOpen((open) => !open)
+  }, [isMobile, isNarrow, setOpen, setOpenMobile])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -118,22 +138,24 @@ function SidebarProvider({
   const wasAutoCollapsed = React.useRef(false)
   React.useEffect(() => {
     if (isMobile) return
-    const mql = window.matchMedia(SIDEBAR_AUTO_COLLAPSE_QUERY)
-    const onChange = () => {
-      if (mql.matches) {
-        if (open) {
-          wasAutoCollapsed.current = true
-          setOpen(false)
-        }
-      } else if (wasAutoCollapsed.current) {
+    if (isNarrow) {
+      if (open) {
+        wasAutoCollapsed.current = true
+        setOpen(false)
+      }
+    } else {
+      setPeek(false)
+      if (wasAutoCollapsed.current) {
         wasAutoCollapsed.current = false
         setOpen(true)
       }
     }
-    onChange()
-    mql.addEventListener("change", onChange)
-    return () => mql.removeEventListener("change", onChange)
-  }, [isMobile, open, setOpen])
+  }, [isMobile, isNarrow, open, setOpen])
+
+  // The peek overlay only makes sense while the dock is collapsed.
+  React.useEffect(() => {
+    if (open) setPeek(false)
+  }, [open])
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
@@ -145,11 +167,14 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
+      isNarrow,
+      peek,
+      setPeek,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, isNarrow, peek, openMobile, setOpenMobile, toggleSidebar]
   )
 
   return (
@@ -189,44 +214,37 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, state, openMobile, setOpenMobile, peek, setPeek } =
+    useSidebar()
 
-  // Hover-peek (offcanvas only): with the sidebar fully hidden, hovering the
-  // window edge floats it back in as an overlay without reflowing the content.
-  const [peek, setPeek] = React.useState(false)
-  const peekOpenTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const peekCloseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const clearPeekTimers = React.useCallback(() => {
-    if (peekOpenTimer.current) clearTimeout(peekOpenTimer.current)
-    if (peekCloseTimer.current) clearTimeout(peekCloseTimer.current)
-    peekOpenTimer.current = null
-    peekCloseTimer.current = null
-  }, [])
-
-  const schedulePeekOpen = React.useCallback(() => {
-    clearPeekTimers()
-    peekOpenTimer.current = setTimeout(() => setPeek(true), 150)
-  }, [clearPeekTimers])
-
-  const schedulePeekClose = React.useCallback(() => {
-    clearPeekTimers()
-    peekCloseTimer.current = setTimeout(() => setPeek(false), 250)
-  }, [clearPeekTimers])
-
-  const closePeek = React.useCallback(() => {
-    clearPeekTimers()
-    setPeek(false)
-  }, [clearPeekTimers])
+  // Peek (offcanvas only): the trigger floats the collapsed sidebar back in
+  // as an overlay without reflowing the content. Escape or a click outside
+  // (or on a nav item) closes it.
+  const isPeeking = collapsible === "offcanvas" && state === "collapsed" && peek
+  const containerRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
-    if (state === "expanded") closePeek()
-  }, [state, closePeek])
-
-  React.useEffect(() => clearPeekTimers, [clearPeekTimers])
-
-  const peekable = collapsible === "offcanvas" && state === "collapsed"
-  const isPeeking = peekable && peek
+    if (!isPeeking) return
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      // Let the trigger's own click handler toggle the peek instead of
+      // closing here first (which would make the click reopen it).
+      if (target.closest('[data-slot="sidebar-trigger"]')) return
+      const container = containerRef.current
+      if (container && !container.contains(target)) {
+        setPeek(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPeek(false)
+    }
+    document.addEventListener("mousedown", onPointerDown)
+    document.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [isPeeking, setPeek])
 
   if (collapsible === "none") {
     return (
@@ -279,24 +297,11 @@ function Sidebar({
       data-peek={isPeeking ? "true" : undefined}
       data-slot="sidebar"
     >
-      {peekable && (
-        <div
-          aria-hidden="true"
-          data-slot="sidebar-peek-trigger"
-          className={cn(
-            "fixed bottom-0 z-40 hidden w-3 md:block",
-            "top-[var(--titlebar-h,0px)]",
-            side === "left" ? "left-0" : "right-0"
-          )}
-          onMouseEnter={schedulePeekOpen}
-          onMouseLeave={schedulePeekClose}
-        />
-      )}
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-150 ease-linear",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -305,13 +310,12 @@ function Sidebar({
         )}
       />
       <div
+        ref={containerRef}
         data-slot="sidebar-container"
         data-side={side}
-        onMouseEnter={peekable ? schedulePeekOpen : undefined}
-        onMouseLeave={peekable ? schedulePeekClose : undefined}
-        onClickCapture={isPeeking ? closePeek : undefined}
+        onClickCapture={isPeeking ? () => setPeek(false) : undefined}
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-150 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
           // Hover-peek: float a narrower panel back in, above the content.
           "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
           // Adjust the padding for floating and inset variants.
