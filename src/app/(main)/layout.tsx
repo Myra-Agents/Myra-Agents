@@ -15,7 +15,7 @@ import { GlobalShortcuts } from "./_components/global-shortcuts";
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
-import { WindowControls, WindowDragRegion } from "./_components/window-controls";
+import { MacHeaderControlsSpacer, WindowControls, WindowDragRegion } from "./_components/window-controls";
 
 // Static export (Tauri desktop) build: no server-side cookies. Use defaults;
 // client-side PreferencesStoreProvider hydrates from document.cookie afterwards.
@@ -30,7 +30,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       className="min-h-[calc(100svh_-_var(--titlebar-h,0px))] pt-[var(--titlebar-h,0px)]"
       style={
         {
-          "--sidebar-width": "calc(var(--spacing) * 68)",
+          // Linear-style narrow sidebar.
+          "--sidebar-width": "15rem",
           // Wide enough for the macOS traffic lights to sit inside the rail
           // when the sidebar is collapsed (WhatsApp-style).
           "--sidebar-width-icon": "4.5rem",
@@ -58,6 +59,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
         >
           <div className="flex h-full w-full items-center gap-3 px-4 lg:px-6">
             <div className="flex items-center gap-1 lg:gap-2">
+              <MacHeaderControlsSpacer />
               <SidebarTrigger className="-ml-1" />
               <Separator
                 orientation="vertical"

@@ -32,6 +32,9 @@ const SIDEBAR_WIDTH_ICON = "3rem"
 // Hover-peek floats a narrower, denser panel than the docked sidebar.
 const SIDEBAR_WIDTH_PEEK = "14rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+// Below this window width the sidebar auto-collapses (Linear-style); the
+// hover-peek overlay remains available for navigation.
+const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1023px)"
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -109,6 +112,28 @@ function SidebarProvider({
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
+
+  // Auto-collapse when the window gets too narrow to share the width with
+  // the content; re-expand only if the collapse was automatic.
+  const wasAutoCollapsed = React.useRef(false)
+  React.useEffect(() => {
+    if (isMobile) return
+    const mql = window.matchMedia(SIDEBAR_AUTO_COLLAPSE_QUERY)
+    const onChange = () => {
+      if (mql.matches) {
+        if (open) {
+          wasAutoCollapsed.current = true
+          setOpen(false)
+        }
+      } else if (wasAutoCollapsed.current) {
+        wasAutoCollapsed.current = false
+        setOpen(true)
+      }
+    }
+    onChange()
+    mql.addEventListener("change", onChange)
+    return () => mql.removeEventListener("change", onChange)
+  }, [isMobile, open, setOpen])
 
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
@@ -302,12 +327,7 @@ function Sidebar({
           data-slot="sidebar-inner"
           className={cn(
             "flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
-            "group-data-[peek=true]:rounded-lg group-data-[peek=true]:shadow-lg group-data-[peek=true]:ring-1 group-data-[peek=true]:ring-sidebar-border",
-            // Condensed density while peeking: tighter rows, smaller text/icons.
-            "group-data-[peek=true]:text-[13px]",
-            "group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:h-8 group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:gap-2 group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:p-1.5 group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]]:text-[13px]",
-            "group-data-[peek=true]:[&_[data-slot=sidebar-menu-button]_svg]:size-4",
-            "group-data-[peek=true]:[&_[data-slot=sidebar-header]]:gap-1 group-data-[peek=true]:[&_[data-slot=sidebar-content]]:gap-1 group-data-[peek=true]:[&_[data-slot=sidebar-group]]:p-1.5"
+            "group-data-[peek=true]:rounded-lg group-data-[peek=true]:shadow-lg group-data-[peek=true]:ring-1 group-data-[peek=true]:ring-sidebar-border"
           )}
         >
           {children}
@@ -400,7 +420,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-1.5 p-2", className)}
       {...props}
     />
   )
@@ -411,7 +431,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-1.5 p-2", className)}
       {...props}
     />
   )
@@ -450,7 +470,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-group"
       data-sidebar="group"
-      className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
+      className={cn("relative flex w-full min-w-0 flex-col px-2 py-1", className)}
       {...props}
     />
   )
@@ -468,7 +488,7 @@ function SidebarGroupLabel({
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
       className={cn(
-        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:pointer-events-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "flex h-7 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:pointer-events-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         className
       )}
       {...props}
@@ -538,7 +558,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-[active=true]:bg-primary/10 data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/10 data-[active=true]:hover:text-primary [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-1.5 text-left text-[13px] ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-[active=true]:bg-primary/10 data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/10 data-[active=true]:hover:text-primary [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {
@@ -547,9 +567,9 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]",
       },
       size: {
-        default: "h-8 text-sm",
-        sm: "h-7 text-xs",
-        lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
+        default: "h-7 text-[13px]",
+        sm: "h-6 text-xs",
+        lg: "h-10 text-sm group-data-[collapsible=icon]:p-0!",
       },
     },
     defaultVariants: {

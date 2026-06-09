@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
 import { isTauri } from "@/lib/tauri";
 
 async function getCurrentTauriWindow() {
@@ -174,6 +175,20 @@ export function MacSidebarControls() {
   return (
     <div aria-hidden="true" className="h-9" onMouseDown={startDragging} onDoubleClick={() => void toggleMaximize()} />
   );
+}
+
+/**
+ * Keeps the content header clear of the native macOS traffic lights when the
+ * sidebar is fully hidden (offcanvas collapsed) — without the sidebar rail the
+ * lights would otherwise overlap the header's left controls. macOS + Tauri only.
+ */
+export function MacHeaderControlsSpacer() {
+  const { isAvailable, isMac } = useWindowControls();
+  const { state, isMobile } = useSidebar();
+
+  if (!isAvailable || !isMac || isMobile || state !== "collapsed") return null;
+
+  return <div aria-hidden="true" className="w-14 shrink-0" />;
 }
 
 /** Windows/Linux window controls, rendered on the right of the header. Hidden on macOS. */
