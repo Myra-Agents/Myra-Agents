@@ -14,8 +14,60 @@
     "noResults": "No results",
     "version": "Version"
   },
+  "home": {
+    "title": "Overview",
+    "loading": "Loading...",
+    "newTask": "New Task",
+    "viewAll": "View all",
+    "empty": {
+      "title": "Nothing here yet",
+      "body": "Create your first task and launch an agent on it — everything happening will show up here.",
+      "cta": "Create a task"
+    },
+    "attention": {
+      "title": "Needs your attention",
+      "question": "Question",
+      "review": "Review",
+      "empty": "Nothing waiting on you."
+    },
+    "running": {
+      "title": "Running now",
+      "running": "Running",
+      "queued": "Queued",
+      "empty": "No agent running."
+    },
+    "upcoming": {
+      "title": "Up next today",
+      "empty": "No schedule due today."
+    },
+    "recent": {
+      "title": "Recent activity",
+      "empty": "No runs yet."
+    },
+    "stats": {
+      "title": "Statistics",
+      "runs": "Runs ({days}d)",
+      "successRate": "Success rate ({days}d)",
+      "cost": "Cost ({days}d)",
+      "avgDuration": "Avg duration ({days}d)",
+      "runsPerDay": "Runs per day — last {days} days",
+      "costPerDay": "Cost per day — last {days} days",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "health": {
+      "server": "Server",
+      "serverRunning": "Local server running on port {port}",
+      "serverStopped": "Local server stopped",
+      "hub": "Hub",
+      "hubOnline": "Hub online — {count} connected machine(s)",
+      "hubOffline": "Hub unreachable",
+      "hubChecking": "Checking hub..."
+    }
+  },
   "nav": {
     "newCard": "New Task",
+    "home": "Home",
     "workspace": "Workspace",
     "configuration": "Configuration",
     "kanban": "Kanban",

@@ -14,8 +14,60 @@
     "noResults": "Aucun résultat",
     "version": "Version"
   },
+  "home": {
+    "title": "Aperçu",
+    "loading": "Chargement...",
+    "newTask": "Nouvelle tâche",
+    "viewAll": "Tout voir",
+    "empty": {
+      "title": "Rien ici pour l'instant",
+      "body": "Créez votre première tâche et lancez un agent dessus — tout ce qui se passe apparaîtra ici.",
+      "cta": "Créer une tâche"
+    },
+    "attention": {
+      "title": "Requiert votre attention",
+      "question": "Question",
+      "review": "Relecture",
+      "empty": "Rien n'attend votre action."
+    },
+    "running": {
+      "title": "En cours",
+      "running": "En cours",
+      "queued": "En file",
+      "empty": "Aucun agent en cours."
+    },
+    "upcoming": {
+      "title": "À venir aujourd'hui",
+      "empty": "Aucune planification prévue aujourd'hui."
+    },
+    "recent": {
+      "title": "Activité récente",
+      "empty": "Aucune exécution pour l'instant."
+    },
+    "stats": {
+      "title": "Statistiques",
+      "runs": "Exécutions ({days} j)",
+      "successRate": "Taux de succès ({days} j)",
+      "cost": "Coût ({days} j)",
+      "avgDuration": "Durée moyenne ({days} j)",
+      "runsPerDay": "Exécutions par jour — {days} derniers jours",
+      "costPerDay": "Coût par jour — {days} derniers jours",
+      "completed": "Réussies",
+      "failed": "Échouées"
+    },
+    "health": {
+      "server": "Serveur",
+      "serverRunning": "Serveur local actif sur le port {port}",
+      "serverStopped": "Serveur local arrêté",
+      "hub": "Hub",
+      "hubOnline": "Hub en ligne — {count} machine(s) connectée(s)",
+      "hubOffline": "Hub injoignable",
+      "hubChecking": "Vérification du hub..."
+    }
+  },
   "nav": {
     "newCard": "Nouvelle tâche",
+    "home": "Accueil",
     "workspace": "Espace de travail",
     "configuration": "Configuration",
     "kanban": "Kanban",
