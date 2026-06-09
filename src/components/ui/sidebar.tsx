@@ -163,6 +163,43 @@ function Sidebar({
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
+  // Hover-peek (offcanvas only): with the sidebar fully hidden, hovering the
+  // window edge floats it back in as an overlay without reflowing the content.
+  const [peek, setPeek] = React.useState(false)
+  const peekOpenTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const peekCloseTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearPeekTimers = React.useCallback(() => {
+    if (peekOpenTimer.current) clearTimeout(peekOpenTimer.current)
+    if (peekCloseTimer.current) clearTimeout(peekCloseTimer.current)
+    peekOpenTimer.current = null
+    peekCloseTimer.current = null
+  }, [])
+
+  const schedulePeekOpen = React.useCallback(() => {
+    clearPeekTimers()
+    peekOpenTimer.current = setTimeout(() => setPeek(true), 150)
+  }, [clearPeekTimers])
+
+  const schedulePeekClose = React.useCallback(() => {
+    clearPeekTimers()
+    peekCloseTimer.current = setTimeout(() => setPeek(false), 250)
+  }, [clearPeekTimers])
+
+  const closePeek = React.useCallback(() => {
+    clearPeekTimers()
+    setPeek(false)
+  }, [clearPeekTimers])
+
+  React.useEffect(() => {
+    if (state === "expanded") closePeek()
+  }, [state, closePeek])
+
+  React.useEffect(() => clearPeekTimers, [clearPeekTimers])
+
+  const peekable = collapsible === "offcanvas" && state === "collapsed"
+  const isPeeking = peekable && peek
+
   if (collapsible === "none") {
     return (
       <div
@@ -211,8 +248,22 @@ function Sidebar({
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
+      data-peek={isPeeking ? "true" : undefined}
       data-slot="sidebar"
     >
+      {peekable && (
+        <div
+          aria-hidden="true"
+          data-slot="sidebar-peek-trigger"
+          className={cn(
+            "fixed bottom-0 z-40 hidden w-3 md:block",
+            "top-[var(--titlebar-h,0px)]",
+            side === "left" ? "left-0" : "right-0"
+          )}
+          onMouseEnter={schedulePeekOpen}
+          onMouseLeave={schedulePeekClose}
+        />
+      )}
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
@@ -228,8 +279,13 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         data-side={side}
+        onMouseEnter={peekable ? schedulePeekOpen : undefined}
+        onMouseLeave={peekable ? schedulePeekClose : undefined}
+        onClickCapture={isPeeking ? closePeek : undefined}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          // Hover-peek: float the offcanvas sidebar back in, above the content.
+          "group-data-[peek=true]:z-[60] data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -241,7 +297,10 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
+          className={cn(
+            "flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
+            "group-data-[peek=true]:rounded-lg group-data-[peek=true]:shadow-lg group-data-[peek=true]:ring-1 group-data-[peek=true]:ring-sidebar-border"
+          )}
         >
           {children}
         </div>
