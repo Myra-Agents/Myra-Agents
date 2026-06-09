@@ -295,38 +295,30 @@ class ConnectionManager {
     if (SERVER_URL || !isTauri()) return;
     try {
       const port = await tauriInvoke<number>("get_sidecar_port");
-      this.pointLocalAtPort(port, await this.localToken());
+      this.pointLocalAtPort(port);
     } catch (e) {
       console.error("[ConnectionManager] sidecar init failed:", e);
     }
   }
 
   /**
-   * The localhost bearer the desktop backend gates `/rpc` + `/events` with (kept
-   * in the OS keychain). `undefined` when running ungated (no keychain backend).
+   * Re-point the LOCAL connection at `http://127.0.0.1:<port>` and rebuild its
+   * transport. The local HTTP interface runs ungated (loopback only) — the
+   * keychain-backed bearer was removed.
    */
-  private async localToken(): Promise<string | undefined> {
-    try {
-      return (await tauriInvoke<string | null>("get_local_server_token")) ?? undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /** Re-point the LOCAL connection at `http://127.0.0.1:<port>` and rebuild its transport. */
-  private pointLocalAtPort(port: number, token?: string): void {
+  private pointLocalAtPort(port: number): void {
     const entry = this.entries.get(LOCAL_ID);
     if (!entry) return;
     const baseUrl = `http://127.0.0.1:${port}`;
-    // Always override any persisted (stale) port/token — they change per launch.
+    // Always override any persisted (stale) port — it changes per launch.
     const connection: Connection = {
       ...entry.connection,
       baseUrl,
       kind: "sidecar",
       status: "connecting",
-      auth: token ? { token } : undefined,
+      auth: undefined,
     };
-    this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl, token) });
+    this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl) });
     this.persist();
     this.emitTopology();
   }
@@ -341,7 +333,7 @@ class ConnectionManager {
     if (SERVER_URL || !isTauri()) return;
     try {
       const port = await tauriInvoke<number>("refresh_local_backend");
-      this.pointLocalAtPort(port, await this.localToken());
+      this.pointLocalAtPort(port);
     } catch (e) {
       console.error("[ConnectionManager] refreshLocal failed:", e);
     }
