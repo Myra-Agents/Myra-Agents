@@ -186,7 +186,11 @@ export function MacHeaderControlsSpacer() {
   const { isAvailable, isMac } = useWindowControls();
   const { state, isMobile } = useSidebar();
 
-  if (!isAvailable || !isMac || isMobile || state !== "collapsed") return null;
+  if (!isAvailable || !isMac) return null;
+  // Only the docked, expanded sidebar hosts the lights itself; in every
+  // other layout (collapsed offcanvas, mobile sheet) they sit over the
+  // content header, so reserve their footprint here.
+  if (!isMobile && state === "expanded") return null;
 
   return <div aria-hidden="true" className="w-14 shrink-0" />;
 }
