@@ -156,10 +156,10 @@ export default function HomePage() {
                 upcoming.map((task) => (
                   <Card
                     key={task.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors"
                     onClick={() => router.push("/schedules")}
                   >
-                    <CardContent className="flex items-center gap-3 p-3">
+                    <CardContent className="flex items-center gap-3 px-3 py-2">
                       <span className="font-mono text-xs text-muted-foreground tabular-nums">
                         {formatHm(task.nextRunAt)}
                       </span>
@@ -182,10 +182,10 @@ export default function HomePage() {
                 recentRuns.map(({ card, run }) => (
                   <Card
                     key={`${card.id}-${run.id}`}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors"
                     onClick={() => router.push("/logs")}
                   >
-                    <CardContent className="flex items-center gap-3 p-3">
+                    <CardContent className="flex items-center gap-3 px-3 py-2">
                       <RunStatusBadge status={run.status} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{card.title}</p>
@@ -249,8 +249,8 @@ function Section({
 
 function SectionEmpty({ label }: { label: string }) {
   return (
-    <Card>
-      <CardContent className="py-4">
+    <Card className="rounded-lg py-0">
+      <CardContent className="px-3 py-2">
         <p className="text-muted-foreground text-xs text-center">{label}</p>
       </CardContent>
     </Card>
@@ -259,8 +259,8 @@ function SectionEmpty({ label }: { label: string }) {
 
 function CardRow({ card, onClick, children }: { card: KanbanCard; onClick: () => void; children: React.ReactNode }) {
   return (
-    <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={onClick}>
-      <CardContent className="flex items-center gap-3 p-3">
+    <Card className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors" onClick={onClick}>
+      <CardContent className="flex items-center gap-3 px-3 py-2">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{card.title}</p>
         </div>
