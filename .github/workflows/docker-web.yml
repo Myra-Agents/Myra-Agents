@@ -1,4 +1,4 @@
-name: Docker — web image
+name: Myra - Web Image
 
 # Build the web app container (multi-stage Dockerfile: bun static export ->
 # Caddy) and publish it to GHCR on every v* release tag. The NEXT_PUBLIC_* keys
