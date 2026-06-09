@@ -16,6 +16,7 @@ import {
 import { useTranslations } from "next-intl";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -148,6 +149,13 @@ export function PluginsPanel({
             <div className="flex items-center gap-2">
               <span className="truncate font-medium text-sm">{plugin.manifestName ?? plugin.name}</span>
               {plugin.version && <span className="text-muted-foreground text-xs">v{plugin.version}</span>}
+              {/* Gate on `=== false`: an older server binary omits the field, and
+                  absent must read as compatible, not incompatible. */}
+              {plugin.compatible === false && (
+                <Badge variant="destructive" title={plugin.incompatibleReason}>
+                  {t("incompatible")}
+                </Badge>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {plugin.roles.includes("agent") && (
