@@ -46,6 +46,7 @@
     },
     "stats": {
       "title": "Statistiques",
+      "empty": "Aucune exécution terminée sur les {days} derniers jours — lancez un agent sur une carte et les stats apparaîtront ici.",
       "runs": "Exécutions ({days} j)",
       "successRate": "Taux de succès ({days} j)",
       "cost": "Coût ({days} j)",

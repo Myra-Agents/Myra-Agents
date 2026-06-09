@@ -46,6 +46,7 @@
     },
     "stats": {
       "title": "Statistics",
+      "empty": "No finished run in the last {days} days — launch an agent on a card and stats will show up here.",
       "runs": "Runs ({days}d)",
       "successRate": "Success rate ({days}d)",
       "cost": "Cost ({days}d)",

@@ -293,8 +293,14 @@ function StatsSection({ cards }: { cards: KanbanCard[] }) {
   const t = useTranslations("home.stats");
   const { daily, kpis } = useMemo(() => buildStats(cards), [cards]);
 
-  // No finished run in the chart window → nothing worth plotting.
-  if (!daily.some((d) => d.completed + d.failed > 0)) return null;
+  // No finished run in the chart window → placeholder instead of flat charts.
+  if (!daily.some((d) => d.completed + d.failed > 0)) {
+    return (
+      <Section icon={BarChart3Icon} title={t("title")} count={0}>
+        <SectionEmpty label={t("empty", { days: CHART_DAYS })} />
+      </Section>
+    );
+  }
 
   const runsConfig = {
     completed: { label: t("completed"), color: "var(--chart-1)" },
