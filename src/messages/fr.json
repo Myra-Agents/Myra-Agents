@@ -670,7 +670,13 @@
     "flags": {
       "--dangerously-skip-permissions": "Ignorer les permissions (dangereux)",
       "--share": "Partager la session",
-      "--thinking": "Afficher la réflexion"
-    }
+      "--thinking": "Afficher la réflexion",
+      "--model": "Modèle",
+      "--variant": "Effort"
+    },
+    "defaultOption": "Par défaut",
+    "searchModels": "Rechercher un modèle…",
+    "loadingModels": "Chargement des modèles…",
+    "noModelFound": "Aucun modèle trouvé"
   }
 }
