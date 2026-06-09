@@ -670,7 +670,13 @@
     "flags": {
       "--dangerously-skip-permissions": "Skip permissions (dangerous)",
       "--share": "Share the session",
-      "--thinking": "Show thinking"
-    }
+      "--thinking": "Show thinking",
+      "--model": "Model",
+      "--variant": "Effort"
+    },
+    "defaultOption": "Default",
+    "searchModels": "Search models…",
+    "loadingModels": "Loading models…",
+    "noModelFound": "No model found"
   }
 }
