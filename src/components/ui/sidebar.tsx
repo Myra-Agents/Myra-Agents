@@ -316,8 +316,9 @@ function Sidebar({
         onClickCapture={isPeeking ? () => setPeek(false) : undefined}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-150 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
-          // Hover-peek: float a narrower panel back in, above the content.
-          "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
+          // Peek: float a narrower panel back in, above the content. The p-2
+          // detaches it from the window edges whatever the variant.
+          "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) group-data-[peek=true]:p-2 group-data-[peek=true]:border-r-0 data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"

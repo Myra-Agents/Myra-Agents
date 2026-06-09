@@ -71,7 +71,7 @@ export const PREFERENCE_DEFAULTS: PreferenceValueMap = {
   font: "lato",
   content_layout: "full-width",
   navbar_style: "sticky",
-  sidebar_variant: "inset",
+  sidebar_variant: "sidebar",
   sidebar_collapsible: "offcanvas",
 };
 

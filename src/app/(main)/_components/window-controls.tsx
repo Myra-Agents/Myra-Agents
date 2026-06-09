@@ -173,7 +173,7 @@ export function MacSidebarControls() {
   };
 
   return (
-    <div aria-hidden="true" className="h-9" onMouseDown={startDragging} onDoubleClick={() => void toggleMaximize()} />
+    <div aria-hidden="true" className="h-10" onMouseDown={startDragging} onDoubleClick={() => void toggleMaximize()} />
   );
 }
 
