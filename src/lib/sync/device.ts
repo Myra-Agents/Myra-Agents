@@ -13,7 +13,7 @@
 
 import { sha256 } from "@noble/hashes/sha256";
 
-import { invoke, isTauri } from "@/lib/tauri";
+import { isTauri } from "@/lib/tauri";
 
 import { fromBase64, generateKeyPair, type KeyPair, publicKeyFor, toBase64 } from "./crypto";
 
@@ -37,14 +37,17 @@ export function deviceIdFor(publicKey: Uint8Array): string {
   return toHex(sha256(publicKey).subarray(0, 8));
 }
 
-async function keychainGet(key: string): Promise<string | null> {
-  return invoke<string | null>("keychain_get", { key });
+// E2E sync is disabled — the OS keychain layer it relied on was removed. These
+// wrappers throw so any stray call surfaces clearly instead of corrupting state.
+const SYNC_DISABLED = "E2E sync is disabled (OS keychain support was removed).";
+async function keychainGet(_key: string): Promise<string | null> {
+  throw new Error(SYNC_DISABLED);
 }
-async function keychainSet(key: string, value: string): Promise<void> {
-  await invoke<void>("keychain_set", { key, value });
+async function keychainSet(_key: string, _value: string): Promise<void> {
+  throw new Error(SYNC_DISABLED);
 }
-async function keychainDelete(key: string): Promise<void> {
-  await invoke<void>("keychain_delete", { key });
+async function keychainDelete(_key: string): Promise<void> {
+  throw new Error(SYNC_DISABLED);
 }
 
 function requireDesktop(): void {

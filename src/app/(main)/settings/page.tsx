@@ -17,12 +17,13 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
-import { HubStatusCard } from "@/components/settings/hub-status-card";
+// User connection disabled — hub status, remote access and cloud sync are off.
+// import { HubStatusCard } from "@/components/settings/hub-status-card";
 import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
 import { LocalServerPanel } from "@/components/settings/local-server-panel";
 import { PluginsPanel } from "@/components/settings/plugins-panel";
-import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
-import { SyncPanel } from "@/components/settings/sync-panel";
+// import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
+// import { SyncPanel } from "@/components/settings/sync-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEntitlement } from "@/hooks/use-entitlement";
+// import { useEntitlement } from "@/hooks/use-entitlement"; // user connection disabled
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -48,7 +49,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  const { isPro } = useEntitlement();
+  // const { isPro } = useEntitlement(); // user connection disabled
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
@@ -228,16 +229,18 @@ export default function SettingsPage() {
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
           <TabsTrigger value="integrations">{t("tabs.integrations")}</TabsTrigger>
-          <TabsTrigger value="sync">{t("tabs.sync")}</TabsTrigger>
+          {/* User connection disabled — cloud sync tab removed. */}
+          {/* <TabsTrigger value="sync">{t("tabs.sync")}</TabsTrigger> */}
           <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="hub" className="space-y-6">
-          {isPro && <HubStatusCard />}
+          {/* User connection disabled — hub status + remote access removed. */}
+          {/* {isPro && <HubStatusCard />} */}
           <ConnectionsPanel />
           {isTauri() && <LocalServerPanel />}
-          {isTauri() && isPro && <RemoteAccessPanel />}
+          {/* {isTauri() && isPro && <RemoteAccessPanel />} */}
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-6">
@@ -400,9 +403,11 @@ export default function SettingsPage() {
           <IntegrationsPanel />
         </TabsContent>
 
+        {/* User connection disabled — cloud sync panel removed.
         <TabsContent value="sync" className="space-y-6">
           <SyncPanel />
         </TabsContent>
+        */}
 
         <TabsContent value="plugins" className="space-y-6">
           <PluginsPanel

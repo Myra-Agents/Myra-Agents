@@ -2,14 +2,15 @@ import { HUB_ROUTES } from "@myra/shared";
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 
 import { parseGlobalId } from "@/lib/aggregate/global-id";
-import {
-  getAccount,
-  getValidSessionToken,
-  isAuthConfigured,
-  isAuthenticated,
-  refresh as refreshSession,
-  subscribe as subscribeAuth,
-} from "@/lib/auth/session";
+// User connection disabled — the managed cloud hub (auth-derived) is off.
+// import {
+//   getAccount,
+//   getValidSessionToken,
+//   isAuthConfigured,
+//   isAuthenticated,
+//   refresh as refreshSession,
+//   subscribe as subscribeAuth,
+// } from "@/lib/auth/session";
 import { browserTransport } from "@/lib/transport/browser";
 import { createHttpTransport } from "@/lib/transport/http";
 import { createHubClient, type HubClient } from "@/lib/transport/hub";
@@ -20,7 +21,8 @@ import type { Connection, ConnectionEntry, ConnectionStatus, HubRegistration } f
 
 /** The managed cloud hub's fixed id — its auth is owned by `lib/auth/session`. */
 const CLOUD_HUB_ID = "cloud";
-const CLOUD_HUB_URL = process.env.NEXT_PUBLIC_MYRA_HUB_URL?.replace(/\/$/, "") || "";
+// User connection disabled — the managed cloud hub URL is unused.
+// const CLOUD_HUB_URL = process.env.NEXT_PUBLIC_MYRA_HUB_URL?.replace(/\/$/, "") || "";
 
 /** Optional server URL baked at build time — seeds the local connection at a real Node server. */
 const SERVER_URL = process.env.NEXT_PUBLIC_MYRA_SERVER_URL?.trim();
@@ -73,10 +75,9 @@ class ConnectionManager {
 
   constructor() {
     this.loadRegistry();
-    // The cloud hub is derived from auth state, never persisted — sync it now
-    // and whenever the session changes (login / logout / refresh).
-    this.syncCloudHub();
-    subscribeAuth(() => this.syncCloudHub());
+    // User connection disabled — the auth-derived cloud hub is no longer synced.
+    // this.syncCloudHub();
+    // subscribeAuth(() => this.syncCloudHub());
   }
 
   // --- registry persistence -------------------------------------------------
@@ -294,38 +295,30 @@ class ConnectionManager {
     if (SERVER_URL || !isTauri()) return;
     try {
       const port = await tauriInvoke<number>("get_sidecar_port");
-      this.pointLocalAtPort(port, await this.localToken());
+      this.pointLocalAtPort(port);
     } catch (e) {
       console.error("[ConnectionManager] sidecar init failed:", e);
     }
   }
 
   /**
-   * The localhost bearer the desktop backend gates `/rpc` + `/events` with (kept
-   * in the OS keychain). `undefined` when running ungated (no keychain backend).
+   * Re-point the LOCAL connection at `http://127.0.0.1:<port>` and rebuild its
+   * transport. The local HTTP interface runs ungated (loopback only) — the
+   * keychain-backed bearer was removed.
    */
-  private async localToken(): Promise<string | undefined> {
-    try {
-      return (await tauriInvoke<string | null>("get_local_server_token")) ?? undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /** Re-point the LOCAL connection at `http://127.0.0.1:<port>` and rebuild its transport. */
-  private pointLocalAtPort(port: number, token?: string): void {
+  private pointLocalAtPort(port: number): void {
     const entry = this.entries.get(LOCAL_ID);
     if (!entry) return;
     const baseUrl = `http://127.0.0.1:${port}`;
-    // Always override any persisted (stale) port/token — they change per launch.
+    // Always override any persisted (stale) port — it changes per launch.
     const connection: Connection = {
       ...entry.connection,
       baseUrl,
       kind: "sidecar",
       status: "connecting",
-      auth: token ? { token } : undefined,
+      auth: undefined,
     };
-    this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl, token) });
+    this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl) });
     this.persist();
     this.emitTopology();
   }
@@ -340,7 +333,7 @@ class ConnectionManager {
     if (SERVER_URL || !isTauri()) return;
     try {
       const port = await tauriInvoke<number>("refresh_local_backend");
-      this.pointLocalAtPort(port, await this.localToken());
+      this.pointLocalAtPort(port);
     } catch (e) {
       console.error("[ConnectionManager] refreshLocal failed:", e);
     }
@@ -385,30 +378,34 @@ class ConnectionManager {
    * Reconcile the managed cloud hub with the auth session: add it (with a
    * dynamic-token client that refreshes on 401) when signed in, drop it when
    * signed out. Never persisted — auth is the single source of truth.
+   *
+   * User connection disabled — the whole cloud-hub sync is commented out. Restore
+   * it (and the auth imports above) from git history to bring back the managed
+   * cloud hub.
    */
-  private syncCloudHub(): void {
-    const shouldHave = CLOUD_HUB_URL.length > 0 && isAuthConfigured() && isAuthenticated();
-    const has = this.hubs.has(CLOUD_HUB_ID);
-    if (shouldHave && !has) {
-      const reg: HubRegistration = {
-        id: CLOUD_HUB_ID,
-        label: getAccount()?.email ?? "Myra Cloud",
-        baseUrl: CLOUD_HUB_URL,
-        token: "",
-      };
-      const client = createHubClient(CLOUD_HUB_URL, {
-        getToken: () => getValidSessionToken(),
-        onUnauthorized: () => refreshSession(),
-      });
-      this.hubs.set(CLOUD_HUB_ID, { reg, client });
-      this.hubsReady = undefined; // force re-expand on the next fan-out
-      this.expandHub(CLOUD_HUB_ID)
-        .then(() => this.emitTopology())
-        .catch((e) => console.error("[ConnectionManager] cloud hub expand failed:", e));
-    } else if (!shouldHave && has) {
-      this.removeHub(CLOUD_HUB_ID);
-    }
-  }
+  // private syncCloudHub(): void {
+  //   const shouldHave = CLOUD_HUB_URL.length > 0 && isAuthConfigured() && isAuthenticated();
+  //   const has = this.hubs.has(CLOUD_HUB_ID);
+  //   if (shouldHave && !has) {
+  //     const reg: HubRegistration = {
+  //       id: CLOUD_HUB_ID,
+  //       label: getAccount()?.email ?? "Myra Cloud",
+  //       baseUrl: CLOUD_HUB_URL,
+  //       token: "",
+  //     };
+  //     const client = createHubClient(CLOUD_HUB_URL, {
+  //       getToken: () => getValidSessionToken(),
+  //       onUnauthorized: () => refreshSession(),
+  //     });
+  //     this.hubs.set(CLOUD_HUB_ID, { reg, client });
+  //     this.hubsReady = undefined; // force re-expand on the next fan-out
+  //     this.expandHub(CLOUD_HUB_ID)
+  //       .then(() => this.emitTopology())
+  //       .catch((e) => console.error("[ConnectionManager] cloud hub expand failed:", e));
+  //   } else if (!shouldHave && has) {
+  //     this.removeHub(CLOUD_HUB_ID);
+  //   }
+  // }
 
   /** Registered hubs (one URL+token that expands into N instance connections). */
   listHubs(): HubRegistration[] {
