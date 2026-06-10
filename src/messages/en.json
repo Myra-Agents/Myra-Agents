@@ -722,6 +722,11 @@
     "defaultOption": "Default",
     "searchModels": "Search models…",
     "loadingModels": "Loading models…",
-    "noModelFound": "No model found"
+    "noModelFound": "No model found",
+    "modelFree": "free",
+    "modelCost": "${input} in · ${output} out /M",
+    "selectModel": "Select a model…",
+    "effortNeedsModel": "Select a model first",
+    "effortNoVariants": "This model has no effort variants"
   }
 }
