@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { AgentFlagDef, AgentFlagsResult, AgentModelCost, AgentModelsResult } from "@/types/settings";
@@ -379,30 +380,47 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
                 {t("allOptions")}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[26rem] p-0" align="start">
+            <PopoverContent className="w-72 p-0" align="start">
               <Command>
                 <CommandInput placeholder={t("searchOptions")} />
                 <CommandList>
                   <CommandEmpty>{t("noOptionFound")}</CommandEmpty>
                   <CommandGroup>
-                    {catalog.map((def) => {
-                      const selected = isSet(flags, def);
-                      return (
-                        <CommandItem
-                          key={def.flag}
-                          value={`${def.flag} ${def.hint}`}
-                          onSelect={() => setFlag(def, !selected)}
-                        >
-                          <CheckIcon className={cn("size-3.5", selected ? "opacity-100" : "opacity-0")} />
-                          <span className={cn("whitespace-nowrap font-mono text-xs", def.danger && "text-destructive")}>
-                            {def.flag}
-                          </span>
-                          <span className="ml-auto truncate text-[10px] text-muted-foreground" title={def.hint}>
-                            {def.hint}
-                          </span>
-                        </CommandItem>
-                      );
-                    })}
+                    <>
+                      {catalog.map((def) => {
+                        const selected = isSet(flags, def);
+                        return (
+                          <CommandItem
+                            key={def.flag}
+                            value={`${def.flag} ${def.hint}`}
+                            onSelect={() => setFlag(def, !selected)}
+                          >
+                            <Tooltip delayDuration={500}>
+                              {/* Trigger on an inner div: cmdk's Item overwrites the
+                                  onPointerMove prop radix relies on, so the item itself
+                                  can't be the trigger. Negative margins keep the whole
+                                  row as hover surface. */}
+                              <TooltipTrigger asChild>
+                                <div className="-mx-2 -my-1.5 flex w-full items-center gap-2 px-2 py-1.5">
+                                  <CheckIcon className={cn("size-3.5", selected ? "opacity-100" : "opacity-0")} />
+                                  <span
+                                    className={cn(
+                                      "whitespace-nowrap font-mono text-xs",
+                                      def.danger && "text-destructive",
+                                    )}
+                                  >
+                                    {def.flag}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" sideOffset={10}>
+                                {def.hint}
+                              </TooltipContent>
+                            </Tooltip>
+                          </CommandItem>
+                        );
+                      })}
+                    </>
                   </CommandGroup>
                 </CommandList>
               </Command>
