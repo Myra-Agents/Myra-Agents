@@ -723,6 +723,7 @@
     "searchModels": "Search models…",
     "loadingModels": "Loading models…",
     "noModelFound": "No model found",
+    "selectModel": "Select a model…",
     "effortNeedsModel": "Select a model first",
     "effortNoVariants": "This model has no effort variants"
   }

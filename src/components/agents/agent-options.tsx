@@ -40,7 +40,7 @@ function flagValue(flags: string[], def: AgentFlagDef): string {
   return eq >= 0 && token ? token.slice(eq + 1) : "";
 }
 
-/** Sentinel for "flag not set" in the dropdowns — model ids never collide with it. */
+/** Sentinel for "flag not set" in the effort dropdown (= the model's default effort). */
 const DEFAULT_VALUE = "__default__";
 
 /**
@@ -89,7 +89,9 @@ function ModelPicker({
     >
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="xs" title={def.flag} className="max-w-56">
-          <span className="truncate font-mono">{value || t("defaultOption")}</span>
+          <span className={cn("truncate", value ? "font-mono" : "text-muted-foreground")}>
+            {value || t("selectModel")}
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
@@ -98,16 +100,6 @@ function ModelPicker({
           <CommandList>
             <CommandEmpty>{models === null ? t("loadingModels") : t("noModelFound")}</CommandEmpty>
             <CommandGroup>
-              <CommandItem
-                value={DEFAULT_VALUE}
-                onSelect={() => {
-                  onChange("");
-                  setOpen(false);
-                }}
-              >
-                <CheckIcon className={cn("size-3.5", value === "" ? "opacity-100" : "opacity-0")} />
-                <span className="text-xs">{t("defaultOption")}</span>
-              </CommandItem>
               {(models ?? []).map((model) => (
                 <CommandItem
                   key={model}
