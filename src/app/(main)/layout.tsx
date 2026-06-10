@@ -13,7 +13,6 @@ import { GlobalShortcuts } from "./_components/global-shortcuts";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
-import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 import {
   HeaderSidebarTrigger,
   MacHeaderControlsSpacer,
@@ -70,7 +69,6 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
             <WindowDragRegion />
             <div className="flex items-center gap-2">
               {/* <LayoutControls /> */}
-              <ThemeSwitcher />
               <WindowControls />
             </div>
           </div>
