@@ -529,12 +529,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
     <li
       data-slot="sidebar-menu-item"
       data-sidebar="menu-item"
-      className={cn(
-        // Active indicator bar: lives on the <li> (no overflow clip), shown when
-        // the contained menu button is active. Sits in the left gutter.
-        "group/menu-item relative before:pointer-events-none before:absolute before:inset-y-1.5 before:-left-2 before:w-1 before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity before:content-[''] has-data-[active=true]:before:opacity-100",
-        className,
-      )}
+      className={cn("group/menu-item relative", className)}
       {...props}
     />
   )
@@ -600,7 +595,7 @@ function SidebarMenuButton({
   }
 
   return (
-    <Tooltip>
+    <Tooltip delayDuration={2000}>
       <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent
         side="right"
