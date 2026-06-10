@@ -15,6 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
@@ -30,6 +31,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations("nav");
   const router = useRouter();
   const requestNewCard = useShortcutStore((s) => s.requestNewCard);
+  const { peek } = useSidebar();
 
   const handleNewCard = () => {
     router.push("/kanban");
@@ -56,7 +58,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     >
       <div className="flex h-10 shrink-0 items-center pl-2">
         <MacSidebarControls />
-        <SidebarTrigger />
+        {/* Docked wide, the sidebar shows no toggle (⌘B still works); the
+            trigger only appears in the peek overlay to close it in place. */}
+        {peek && <SidebarTrigger />}
       </div>
       <SidebarHeader>
         <SidebarMenu>
