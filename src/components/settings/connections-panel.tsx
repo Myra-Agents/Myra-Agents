@@ -54,17 +54,21 @@ export function ConnectionsPanel() {
     }
   };
 
-  // Poll every 30s while the panel is open so statuses, reported versions and
-  // the update badge stay live without a manual click. The latest-release check
-  // honors its own 6h cache (won't blow GitHub's 60 req/hr limit); only the
-  // connection refresh actually runs every tick. Pause while the window is
-  // hidden (e.g. minimized to the tray) to avoid needless work.
+  // Probe once on mount, then every 30s while the panel is open, so statuses,
+  // reported versions and the update badge stay live without a manual click.
+  // The immediate tick matters: persisted statuses can be stale (e.g. local
+  // restored as "connecting"), and the first interval tick is 30s away. The
+  // latest-release check honors its own 6h cache (won't blow GitHub's
+  // 60 req/hr limit); only the connection refresh actually runs every tick.
+  // Pause while the window is hidden (e.g. minimized to the tray) to avoid
+  // needless work.
   useEffect(() => {
     const tick = () => {
       if (typeof document !== "undefined" && document.hidden) return;
       void refresh();
       void refreshLatest();
     };
+    tick();
     const id = window.setInterval(tick, 30_000);
     return () => window.clearInterval(id);
   }, [refresh, refreshLatest]);
