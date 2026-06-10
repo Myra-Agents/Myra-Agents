@@ -10,6 +10,7 @@ import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
 
 import { GlobalShortcuts } from "./_components/global-shortcuts";
+import { TrayActionListener } from "./_components/tray-action-listener";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
@@ -42,6 +43,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       }
     >
       <GlobalShortcuts />
+      <TrayActionListener />
       <AppSidebar variant={variant} collapsible={collapsible} />
       <SidebarInset
         className={cn(

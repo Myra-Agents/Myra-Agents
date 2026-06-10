@@ -13,7 +13,7 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
-use tray::TrayState;
+use tray::{hide_tray_popover, open_main, quit_app, TrayState};
 
 /// Buffer for a `myra://auth/callback?code=…` that arrives before the webview's
 /// listener is ready (the deep link can launch/focus the app first). The
@@ -635,7 +635,10 @@ pub fn run() {
             remote_access_status,
             start_login,
             take_pending_auth_code,
-            open_devtools
+            open_devtools,
+            hide_tray_popover,
+            open_main,
+            quit_app
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
