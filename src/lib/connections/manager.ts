@@ -32,8 +32,11 @@ const STORAGE_KEY = "myra.connections";
 
 const LOCAL_ID = "local";
 
+/** Persisted connections carry no runtime `status` — it is re-derived on load. */
+type PersistedConnection = Omit<Connection, "status">;
+
 interface PersistedRegistry {
-  connections: Connection[];
+  connections: PersistedConnection[];
   primaryId: string;
   hubs?: HubRegistration[];
 }
@@ -87,7 +90,10 @@ class ConnectionManager {
     if (persisted && persisted.connections.length > 0) {
       for (const conn of persisted.connections) {
         if (conn.kind === "hub-instance") continue; // rebuilt from hubs in ensureHubs
-        this.entries.set(conn.id, { connection: conn, transport: this.buildTransport(conn) });
+        // Status is runtime state (older payloads may still carry a stale one) —
+        // always restart at "connecting"; health probes flip it from there.
+        const connection: Connection = { ...conn, status: "connecting" };
+        this.entries.set(connection.id, { connection, transport: this.buildTransport(connection) });
       }
       for (const reg of persisted.hubs ?? []) {
         if (reg.id === CLOUD_HUB_ID) continue; // re-derived from auth, not persisted
@@ -120,7 +126,9 @@ class ConnectionManager {
   private persist(): void {
     if (typeof localStorage === "undefined") return;
     const payload: PersistedRegistry = {
-      connections: this.list().filter((c) => c.kind !== "hub-instance"), // hub-instances are rebuilt from hubs
+      connections: this.list()
+        .filter((c) => c.kind !== "hub-instance") // hub-instances are rebuilt from hubs
+        .map(({ status: _status, ...rest }) => rest), // status is runtime state, never persisted
       primaryId: this.primaryConnId,
       // The cloud hub is derived from auth state (syncCloudHub), never persisted.
       hubs: [...this.hubs.values()].map((h) => h.reg).filter((reg) => reg.id !== CLOUD_HUB_ID),
