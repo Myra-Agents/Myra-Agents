@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { isTauri } from "@/lib/tauri";
 
 async function getCurrentTauriWindow() {
@@ -173,7 +174,12 @@ export function MacSidebarControls() {
   };
 
   return (
-    <div aria-hidden="true" className="h-10" onMouseDown={startDragging} onDoubleClick={() => void toggleMaximize()} />
+    <div
+      aria-hidden="true"
+      className="h-10 w-19 shrink-0"
+      onMouseDown={startDragging}
+      onDoubleClick={() => void toggleMaximize()}
+    />
   );
 }
 
@@ -184,17 +190,37 @@ export function MacSidebarControls() {
  */
 export function MacHeaderControlsSpacer() {
   const { isAvailable, isMac } = useWindowControls();
-  const { state, isMobile } = useSidebar();
+  const { state } = useSidebar();
 
   if (!isAvailable || !isMac) return null;
-  // Only the docked, expanded sidebar hosts the lights itself; in every
-  // other layout (collapsed offcanvas, mobile sheet) they sit over the
-  // content header, so reserve their footprint here.
-  if (!isMobile && state === "expanded") return null;
+  // The docked, expanded sidebar hosts the lights itself; whenever it is
+  // hidden they sit over the content header, so reserve their footprint here.
+  if (state === "expanded") return null;
 
   // Lights span x:18 -> ~70px from the window edge; the header has 12px of
   // padding, so 72px here puts the first control at ~84px with clear margin.
   return <div aria-hidden="true" className="w-18 shrink-0" />;
+}
+
+/**
+ * Header-side sidebar toggle: rendered only while the sidebar is hidden, so
+ * the toggle lives in one screen position — inside the sidebar when it's
+ * visible, in the content header (same spot) when it's not.
+ */
+export function HeaderSidebarTrigger() {
+  const { state } = useSidebar();
+
+  if (state === "expanded") return null;
+
+  return (
+    <>
+      <SidebarTrigger />
+      <Separator
+        orientation="vertical"
+        className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
+      />
+    </>
+  );
 }
 
 /** Windows/Linux window controls, rendered on the right of the header. Hidden on macOS. */

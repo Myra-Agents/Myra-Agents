@@ -9,13 +9,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -27,7 +20,6 @@ import { PanelLeftIcon } from "lucide-react"
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 // Hover-peek floats a narrower, denser panel than the docked sidebar.
 const SIDEBAR_WIDTH_PEEK = "14rem"
@@ -112,10 +104,9 @@ function SidebarProvider({
   // Helper to toggle the sidebar. On a narrow window the dock is forced
   // collapsed, so the trigger toggles the peek overlay instead.
   const toggleSidebar = React.useCallback(() => {
-    if (isMobile) return setOpenMobile((open) => !open)
     if (isNarrow) return setPeek((peek) => !peek)
     return setOpen((open) => !open)
-  }, [isMobile, isNarrow, setOpen, setOpenMobile])
+  }, [isNarrow, setOpen])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -133,24 +124,20 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
 
-  // Auto-collapse when the window gets too narrow to share the width with
-  // the content; re-expand only if the collapse was automatic.
-  const wasAutoCollapsed = React.useRef(false)
+  // Narrow window forces the dock collapsed (peek takes over). Crossing back
+  // to wide — including maximizing — always brings the docked sidebar back,
+  // while still allowing a manual collapse on a wide window.
+  const prevNarrow = React.useRef(isNarrow)
   React.useEffect(() => {
-    if (isMobile) return
+    const wasNarrow = prevNarrow.current
+    prevNarrow.current = isNarrow
     if (isNarrow) {
-      if (open) {
-        wasAutoCollapsed.current = true
-        setOpen(false)
-      }
-    } else {
+      if (open) setOpen(false)
+    } else if (wasNarrow) {
       setPeek(false)
-      if (wasAutoCollapsed.current) {
-        wasAutoCollapsed.current = false
-        setOpen(true)
-      }
+      setOpen(true)
     }
-  }, [isMobile, isNarrow, open, setOpen])
+  }, [isNarrow, open, setOpen])
 
   // The peek overlay only makes sense while the dock is collapsed.
   React.useEffect(() => {
@@ -207,15 +194,13 @@ function Sidebar({
   collapsible = "offcanvas",
   className,
   children,
-  dir,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile, peek, setPeek } =
-    useSidebar()
+  const { state, peek, setPeek } = useSidebar()
 
   // Peek (offcanvas only): the trigger floats the collapsed sidebar back in
   // as an overlay without reflowing the content. Escape or a click outside
@@ -261,35 +246,11 @@ function Sidebar({
     )
   }
 
-  if (isMobile) {
-    return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          dir={dir}
-          data-sidebar="sidebar"
-          data-slot="sidebar"
-          data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-          style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
-    )
-  }
-
+  // No mobile Sheet: every narrow width uses the same collapsed-dock + peek
+  // overlay, so the behaviour is identical across breakpoints.
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className="group peer block text-sidebar-foreground"
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
@@ -313,9 +274,17 @@ function Sidebar({
         ref={containerRef}
         data-slot="sidebar-container"
         data-side={side}
-        onClickCapture={isPeeking ? () => setPeek(false) : undefined}
+        onClickCapture={
+          isPeeking
+            ? (event) => {
+                // The in-sidebar trigger toggles the peek itself.
+                if ((event.target as HTMLElement).closest('[data-slot="sidebar-trigger"]')) return
+                setPeek(false)
+              }
+            : undefined
+        }
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-150 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "fixed inset-y-0 z-10 flex h-svh w-(--sidebar-width) transition-[left,right,width] duration-150 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
           // Peek: float a narrower panel back in, above the content. The p-2
           // detaches it from the window edges whatever the variant.
           "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) group-data-[peek=true]:p-2 group-data-[peek=true]:border-r-0 data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
