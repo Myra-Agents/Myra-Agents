@@ -261,7 +261,7 @@ function Sidebar({
       {isPeeking && (
         <div
           data-slot="sidebar-peek-backdrop"
-          className="fade-in-0 fixed inset-0 z-50 animate-in bg-black/20 backdrop-blur-[2px] duration-150"
+          className="fade-in-0 fixed inset-0 z-[55] animate-in bg-black/20 backdrop-blur-[2px] duration-150"
           onClick={() => setPeek(false)}
         />
       )}
