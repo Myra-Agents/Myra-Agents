@@ -14,24 +14,51 @@ async function getCurrentTauriWindow() {
   return getCurrentWindow();
 }
 
+type Platform = "mac" | "windows" | "linux" | "other";
+
+const VALID_PLATFORMS: Platform[] = ["mac", "windows", "linux", "other"];
+
+function detectPlatform(): Platform {
+  if (typeof navigator === "undefined") return "other";
+  // Dev override: localStorage.setItem('myra:dev:platform', 'windows') then reload
+  if (process.env.NODE_ENV === "development" && typeof localStorage !== "undefined") {
+    const override = localStorage.getItem("myra:dev:platform") as Platform | null;
+    if (override && VALID_PLATFORMS.includes(override)) return override;
+  }
+  const ua = navigator.userAgent;
+  if (/Mac|iPhone|iPad|iPod/i.test(ua)) return "mac";
+  if (/Win/i.test(ua)) return "windows";
+  if (/Linux/i.test(ua)) return "linux";
+  return "other";
+}
+
 function detectMac(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  return detectPlatform() === "mac";
 }
 
 /** Shared window-control state + actions for the custom (decoration-less) titlebar. */
 function useWindowControls() {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isMac, setIsMac] = useState(false);
+  const [platform, setPlatform] = useState<Platform>("other");
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    const p = detectPlatform();
+    const hasDevOverride =
+      process.env.NODE_ENV === "development" &&
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("myra:dev:platform") !== null;
+
+    if (!isTauri() && !hasDevOverride) return;
 
     let disposed = false;
     let unlistenResized: (() => void) | undefined;
     setIsAvailable(true);
-    setIsMac(detectMac());
+    setIsMac(p === "mac");
+    setPlatform(p);
+
+    if (!isTauri()) return;
 
     getCurrentTauriWindow()
       .then(async (appWindow) => {
@@ -94,7 +121,7 @@ function useWindowControls() {
     }
   };
 
-  return { isAvailable, isMac, isMaximized, minimize, toggleMaximize, close };
+  return { isAvailable, isMac, platform, isMaximized, minimize, toggleMaximize, close };
 }
 
 export function WindowDragRegion() {
@@ -203,18 +230,20 @@ export function MacHeaderControlsSpacer() {
 }
 
 /**
- * Header-side sidebar toggle: rendered only while the sidebar is hidden, so
- * the toggle lives in one screen position — inside the sidebar when it's
- * visible, in the content header (same spot) when it's not.
+ * Header-side sidebar toggle — the only toggle in the UI (the sidebar itself
+ * carries none), always visible in the top bar. On a narrow window simply
+ * hovering the icon opens the peek overlay; leaving the panel closes it.
  */
 export function HeaderSidebarTrigger() {
-  const { state } = useSidebar();
-
-  if (state === "expanded") return null;
+  const { state, isNarrow, peek, setPeek } = useSidebar();
 
   return (
     <>
-      <SidebarTrigger />
+      <SidebarTrigger
+        onMouseEnter={() => {
+          if (isNarrow && state === "collapsed" && !peek) setPeek(true);
+        }}
+      />
       <Separator
         orientation="vertical"
         className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
@@ -223,12 +252,126 @@ export function HeaderSidebarTrigger() {
   );
 }
 
-/** Windows/Linux window controls, rendered on the right of the header. Hidden on macOS. */
+/** Windows 11-style controls: full-height flat buttons, red hover on close. */
+function WindowControlsWindows({
+  isMaximized,
+  minimize,
+  toggleMaximize,
+  close,
+}: {
+  isMaximized: boolean;
+  minimize: () => void;
+  toggleMaximize: () => void;
+  close: () => void;
+}) {
+  return (
+    <div className="flex h-full items-stretch">
+      <button
+        aria-label="Minimize window"
+        className="flex h-full w-[46px] items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        onClick={minimize}
+        title="Minimize"
+        type="button"
+      >
+        <Minus className="h-3 w-3" strokeWidth={1.5} />
+      </button>
+      <button
+        aria-label={isMaximized ? "Restore window" : "Maximize window"}
+        className="flex h-full w-[46px] items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        onClick={toggleMaximize}
+        title={isMaximized ? "Restore" : "Maximize"}
+        type="button"
+      >
+        {isMaximized ? (
+          <Minimize2 className="h-3 w-3" strokeWidth={1.5} />
+        ) : (
+          <Maximize2 className="h-3 w-3" strokeWidth={1.5} />
+        )}
+      </button>
+      <button
+        aria-label="Close window"
+        className="flex h-full w-[46px] items-center justify-center text-muted-foreground transition-colors hover:bg-red-500 hover:text-white"
+        onClick={close}
+        title="Close"
+        type="button"
+      >
+        <X className="h-3 w-3" strokeWidth={1.5} />
+      </button>
+    </div>
+  );
+}
+
+/** Linux (GNOME-style) controls: colored circles on the right. */
+function WindowControlsLinux({
+  isMaximized,
+  minimize,
+  toggleMaximize,
+  close,
+}: {
+  isMaximized: boolean;
+  minimize: () => void;
+  toggleMaximize: () => void;
+  close: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 pl-2">
+      <button
+        aria-label="Minimize window"
+        className="flex h-3.5 w-3.5 items-center justify-center rounded-full transition-opacity hover:opacity-80 active:opacity-60"
+        onClick={minimize}
+        style={{ background: "#e5a50a" }}
+        title="Minimize"
+        type="button"
+      />
+      <button
+        aria-label={isMaximized ? "Restore window" : "Maximize window"}
+        className="flex h-3.5 w-3.5 items-center justify-center rounded-full transition-opacity hover:opacity-80 active:opacity-60"
+        onClick={toggleMaximize}
+        style={{ background: "#33d17a" }}
+        title={isMaximized ? "Restore" : "Maximize"}
+        type="button"
+      />
+      <button
+        aria-label="Close window"
+        className="flex h-3.5 w-3.5 items-center justify-center rounded-full transition-opacity hover:opacity-80 active:opacity-60"
+        onClick={close}
+        style={{ background: "#f66151" }}
+        title="Close"
+        type="button"
+      />
+    </div>
+  );
+}
+
+/** Window controls rendered on the right of the header. Hidden on macOS. */
 export function WindowControls() {
-  const { isAvailable, isMac, isMaximized, minimize, toggleMaximize, close } = useWindowControls();
+  const { isAvailable, isMac, platform, isMaximized, minimize, toggleMaximize, close } = useWindowControls();
 
   if (!isAvailable || isMac) return null;
 
+  if (platform === "windows") {
+    return (
+      <WindowControlsWindows
+        isMaximized={isMaximized}
+        minimize={minimize}
+        toggleMaximize={toggleMaximize}
+        close={close}
+      />
+    );
+  }
+
+  if (platform === "linux") {
+    return (
+      <WindowControlsLinux
+        isMaximized={isMaximized}
+        minimize={minimize}
+        toggleMaximize={toggleMaximize}
+        close={close}
+      />
+    );
+  }
+
+  // Fallback générique (autre OS)
   return (
     <div className="flex items-center gap-1 border-l pl-2">
       <Button
