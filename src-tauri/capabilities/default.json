@@ -16,6 +16,7 @@
     "core:window:allow-set-focus",
     "deep-link:default",
     "dialog:default",
+    "log:default",
     "opener:allow-open-url",
     "opener:allow-default-urls",
     {

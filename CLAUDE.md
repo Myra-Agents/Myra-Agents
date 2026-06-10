@@ -109,6 +109,13 @@ in one `generate_handler!` block. **Any new command must be added there.** The
 Rust side is now thin: window/tray, OS helpers, and sidecar lifecycle. The board
 data + agent execution are served by the sidecar.
 
+**Logging:** `tauri-plugin-log` is registered first in the builder (so early
+logs are captured), with three targets — Stdout, **LogDir** (persistent file),
+and Webview. Emit from Rust with the `log` crate macros (`log::info!` etc.), not
+`println!`/`eprintln!`, or it won't reach the file. Sidecar output is logged
+under the `myra-server` target. File: `~/Library/Logs/com.myra-agents.app/Myra
+Agents.log` on macOS (`log:default` permission in `capabilities/default.json`).
+
 ### Frontend (`src/`)
 
 - `app/(main)/` routes: `kanban`, `schedules`, `planner`, `logs`, `settings`
