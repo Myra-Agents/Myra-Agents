@@ -25,16 +25,35 @@ export interface NavGroup {
   items: NavMainItem[];
 }
 
+// Sidebar organized Linear-style: a label-less personal section on top,
+// then collapsible labeled scopes below (workspace-wide first, then per-team).
 export const sidebarItems: NavGroup[] = [
   {
+    // Personal section — no label, always visible (Linear's Inbox / My issues row).
     id: 1,
-    label: "Workspace",
     items: [
       {
         title: "Home",
         url: "/",
         icon: House,
       },
+      // {
+      //   title: "Inbox",
+      //   url: "/inbox",
+      //   icon: Inbox, // lucide: Inbox — agent results awaiting attention, with unread count badge
+      // },
+      // {
+      //   title: "My cards",
+      //   url: "/my-cards",
+      //   icon: SquareUser, // lucide: SquareUser — cards assigned to me across boards
+      // },
+    ],
+  },
+  {
+    // Workspace scope — everything org/app-wide.
+    id: 2,
+    label: "Workspace",
+    items: [
       {
         title: "Kanban",
         url: "/kanban",
@@ -56,6 +75,40 @@ export const sidebarItems: NavGroup[] = [
         url: "/logs",
         icon: ScrollText,
       },
+      // {
+      //   title: "Views",
+      //   url: "/views",
+      //   icon: Layers2, // lucide: Layers2 — saved filtered views of cards (Linear's "Views")
+      // },
     ],
   },
+  // {
+  //   // Per-board scope — one entry per connected board, each with its own subtree
+  //   // (Linear's "Your teams" pattern: team name collapses to Issues / Projects / Views).
+  //   id: 3,
+  //   label: "Your boards",
+  //   items: [
+  //     {
+  //       title: "Local",
+  //       url: "/boards/local",
+  //       icon: HardDrive, // lucide: HardDrive — the sidecar-served local board
+  //       subItems: [
+  //         { title: "Cards", url: "/boards/local/cards", icon: Kanban },
+  //         { title: "Schedules", url: "/boards/local/schedules", icon: Calendar },
+  //         { title: "Logs", url: "/boards/local/logs", icon: ScrollText },
+  //       ],
+  //     },
+  //   ],
+  // },
+  // {
+  //   // Onboarding section — shown to new users, dismissed once configured
+  //   // (Linear's "Try" pattern: Import issues / Invite people / Connect Cursor).
+  //   id: 4,
+  //   label: "Get started",
+  //   items: [
+  //     { title: "Connect an agent", url: "/settings/agents", icon: Bot },       // lucide: Bot
+  //     { title: "Import cards", url: "/settings/import", icon: FileInput },     // lucide: FileInput
+  //     { title: "Connect a board", url: "/settings/connections", icon: Plug },  // lucide: Plug
+  //   ],
+  // },
 ];
