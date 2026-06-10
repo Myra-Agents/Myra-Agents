@@ -25,7 +25,12 @@ jobs:
         include:
           - platform: macos-14 # Apple Silicon
             target: aarch64-apple-darwin
-          - platform: macos-13 # Intel
+          # GitHub retired its Intel macOS hosted runner; x86_64 is built on our
+          # self-hosted Apple Silicon Mac (label `myra-x64`, see runner.sh in the
+          # dev workspace). Tauri cross-compiles the Rust shell to x86_64, and the
+          # bundled sidecar is forced to this target via MYRA_SERVER_TRIPLE below
+          # (otherwise build-sidecar.mjs would fetch the host's arm64 binary).
+          - platform: myra-x64 # self-hosted Apple Silicon, cross-builds x86_64
             target: x86_64-apple-darwin
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -36,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           submodules: recursive
@@ -78,6 +83,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # build-sidecar.mjs reads server-version.json; override here if needed.
+          # Pin the bundled sidecar to the BUILD target, not the runner host —
+          # required when cross-compiling x86_64 on the Apple Silicon self-hosted
+          # runner (otherwise it would download the arm64 sidecar). Harmless on
+          # native rows where the target already equals the host triple.
+          MYRA_SERVER_TRIPLE: ${{ matrix.target }}
           #
           # macOS code signing + notarization (no-ops on Linux/Windows and on
           # forks where the secrets are absent — the build just stays unsigned).

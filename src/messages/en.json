@@ -14,8 +14,61 @@
     "noResults": "No results",
     "version": "Version"
   },
+  "home": {
+    "title": "Overview",
+    "loading": "Loading...",
+    "newTask": "New Task",
+    "viewAll": "View all",
+    "empty": {
+      "title": "Nothing here yet",
+      "body": "Create your first task and launch an agent on it — everything happening will show up here.",
+      "cta": "Create a task"
+    },
+    "attention": {
+      "title": "Needs your attention",
+      "question": "Question",
+      "review": "Review",
+      "empty": "Nothing waiting on you."
+    },
+    "running": {
+      "title": "Running now",
+      "running": "Running",
+      "queued": "Queued",
+      "empty": "No agent running."
+    },
+    "upcoming": {
+      "title": "Up next today",
+      "empty": "No schedule due today."
+    },
+    "recent": {
+      "title": "Recent activity",
+      "empty": "No runs yet."
+    },
+    "stats": {
+      "title": "Statistics",
+      "empty": "No finished run in the last {days} days — launch an agent on a card and stats will show up here.",
+      "runs": "Runs ({days}d)",
+      "successRate": "Success rate ({days}d)",
+      "cost": "Cost ({days}d)",
+      "avgDuration": "Avg duration ({days}d)",
+      "runsPerDay": "Runs per day — last {days} days",
+      "costPerDay": "Cost per day — last {days} days",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "health": {
+      "server": "Server",
+      "serverRunning": "Local server running on port {port}",
+      "serverStopped": "Local server stopped",
+      "hub": "Hub",
+      "hubOnline": "Hub online — {count} connected machine(s)",
+      "hubOffline": "Hub unreachable",
+      "hubChecking": "Checking hub..."
+    }
+  },
   "nav": {
-    "newCard": "New Card",
+    "newCard": "New Task",
+    "home": "Home",
     "workspace": "Workspace",
     "configuration": "Configuration",
     "kanban": "Kanban",
@@ -53,10 +106,10 @@
       "trashed": "Trash"
     },
     "card": {
-      "addCard": "Add card",
-      "editCard": "Edit card",
-      "deleteCard": "Delete card",
-      "restoreCard": "Restore card",
+      "addCard": "Add task",
+      "editCard": "Edit task",
+      "deleteCard": "Delete task",
+      "restoreCard": "Restore task",
       "moveToTrash": "Move to trash",
       "launchAgent": "Launch agent",
       "cancelAgent": "Cancel agent",
@@ -93,7 +146,7 @@
     },
     "loading": "Loading board…",
     "filters": {
-      "searchPlaceholder": "Search cards, prompts, tags...",
+      "searchPlaceholder": "Search tasks, prompts, tags...",
       "status": "Status",
       "allStatuses": "All columns",
       "agent": "Agent",
@@ -107,13 +160,13 @@
       "activeOnly": "Active agents",
       "tagsMatchAny": "Tags",
       "clear": "Clear",
-      "showing": "Showing {visible} of {total} cards"
+      "showing": "Showing {visible} of {total} tasks"
     },
     "cardModal": {
-      "newTitle": "New Card",
-      "editTitle": "Edit Card",
+      "newTitle": "New Task",
+      "editTitle": "Edit Task",
       "newDescription": "Add a new task to the board.",
-      "editDescription": "Update card details.",
+      "editDescription": "Update task details.",
       "title": "Title",
       "titlePlaceholder": "e.g. Update npm dependencies",
       "column": "Column",
@@ -160,25 +213,25 @@
       "export": "Export",
       "trash": "Trash",
       "clear": "Clear",
-      "noMovable": "No selected cards can move to that column.",
-      "noLaunchable": "No selected cards can be launched.",
-      "moved": "Moved {count} card(s). {skipped} skipped.",
-      "tagged": "Tagged {count} card(s) with {tag}.",
-      "launched": "Launched {count} card(s). {skipped} skipped.",
-      "trashed": "Moved {count} card(s) to trash."
+      "noMovable": "No selected tasks can move to that column.",
+      "noLaunchable": "No selected tasks can be launched.",
+      "moved": "Moved {count} task(s). {skipped} skipped.",
+      "tagged": "Tagged {count} task(s) with {tag}.",
+      "launched": "Launched {count} task(s). {skipped} skipped.",
+      "trashed": "Moved {count} task(s) to trash."
     },
     "columnsMenu": {
       "title": "Columns",
       "description": "Show, hide, or rename board columns.",
       "showColumn": "Show {column}",
       "labelPlaceholder": "{column} label",
-      "attentionProtected": "Columns with cards needing attention stay visible.",
+      "attentionProtected": "Columns with tasks needing attention stay visible.",
       "reset": "Reset columns"
     },
     "toast": {
       "queued": "Agent queued — waiting for a free slot.",
       "canceled": "Agent canceled.",
-      "trashed": "Card moved to trash.",
+      "trashed": "Task moved to trash.",
       "undo": "Undo"
     }
   },
@@ -202,8 +255,8 @@
     },
     "form": {
       "name": "Name",
-      "cardTitle": "Card title",
-      "cardDescription": "Card description",
+      "cardTitle": "Task title",
+      "cardDescription": "Task description",
       "agentPrompt": "Agent prompt",
       "tags": "Tags",
       "scheduleKind": "Schedule type",
@@ -216,7 +269,7 @@
       "scheduleName": "Schedule Name",
       "scheduleNamePlaceholder": "e.g. Daily code review",
       "description": "Description",
-      "cardTitlePlaceholder": "Title of the generated card",
+      "cardTitlePlaceholder": "Title of the generated task",
       "tagsPlaceholder": "infra, daily",
       "cronPlaceholder": "0 9 * * 1-5"
     },
@@ -241,6 +294,44 @@
       "fri": "Fri",
       "sat": "Sat",
       "sun": "Sun"
+    },
+    "ideas": {
+      "heading": "More ideas",
+      "dailyBrief": {
+        "label": "Daily brief",
+        "name": "Daily brief",
+        "cardTitle": "Daily brief",
+        "description": "Morning summary of overnight repo activity and the board.",
+        "prompt": "Summarize what changed in the repo since yesterday: new commits, open PRs, failing checks, and any cards waiting on me. Keep it to a short bulleted brief."
+      },
+      "standupPrep": {
+        "label": "Scrum daily prep",
+        "name": "Scrum daily prep",
+        "cardTitle": "Scrum daily prep",
+        "description": "Talking points for the daily standup, ready before the meeting.",
+        "prompt": "Prepare my daily scrum standup notes in three sections: Yesterday (commits I pushed and cards I moved to Done), Today (cards in In Progress and Todo I plan to work on), Blockers (cards stuck in Waiting Feedback or Awaiting Review, and any failing checks). Keep each point one short line."
+      },
+      "weeklyReview": {
+        "label": "Weekly review",
+        "name": "Weekly review",
+        "cardTitle": "Weekly review",
+        "description": "End-of-week board review and stale-card cleanup.",
+        "prompt": "Review the Kanban board: list cards that haven't moved in over a week, flag anything stuck in Waiting Feedback or Awaiting Review, and propose next steps for each."
+      },
+      "depUpdates": {
+        "label": "Dependency updates",
+        "name": "Dependency updates",
+        "cardTitle": "Dependency updates",
+        "description": "Check for outdated dependencies and propose bumps.",
+        "prompt": "Check for outdated dependencies, identify which are safe to bump, and draft the upgrade with a short note on any breaking changes."
+      },
+      "testSweep": {
+        "label": "Test sweep",
+        "name": "Test sweep",
+        "cardTitle": "Test sweep",
+        "description": "Run the test suite and report failures.",
+        "prompt": "Run the full test suite. If anything fails, summarize the failures and the most likely cause for each."
+      }
     }
   },
   "planner": {
@@ -249,7 +340,7 @@
     "objectivesPlaceholder": "Describe your goals for today in plain language...",
     "generatePlan": "Generate plan",
     "generating": "Generating…",
-    "createAll": "Create all cards",
+    "createAll": "Create all tasks",
     "editTask": "Edit task",
     "removeTask": "Remove task",
     "addTask": "Add task manually",
@@ -258,7 +349,7 @@
     "workingDirectory": "Working Directory",
     "optional": "optional",
     "generatedTasks": "Generated Tasks ({selected}/{total} selected)",
-    "createCards": "Create {count, plural, one {# Card} other {# Cards}}"
+    "createCards": "Create {count, plural, one {# Task} other {# Tasks}}"
   },
   "logs": {
     "title": "Logs & History",
@@ -308,12 +399,15 @@
       "hub": "Hub",
       "preferences": "Preferences",
       "agents": "Agents",
+      "integrations": "Integrations",
+      "sync": "Sync",
       "plugins": "Plugins",
       "data": "Data"
     },
     "connections": {
       "title": "Connections",
-      "description": "Backends this board aggregates. Add remote servers; cards from each are tagged by origin. The local connection is permanent.",
+      "description": "Backends this board aggregates. Add remote servers; tasks from each are tagged by origin. The local connection is permanent.",
+      "refresh": "Refresh",
       "primary": "Primary",
       "inProcess": "In-process",
       "labelField": "Label",
@@ -333,6 +427,13 @@
         "connecting": "Connecting…",
         "error": "Unreachable",
         "disabled": "Disabled"
+      },
+      "version": {
+        "current": "Up to date",
+        "outdated": "Update available",
+        "ahead": "Ahead",
+        "outdatedHint": "This server is behind the latest release ({latest}). Re-run the installer to update it.",
+        "aheadHint": "This server is newer than the latest published release ({latest})."
       },
       "hub": {
         "title": "Hubs",
@@ -356,9 +457,24 @@
         "osUnix": "macOS / Linux",
         "osWindows": "Windows"
       },
+      "localServer": {
+        "title": "Local Server",
+        "description": "Run Myra's server on this computer and connect to it directly over localhost — no hub or internet needed.",
+        "installedRunning": "Installed and running on port {port}",
+        "installedStopped": "Installed (version {version}) — not running",
+        "notInstalled": "Not set up yet — running a temporary server for this session.",
+        "secured": "Secured with a local access token",
+        "setUp": "Set up local server",
+        "update": "Update to {version}",
+        "uninstall": "Remove local server",
+        "setupDone": "Local server set up.",
+        "setupFailed": "Could not set up the local server.",
+        "removed": "Local server removed.",
+        "removeFailed": "Could not remove the local server."
+      },
       "remote": {
         "title": "Remote Access",
-        "description": "Make this computer reachable from the web app anywhere. It runs Myra in the background as a per-user service enrolled to your hub.",
+        "description": "Reach this computer's local server from the web app anywhere. Layers your hub on top of the local server, running Myra in the background as a per-user service enrolled to your hub.",
         "reachable": "This computer is reachable via {hub} as {label}",
         "localOnly": "Local only — this computer isn't reachable remotely.",
         "enable": "Make this computer reachable",
@@ -412,6 +528,81 @@
         "configured": "Configured"
       }
     },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Configured integration instances. Run a plugin more than once — each with its own config, secret, triggers, and the machines it's deployed to.",
+      "new": "New integration",
+      "empty": "No integrations yet. Create one to send task updates to Slack, receive webhooks, and more.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "toggleAria": "Toggle {label}",
+      "firesOn": "Fires on: {events}",
+      "noTriggers": "No triggers",
+      "noMachines": "No machines",
+      "deleteConfirm": "Delete the “{label}” integration from every machine?",
+      "deletePartial": "Some machines couldn't be updated — try again.",
+      "webhookWarning": {
+        "title": "Webhooks run in the local server",
+        "body": "They only fire while Myra is running and stop when you quit the app or shut down. For 24/7 delivery, install the background service or use a remote instance."
+      },
+      "wizard": {
+        "titleNew": "New integration",
+        "titleEdit": "Edit integration",
+        "subtitle": "Configure a plugin instance and deploy it to your machines.",
+        "stepPlugin": "Plugin",
+        "stepConfigure": "Configure",
+        "stepMachines": "Machines",
+        "pickPlugin": "Pick a plugin to configure.",
+        "noPlugins": "No webhook plugins installed. Drop one under ~/.myra-agents/plugins.",
+        "label": "Label",
+        "labelPlaceholder": "e.g. #eng-alerts",
+        "events": "Triggers",
+        "eventsHint": "Task statuses that fire this integration's outbound webhook.",
+        "template": "Message template",
+        "templateHint": "Mustache-lite — use card.title and card.status placeholders. Leave blank for the plugin default.",
+        "pickMachines": "Pick which of your linked machines run this integration.",
+        "offline": "offline",
+        "inboundUrl": "Inbound URL (per machine) — paste into the sender",
+        "secretNote": "Secrets are pushed to each selected machine's keychain now. Keychains can't be copied between machines, so a machine added later will prompt for the secret again.",
+        "secretSet": "Set",
+        "cancel": "Cancel",
+        "back": "Back",
+        "next": "Next",
+        "deploy": "Deploy",
+        "save": "Save",
+        "deployOk": "“{label}” deployed.",
+        "deployPartial": "Deployed, but {count} machine(s) failed — check connections and retry."
+      }
+    },
+    "sync": {
+      "title": "Encrypted sync",
+      "description": "Sync your integrations and their secrets across your devices, end-to-end encrypted. The cloud never sees your secrets or keys.",
+      "unavailable": "Sync needs the Myra cloud. Configure a hub URL to enable it.",
+      "signInRequired": "Sign in to set up encrypted sync across your devices.",
+      "deviceLabel": "This device's name",
+      "deviceLabelPlaceholder": "e.g. MacBook Pro",
+      "setUp": "Set up sync",
+      "setUpHint": "Generates this device's key and a recovery code, then encrypts a vault key only your devices can open.",
+      "joinTitle": "Already syncing on another device?",
+      "join": "Join with recovery code",
+      "joinHint": "Enter the recovery code from your first device to decrypt the vault here — works even if your other devices are offline.",
+      "recoveryPlaceholder": "XXXX-XXXX-XXXX-…",
+      "thisDevice": "This device",
+      "lockedHint": "This device is enrolled but locked. Unlock to sync.",
+      "unlock": "Unlock",
+      "e2eTitle": "End-to-end encrypted",
+      "e2eBody": "Integrations and secrets are encrypted on this device before they reach the cloud. The hub only relays ciphertext.",
+      "devices": "Devices",
+      "revoke": "Revoke",
+      "revokeConfirm": "Revoke “{label}”? This rotates the vault key so the removed device can't read future changes — you'll get a new recovery code.",
+      "revoked": "“{label}” revoked — vault key rotated.",
+      "leave": "Leave sync on this device",
+      "syncNow": "Sync now",
+      "recoveryTitle": "Save your recovery code",
+      "recoveryWarning": "This is shown once. It's the only way to recover your vault from a new device if all your other devices are offline. Store it somewhere safe — we can't show it again.",
+      "recoveryAck": "I've saved my recovery code somewhere safe.",
+      "recoveryDone": "Done"
+    },
     "agents": {
       "title": "Agent Presets",
       "description": "Configure which AI agents can run your tasks",
@@ -430,7 +621,8 @@
       "customAgent": "Custom Agent",
       "workingDirPlaceholder": "Default directory (optional)",
       "maxConcurrent": "Max concurrent agents",
-      "maxConcurrentHint": "How many agents may run at once. 0 = unlimited; extra launches are queued."
+      "maxConcurrentHint": "How many agents may run at once. 0 = unlimited; extra launches are queued.",
+      "options": "Options"
     },
     "preferences": {
       "title": "Preferences",
@@ -462,7 +654,7 @@
       "exportBoard": "Export board",
       "exportDescription": "Download the current board as a JSON backup.",
       "importBoard": "Import board",
-      "importDescription": "Restore cards from a previously exported JSON file.",
+      "importDescription": "Restore tasks from a previously exported JSON file.",
       "clearLogs": "Clear logs",
       "clearLogsDescription": "Remove stored execution logs after confirmation.",
       "clearLogsConfirm": "Clear all logs? This action cannot be undone."
@@ -491,5 +683,44 @@
     "body": "Myra Pro lets you reach your agents from anywhere. The free app is desktop-only — upgrade to use the web app and observe your machines remotely.",
     "signInTitle": "Already Pro? Sign in to your hub",
     "signIn": "Sign in"
+  },
+  "agents": {
+    "checking": "Checking…",
+    "installed": "Installed",
+    "installedVersion": "Installed · v{version}",
+    "notInstalled": "Not installed",
+    "install": "Install",
+    "installAuto": "Install automatically",
+    "installManually": "Install manually",
+    "installGateTitle": "{binary} is not installed",
+    "installGateDescription": "Install it to configure and run this agent.",
+    "configureAnyway": "Configure anyway",
+    "installing": "Installing…",
+    "howToInstall": "How to install",
+    "installTitle": "Install {binary}",
+    "installDescription": "Run one of these commands in a terminal, or use the one-click install. Then restart the agent check.",
+    "installSucceeded": "{binary} installed successfully",
+    "installFailed": "Failed to install {binary}",
+    "commandCopied": "Command copied to clipboard",
+    "copyCommand": "Copy command",
+    "openDocs": "Open documentation",
+    "recheck": "Check again",
+    "pickWorkingDir": "Choose a folder",
+    "optionWorktree": "Run in a git worktree",
+    "allOptions": "All options",
+    "searchOptions": "Search options…",
+    "noOptionFound": "No option found",
+    "customFlag": "Custom flag",
+    "flags": {
+      "--dangerously-skip-permissions": "Skip permissions (dangerous)",
+      "--share": "Share the session",
+      "--thinking": "Show thinking",
+      "--model": "Model",
+      "--variant": "Effort"
+    },
+    "defaultOption": "Default",
+    "searchModels": "Search models…",
+    "loadingModels": "Loading models…",
+    "noModelFound": "No model found"
   }
 }

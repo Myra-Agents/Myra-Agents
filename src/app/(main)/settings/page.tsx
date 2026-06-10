@@ -16,10 +16,18 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { AgentOptions } from "@/components/agents/agent-options";
+import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
+import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
-import { HubStatusCard } from "@/components/settings/hub-status-card";
-import { PluginsPanel } from "@/components/settings/plugins-panel";
-import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
+// User connection disabled — hub status, remote access and cloud sync are off.
+// import { HubStatusCard } from "@/components/settings/hub-status-card";
+// Integrations, Plugins and Sync are parked for now — restore the imports with their tabs below.
+// import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
+import { LocalServerPanel } from "@/components/settings/local-server-panel";
+// import { PluginsPanel } from "@/components/settings/plugins-panel";
+// import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
+// import { SyncPanel } from "@/components/settings/sync-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,7 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEntitlement } from "@/hooks/use-entitlement";
+// import { useEntitlement } from "@/hooks/use-entitlement"; // user connection disabled
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -43,9 +51,100 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
+interface AgentPresetCardProps {
+  preset: AgentPreset;
+  idx: number;
+  isDefault: boolean;
+  t: ReturnType<typeof useTranslations>;
+  onUpdate: (idx: number, patch: Partial<AgentPreset>) => void;
+  onRemove: (idx: number) => void;
+}
+
+/**
+ * One agent preset row. Calls `useBinaryStatus` once so the header badge and the
+ * install gate share a single `check_binary`. While the binary is a known,
+ * installable CLI that isn't present, the config fields are replaced by an
+ * install gate (auto / manual) — unless the user opts to configure anyway.
+ */
+function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: AgentPresetCardProps) {
+  const bin = useBinaryStatus(preset.binary);
+  const [configureAnyway, setConfigureAnyway] = useState(false);
+  // Gate only when we *can* install it (known binary) and a check confirmed it's missing.
+  const gated = !configureAnyway && bin.missing && Boolean(bin.installInfo);
+
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label className="font-semibold text-sm">{preset.name}</Label>
+          <AgentStatusBadge {...bin} />
+        </div>
+        {!isDefault && (
+          <Button variant="ghost" size="icon-xs" onClick={() => onRemove(idx)}>
+            <TrashIcon />
+          </Button>
+        )}
+      </div>
+      {gated ? (
+        <AgentInstallGate state={bin} onConfigureAnyway={() => setConfigureAnyway(true)} />
+      ) : (
+        <>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("agents.name")}</Label>
+              <Input
+                value={preset.name}
+                onChange={(event) => onUpdate(idx, { name: event.target.value })}
+                className="h-7 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("agents.binary")}</Label>
+              <Input
+                value={preset.binary}
+                onChange={(event) => onUpdate(idx, { binary: event.target.value })}
+                className="h-7 font-mono text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("agents.argsTemplate")}</Label>
+            <Input
+              value={preset.argsTemplate}
+              onChange={(event) => onUpdate(idx, { argsTemplate: event.target.value })}
+              placeholder="{prompt}"
+              className="h-7 font-mono text-xs"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("agents.workingDir")}</Label>
+            <WorkingDirField
+              value={preset.workingDir ?? ""}
+              onChange={(value) => onUpdate(idx, { workingDir: value || undefined })}
+              placeholder={t("agents.workingDirPlaceholder")}
+              inputClassName="h-7"
+              compact
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("agents.options")}</Label>
+            <AgentOptions
+              binary={preset.binary}
+              flags={preset.flags ?? []}
+              useWorktree={preset.useWorktree ?? false}
+              onFlagsChange={(flags) => onUpdate(idx, { flags })}
+              onWorktreeChange={(useWorktree) => onUpdate(idx, { useWorktree })}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  const { isPro } = useEntitlement();
+  // const { isPro } = useEntitlement(); // user connection disabled
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
@@ -83,27 +182,28 @@ export default function SettingsPage() {
     setAppLocale(locale);
   };
 
-  const togglePlugin = useCallback(
-    (name: string, enabled: boolean) => {
-      const disabled = new Set(current.disabledPlugins ?? []);
-      if (enabled) {
-        disabled.delete(name);
-      } else {
-        disabled.add(name);
-      }
-      update({ disabledPlugins: [...disabled] });
-    },
-    [current.disabledPlugins, update],
-  );
+  // Plugins tab is parked for now — restore these callbacks with it.
+  // const togglePlugin = useCallback(
+  //   (name: string, enabled: boolean) => {
+  //     const disabled = new Set(current.disabledPlugins ?? []);
+  //     if (enabled) {
+  //       disabled.delete(name);
+  //     } else {
+  //       disabled.add(name);
+  //     }
+  //     update({ disabledPlugins: [...disabled] });
+  //   },
+  //   [current.disabledPlugins, update],
+  // );
 
-  const updatePluginConfig = useCallback(
-    (plugin: string, key: string, value: string | number | boolean) => {
-      const next = { ...(current.pluginConfig ?? {}) };
-      next[plugin] = { ...(next[plugin] ?? {}), [key]: value };
-      update({ pluginConfig: next });
-    },
-    [current.pluginConfig, update],
-  );
+  // const updatePluginConfig = useCallback(
+  //   (plugin: string, key: string, value: string | number | boolean) => {
+  //     const next = { ...(current.pluginConfig ?? {}) };
+  //     next[plugin] = { ...(next[plugin] ?? {}), [key]: value };
+  //     update({ pluginConfig: next });
+  //   },
+  //   [current.pluginConfig, update],
+  // );
 
   const handleThemeChange = (theme: string) => {
     const nextTheme = theme as AppSettings["theme"];
@@ -224,14 +324,20 @@ export default function SettingsPage() {
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
+          {/* Integrations, Sync and Plugins are parked for now.
+          <TabsTrigger value="integrations">{t("tabs.integrations")}</TabsTrigger>
+          <TabsTrigger value="sync">{t("tabs.sync")}</TabsTrigger>
           <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
+          */}
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="hub" className="space-y-6">
-          {isPro && <HubStatusCard />}
+          {/* User connection disabled — hub status + remote access removed. */}
+          {/* {isPro && <HubStatusCard />} */}
           <ConnectionsPanel />
-          {isTauri() && isPro && <RemoteAccessPanel />}
+          {isTauri() && <LocalServerPanel />}
+          {/* {isTauri() && isPro && <RemoteAccessPanel />} */}
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-6">
@@ -267,7 +373,9 @@ export default function SettingsPage() {
                     <SelectContent>
                       <SelectItem value="kanban">{t("preferences.pageOptions.kanban")}</SelectItem>
                       <SelectItem value="schedules">{t("preferences.pageOptions.schedules")}</SelectItem>
+                      {/* Day Planner is parked for now.
                       <SelectItem value="planner">{t("preferences.pageOptions.planner")}</SelectItem>
+                      */}
                       <SelectItem value="logs">{t("preferences.pageOptions.logs")}</SelectItem>
                     </SelectContent>
                   </Select>
@@ -339,55 +447,27 @@ export default function SettingsPage() {
               <Separator />
 
               {current.agents.map((preset, idx) => (
-                <div key={preset.id} className="space-y-2 rounded-md border p-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="font-semibold text-sm">{preset.name}</Label>
-                    {!DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id) && (
-                      <Button variant="ghost" size="icon-xs" onClick={() => removePreset(idx)}>
-                        <TrashIcon />
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t("agents.name")}</Label>
-                      <Input
-                        value={preset.name}
-                        onChange={(event) => updatePreset(idx, { name: event.target.value })}
-                        className="h-7 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t("agents.binary")}</Label>
-                      <Input
-                        value={preset.binary}
-                        onChange={(event) => updatePreset(idx, { binary: event.target.value })}
-                        className="h-7 font-mono text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">{t("agents.argsTemplate")}</Label>
-                    <Input
-                      value={preset.argsTemplate}
-                      onChange={(event) => updatePreset(idx, { argsTemplate: event.target.value })}
-                      placeholder="{prompt}"
-                      className="h-7 font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">{t("agents.workingDir")}</Label>
-                    <Input
-                      value={preset.workingDir ?? ""}
-                      onChange={(event) => updatePreset(idx, { workingDir: event.target.value || undefined })}
-                      placeholder={t("agents.workingDirPlaceholder")}
-                      className="h-7 font-mono text-xs"
-                    />
-                  </div>
-                </div>
+                <AgentPresetCard
+                  key={preset.id}
+                  preset={preset}
+                  idx={idx}
+                  isDefault={DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id)}
+                  t={t}
+                  onUpdate={updatePreset}
+                  onRemove={removePreset}
+                />
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Integrations, Sync and Plugins are parked for now.
+        <TabsContent value="integrations" className="space-y-6">
+          <IntegrationsPanel />
+        </TabsContent>
+
+        <TabsContent value="sync" className="space-y-6">
+          <SyncPanel />
         </TabsContent>
 
         <TabsContent value="plugins" className="space-y-6">
@@ -398,6 +478,7 @@ export default function SettingsPage() {
             onConfigChange={updatePluginConfig}
           />
         </TabsContent>
+        */}
 
         <TabsContent value="data" className="space-y-6">
           <Card>

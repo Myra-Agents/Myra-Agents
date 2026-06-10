@@ -1,0 +1,27 @@
+# Maestro web e2e — Encrypted sync panel (Phase 2).
+#
+# Validates that the E2E-encrypted sync UI renders on the Sync tab. Full sync
+# requires a configured hub URL + sign-in (and a second device to verify the
+# crypto end to end), which can't be driven headless here — so this asserts the
+# panel and its gating copy. The crypto + merge logic itself is covered by the
+# bun unit tests (src/lib/sync/*.test.ts).
+#
+# Prereqs: dev server on http://localhost:1420 (cd app && bun dev).
+#
+#   maestro test app/tests/e2e/sync.yaml
+url: http://localhost:1420
+tags:
+  - sync
+---
+- openLink: http://localhost:1420/settings
+- extendedWaitUntil:               # let the settings shell hydrate before tapping
+    visible: "Settings"
+    timeout: 15000
+- tapOn: "Sync"
+
+- assertVisible: "Encrypted sync"
+# Without a hub configured the panel surfaces its gating message. (With a hub
+# but no auth it instead shows "Sign in to set up encrypted sync…".)
+- assertVisible:
+    text: "Sync needs the Myra cloud.*|Sign in to set up encrypted sync.*"
+- takeScreenshot: sync-panel

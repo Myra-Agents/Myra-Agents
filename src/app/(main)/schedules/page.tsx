@@ -26,7 +26,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PlusIcon, PlayIcon, TrashIcon, PencilIcon, ClockIcon } from "lucide-react";
+import {
+  PlusIcon,
+  PlayIcon,
+  TrashIcon,
+  PencilIcon,
+  ClockIcon,
+  CoffeeIcon,
+  UsersIcon,
+  ListChecksIcon,
+  PackageIcon,
+  FlaskConicalIcon,
+  type LucideIcon,
+} from "lucide-react";
+
+interface SchedulePreset {
+  id: string;
+  icon: LucideIcon;
+  schedule: ScheduleKind;
+  tags: string[];
+}
+
+// Starter recurring tasks surfaced as "More ideas" chips. Clicking one opens the
+// editor prefilled — labels/copy come from i18n (`schedules.ideas.<id>.*`).
+const SCHEDULE_PRESETS: SchedulePreset[] = [
+  { id: "dailyBrief", icon: CoffeeIcon, schedule: { type: "daily", time: "09:00" }, tags: ["brief"] },
+  { id: "standupPrep", icon: UsersIcon, schedule: { type: "weekly", days: [1, 2, 3, 4, 5], time: "08:45" }, tags: ["standup"] },
+  { id: "weeklyReview", icon: ListChecksIcon, schedule: { type: "weekly", days: [1], time: "09:00" }, tags: ["review"] },
+  { id: "depUpdates", icon: PackageIcon, schedule: { type: "weekly", days: [1], time: "10:00" }, tags: ["deps"] },
+  { id: "testSweep", icon: FlaskConicalIcon, schedule: { type: "daily", time: "08:00" }, tags: ["tests"] },
+];
 
 export default function SchedulesPage() {
   const t = useTranslations("schedules");
@@ -43,15 +72,35 @@ export default function SchedulesPage() {
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
+  const [presetInput, setPresetInput] = useState<CreateScheduleInput | null>(null);
   const [triggering, setTriggering] = useState<string | null>(null);
 
   const handleNew = useCallback(() => {
     setEditingTask(null);
+    setPresetInput(null);
     setEditModalOpen(true);
   }, []);
 
+  const handleIdea = useCallback(
+    (preset: SchedulePreset) => {
+      setEditingTask(null);
+      setPresetInput({
+        name: t(`ideas.${preset.id}.name`),
+        cardTitle: t(`ideas.${preset.id}.cardTitle`),
+        cardDescription: t(`ideas.${preset.id}.description`),
+        agentPrompt: t(`ideas.${preset.id}.prompt`),
+        tags: preset.tags,
+        schedule: preset.schedule,
+        enabled: true,
+      });
+      setEditModalOpen(true);
+    },
+    [t],
+  );
+
   const handleEdit = useCallback((task: ScheduledTask) => {
     setEditingTask(task);
+    setPresetInput(null);
     setEditModalOpen(true);
   }, []);
 
@@ -118,8 +167,8 @@ export default function SchedulesPage() {
       ) : (
         <div className="space-y-2">
           {sorted.map((task) => (
-            <Card key={task.id} className={!task.enabled ? "opacity-60" : ""}>
-              <CardContent className="flex items-center gap-4 p-4">
+            <Card key={task.id} className={`py-0 ${!task.enabled ? "opacity-60" : ""}`}>
+              <CardContent className="flex items-center gap-4 px-4 py-2.5">
                 <Switch
                   checked={task.enabled}
                   onCheckedChange={(v) => toggleEnabled(task.id, v)}
@@ -163,9 +212,26 @@ export default function SchedulesPage() {
         </div>
       )}
 
+      <div className="space-y-2 pt-2">
+        <p className="text-xs font-medium text-muted-foreground">{t("ideas.heading")}</p>
+        <div className="flex flex-wrap gap-2">
+          {SCHEDULE_PRESETS.map((preset) => {
+            const Icon = preset.icon;
+            return (
+              <Button key={preset.id} variant="outline" size="sm" onClick={() => handleIdea(preset)}>
+                <Icon className="size-3.5" />
+                {t(`ideas.${preset.id}.label`)}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
       <ScheduleEditModal
+        key={`${editingTask?.id ?? presetInput?.name ?? "new"}-${editModalOpen}`}
         open={editModalOpen}
         task={editingTask}
+        initial={presetInput}
         onSave={handleSave}
         onClose={() => setEditModalOpen(false)}
       />
@@ -176,20 +242,23 @@ export default function SchedulesPage() {
 interface ScheduleEditModalProps {
   open: boolean;
   task: ScheduledTask | null;
+  initial?: CreateScheduleInput | null;
   onSave: (input: CreateScheduleInput | UpdateScheduleInput) => Promise<void>;
   onClose: () => void;
 }
 
-function ScheduleEditModal({ open, task, onSave, onClose }: ScheduleEditModalProps) {
+function ScheduleEditModal({ open, task, initial, onSave, onClose }: ScheduleEditModalProps) {
   const t = useTranslations("schedules");
-  const [name, setName] = useState(task?.name ?? "");
-  const [cardTitle, setCardTitle] = useState(task?.cardTitle ?? "");
-  const [cardDescription, setCardDescription] = useState(task?.cardDescription ?? "");
-  const [agentPrompt, setAgentPrompt] = useState(task?.agentPrompt ?? "");
-  const [tags, setTags] = useState(task?.tags.join(", ") ?? "");
-  const [kindType, setKindType] = useState<ScheduleKindType>(task?.schedule.type ?? "daily");
-  const [schedule, setSchedule] = useState<ScheduleKind>(task?.schedule ?? defaultScheduleKind("daily"));
-  const [enabled, setEnabled] = useState(task?.enabled ?? true);
+  // Editing an existing task wins; otherwise seed from a clicked "More ideas" preset.
+  const seed = task ?? initial ?? null;
+  const [name, setName] = useState(seed?.name ?? "");
+  const [cardTitle, setCardTitle] = useState(seed?.cardTitle ?? "");
+  const [cardDescription, setCardDescription] = useState(seed?.cardDescription ?? "");
+  const [agentPrompt, setAgentPrompt] = useState(seed?.agentPrompt ?? "");
+  const [tags, setTags] = useState(seed?.tags.join(", ") ?? "");
+  const [kindType, setKindType] = useState<ScheduleKindType>(seed?.schedule.type ?? "daily");
+  const [schedule, setSchedule] = useState<ScheduleKind>(seed?.schedule ?? defaultScheduleKind("daily"));
+  const [enabled, setEnabled] = useState(seed?.enabled ?? true);
   const [saving, setSaving] = useState(false);
 
   const handleKindChange = (type: ScheduleKindType) => {

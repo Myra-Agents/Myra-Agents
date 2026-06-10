@@ -1,0 +1,14 @@
+# Maestro web smoke test for the Myra Agents app.
+# Start the dev server first (serves http://localhost:1420):
+#   cd app && bun dev
+# Then run:
+#   maestro test app/tests/e2e/smoke.yaml
+url: http://localhost:1420
+---
+- openLink: http://localhost:1420
+# extendedWaitUntil (not a bare assertVisible) so a cold dev-server route compile
+# doesn't race the first paint — keeps the suite deterministic back-to-back.
+- extendedWaitUntil:
+    visible: "Myra Agents"
+    timeout: 15000
+- takeScreenshot: smoke

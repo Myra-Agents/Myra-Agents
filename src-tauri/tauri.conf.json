@@ -23,9 +23,12 @@
         "title": "Myra Agents",
         "width": 1400,
         "height": 900,
-        "minWidth": 1024,
-        "minHeight": 700,
-        "decorations": false,
+        "minWidth": 640,
+        "minHeight": 500,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 18, "y": 22 },
         "transparent": true,
         "resizable": true,
         "fullscreen": false
@@ -50,7 +53,13 @@
     "macOS": {
       "minimumSystemVersion": "10.15",
       "hardenedRuntime": true,
-      "entitlements": "entitlements.plist"
+      "entitlements": "entitlements.plist",
+      "dmg": {
+        "background": "./dmg-background.png",
+        "windowSize": { "width": 660, "height": 400 },
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 }
+      }
     }
   }
 }

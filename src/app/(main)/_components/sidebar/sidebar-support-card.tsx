@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import Link from "next/link";
+import { type MouseEvent, useEffect, useState } from "react";
 
 import { StarIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -11,6 +9,7 @@ import { siGithub } from "simple-icons";
 import { SimpleIcon } from "@/components/simple-icon";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_CONFIG } from "@/config/app-config";
+import { openExternal } from "@/lib/tauri";
 
 const DISMISS_KEY = "myra.sidebar-support-dismissed";
 
@@ -33,6 +32,13 @@ export function SidebarSupportCard() {
     setDismissed(true);
   };
 
+  // A plain anchor never reaches the OS browser from the Tauri webview, so route
+  // every click through the opener plugin (with a new-tab fallback in a browser).
+  const open = (url: string) => (e: MouseEvent) => {
+    e.preventDefault();
+    void openExternal(url);
+  };
+
   if (dismissed) return null;
 
   return (
@@ -50,37 +56,40 @@ export function SidebarSupportCard() {
         <CardDescription>
           {t.rich("body", {
             issue: (chunks) => (
-              <Link
+              <a
                 href={APP_CONFIG.issuesUrl}
+                onClick={open(APP_CONFIG.issuesUrl)}
                 target="_blank"
                 rel="noreferrer"
                 className="text-foreground underline-offset-2 hover:underline"
               >
                 {chunks}
-              </Link>
+              </a>
             ),
           })}
           &nbsp;
-          <Link
+          <a
             href={APP_CONFIG.repoUrl}
+            onClick={open(APP_CONFIG.repoUrl)}
             target="_blank"
             rel="noreferrer"
             aria-label={t("repo")}
             className="inline-flex items-center text-foreground"
           >
             <SimpleIcon icon={siGithub} aria-hidden className="size-3 fill-current" />
-          </Link>
+          </a>
           .
         </CardDescription>
-        <Link
+        <a
           href={APP_CONFIG.repoUrl}
+          onClick={open(APP_CONFIG.repoUrl)}
           target="_blank"
           rel="noreferrer"
-          className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          className="mt-1 inline-flex items-center gap-1.5 text-muted-foreground text-xs transition-colors hover:text-foreground"
         >
           <StarIcon className="size-3.5" />
           {t("star")}
-        </Link>
+        </a>
       </CardHeader>
     </Card>
   );

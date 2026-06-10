@@ -14,8 +14,61 @@
     "noResults": "Aucun résultat",
     "version": "Version"
   },
+  "home": {
+    "title": "Aperçu",
+    "loading": "Chargement...",
+    "newTask": "Nouvelle tâche",
+    "viewAll": "Tout voir",
+    "empty": {
+      "title": "Rien ici pour l'instant",
+      "body": "Créez votre première tâche et lancez un agent dessus — tout ce qui se passe apparaîtra ici.",
+      "cta": "Créer une tâche"
+    },
+    "attention": {
+      "title": "Requiert votre attention",
+      "question": "Question",
+      "review": "Relecture",
+      "empty": "Rien n'attend votre action."
+    },
+    "running": {
+      "title": "En cours",
+      "running": "En cours",
+      "queued": "En file",
+      "empty": "Aucun agent en cours."
+    },
+    "upcoming": {
+      "title": "À venir aujourd'hui",
+      "empty": "Aucune planification prévue aujourd'hui."
+    },
+    "recent": {
+      "title": "Activité récente",
+      "empty": "Aucune exécution pour l'instant."
+    },
+    "stats": {
+      "title": "Statistiques",
+      "empty": "Aucune exécution terminée sur les {days} derniers jours — lancez un agent sur une carte et les stats apparaîtront ici.",
+      "runs": "Exécutions ({days} j)",
+      "successRate": "Taux de succès ({days} j)",
+      "cost": "Coût ({days} j)",
+      "avgDuration": "Durée moyenne ({days} j)",
+      "runsPerDay": "Exécutions par jour — {days} derniers jours",
+      "costPerDay": "Coût par jour — {days} derniers jours",
+      "completed": "Réussies",
+      "failed": "Échouées"
+    },
+    "health": {
+      "server": "Serveur",
+      "serverRunning": "Serveur local actif sur le port {port}",
+      "serverStopped": "Serveur local arrêté",
+      "hub": "Hub",
+      "hubOnline": "Hub en ligne — {count} machine(s) connectée(s)",
+      "hubOffline": "Hub injoignable",
+      "hubChecking": "Vérification du hub..."
+    }
+  },
   "nav": {
-    "newCard": "Nouvelle carte",
+    "newCard": "Nouvelle tâche",
+    "home": "Accueil",
     "workspace": "Espace de travail",
     "configuration": "Configuration",
     "kanban": "Kanban",
@@ -53,10 +106,10 @@
       "trashed": "Corbeille"
     },
     "card": {
-      "addCard": "Ajouter une carte",
-      "editCard": "Modifier la carte",
-      "deleteCard": "Supprimer la carte",
-      "restoreCard": "Restaurer la carte",
+      "addCard": "Ajouter une tâche",
+      "editCard": "Modifier la tâche",
+      "deleteCard": "Supprimer la tâche",
+      "restoreCard": "Restaurer la tâche",
       "moveToTrash": "Mettre à la corbeille",
       "launchAgent": "Lancer l'agent",
       "cancelAgent": "Annuler l'agent",
@@ -93,7 +146,7 @@
     },
     "loading": "Chargement du tableau…",
     "filters": {
-      "searchPlaceholder": "Rechercher cartes, prompts, étiquettes...",
+      "searchPlaceholder": "Rechercher tâches, prompts, étiquettes...",
       "status": "Statut",
       "allStatuses": "Toutes les colonnes",
       "agent": "Agent",
@@ -107,13 +160,13 @@
       "activeOnly": "Agents actifs",
       "tagsMatchAny": "Étiquettes",
       "clear": "Effacer",
-      "showing": "{visible} carte(s) sur {total}"
+      "showing": "{visible} tâche(s) sur {total}"
     },
     "cardModal": {
-      "newTitle": "Nouvelle carte",
-      "editTitle": "Modifier la carte",
+      "newTitle": "Nouvelle tâche",
+      "editTitle": "Modifier la tâche",
       "newDescription": "Ajoutez une nouvelle tâche au tableau.",
-      "editDescription": "Mettez à jour les détails de la carte.",
+      "editDescription": "Mettez à jour les détails de la tâche.",
       "title": "Titre",
       "titlePlaceholder": "ex. Mettre à jour les dépendances npm",
       "column": "Colonne",
@@ -160,25 +213,25 @@
       "export": "Exporter",
       "trash": "Corbeille",
       "clear": "Effacer",
-      "noMovable": "Aucune carte sélectionnée ne peut aller dans cette colonne.",
-      "noLaunchable": "Aucune carte sélectionnée ne peut être lancée.",
-      "moved": "{count} carte(s) déplacée(s). {skipped} ignorée(s).",
-      "tagged": "{count} carte(s) étiquetée(s) avec {tag}.",
-      "launched": "{count} carte(s) lancée(s). {skipped} ignorée(s).",
-      "trashed": "{count} carte(s) déplacée(s) vers la corbeille."
+      "noMovable": "Aucune tâche sélectionnée ne peut aller dans cette colonne.",
+      "noLaunchable": "Aucune tâche sélectionnée ne peut être lancée.",
+      "moved": "{count} tâche(s) déplacée(s). {skipped} ignorée(s).",
+      "tagged": "{count} tâche(s) étiquetée(s) avec {tag}.",
+      "launched": "{count} tâche(s) lancée(s). {skipped} ignorée(s).",
+      "trashed": "{count} tâche(s) déplacée(s) vers la corbeille."
     },
     "columnsMenu": {
       "title": "Colonnes",
       "description": "Afficher, masquer ou renommer les colonnes.",
       "showColumn": "Afficher {column}",
       "labelPlaceholder": "Libellé {column}",
-      "attentionProtected": "Les colonnes avec des cartes nécessitant une attention restent visibles.",
+      "attentionProtected": "Les colonnes avec des tâches nécessitant une attention restent visibles.",
       "reset": "Réinitialiser les colonnes"
     },
     "toast": {
       "queued": "Agent mis en file — en attente d’un créneau libre.",
       "canceled": "Agent annulé.",
-      "trashed": "Carte mise à la corbeille.",
+      "trashed": "Tâche mise à la corbeille.",
       "undo": "Annuler"
     }
   },
@@ -202,8 +255,8 @@
     },
     "form": {
       "name": "Nom",
-      "cardTitle": "Titre de la carte",
-      "cardDescription": "Description de la carte",
+      "cardTitle": "Titre de la tâche",
+      "cardDescription": "Description de la tâche",
       "agentPrompt": "Prompt de l'agent",
       "tags": "Étiquettes",
       "scheduleKind": "Type de planification",
@@ -216,7 +269,7 @@
       "scheduleName": "Nom de la planification",
       "scheduleNamePlaceholder": "ex. Revue de code quotidienne",
       "description": "Description",
-      "cardTitlePlaceholder": "Titre de la carte générée",
+      "cardTitlePlaceholder": "Titre de la tâche générée",
       "tagsPlaceholder": "infra, quotidien",
       "cronPlaceholder": "0 9 * * 1-5"
     },
@@ -241,6 +294,44 @@
       "fri": "Ven",
       "sat": "Sam",
       "sun": "Dim"
+    },
+    "ideas": {
+      "heading": "Plus d'idées",
+      "dailyBrief": {
+        "label": "Brief quotidien",
+        "name": "Brief quotidien",
+        "cardTitle": "Brief quotidien",
+        "description": "Résumé matinal de l'activité du dépôt et du tableau.",
+        "prompt": "Résume ce qui a changé dans le dépôt depuis hier : nouveaux commits, PR ouvertes, checks en échec, et les cartes en attente de ma part. Garde un brief court en puces."
+      },
+      "standupPrep": {
+        "label": "Prépa daily scrum",
+        "name": "Prépa daily scrum",
+        "cardTitle": "Prépa daily scrum",
+        "description": "Points à dire au daily standup, prêts avant la réunion.",
+        "prompt": "Prépare mes notes pour le daily scrum en trois parties : Hier (commits poussés et cartes passées en Terminé), Aujourd'hui (cartes En cours et À faire que je compte traiter), Blocages (cartes bloquées en Retour attendu ou En attente de revue, et checks en échec). Garde chaque point sur une ligne courte."
+      },
+      "weeklyReview": {
+        "label": "Revue hebdomadaire",
+        "name": "Revue hebdomadaire",
+        "cardTitle": "Revue hebdomadaire",
+        "description": "Revue de fin de semaine du tableau et nettoyage des cartes inactives.",
+        "prompt": "Passe en revue le tableau Kanban : liste les cartes immobiles depuis plus d'une semaine, signale celles bloquées en Retour attendu ou En attente de revue, et propose une prochaine étape pour chacune."
+      },
+      "depUpdates": {
+        "label": "Mises à jour des dépendances",
+        "name": "Mises à jour des dépendances",
+        "cardTitle": "Mises à jour des dépendances",
+        "description": "Vérifie les dépendances obsolètes et propose des mises à jour.",
+        "prompt": "Vérifie les dépendances obsolètes, identifie celles qu'on peut mettre à jour sans risque, et prépare la mise à niveau avec une note sur les éventuels changements cassants."
+      },
+      "testSweep": {
+        "label": "Passe de tests",
+        "name": "Passe de tests",
+        "cardTitle": "Passe de tests",
+        "description": "Lance la suite de tests et signale les échecs.",
+        "prompt": "Lance toute la suite de tests. En cas d'échec, résume les échecs et la cause la plus probable pour chacun."
+      }
     }
   },
   "planner": {
@@ -249,7 +340,7 @@
     "objectivesPlaceholder": "Décrivez vos objectifs du jour en langage naturel...",
     "generatePlan": "Générer le plan",
     "generating": "Génération…",
-    "createAll": "Créer toutes les cartes",
+    "createAll": "Créer toutes les tâches",
     "editTask": "Modifier la tâche",
     "removeTask": "Supprimer la tâche",
     "addTask": "Ajouter manuellement",
@@ -258,7 +349,7 @@
     "workingDirectory": "Répertoire de travail",
     "optional": "facultatif",
     "generatedTasks": "Tâches générées ({selected}/{total} sélectionnées)",
-    "createCards": "Créer {count, plural, one {# carte} other {# cartes}}"
+    "createCards": "Créer {count, plural, one {# tâche} other {# tâches}}"
   },
   "logs": {
     "title": "Journaux et historique",
@@ -308,12 +399,15 @@
       "hub": "Hub",
       "preferences": "Préférences",
       "agents": "Agents",
+      "integrations": "Intégrations",
+      "sync": "Sync",
       "plugins": "Plugins",
       "data": "Données"
     },
     "connections": {
       "title": "Connexions",
-      "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les cartes de chacun portent une étiquette d'origine. La connexion locale est permanente.",
+      "description": "Backends agrégés par ce tableau. Ajoutez des serveurs distants ; les tâches de chacun portent une étiquette d'origine. La connexion locale est permanente.",
+      "refresh": "Actualiser",
       "primary": "Principal",
       "inProcess": "En interne",
       "labelField": "Libellé",
@@ -333,6 +427,13 @@
         "connecting": "Connexion…",
         "error": "Injoignable",
         "disabled": "Désactivé"
+      },
+      "version": {
+        "current": "À jour",
+        "outdated": "Mise à jour disponible",
+        "ahead": "En avance",
+        "outdatedHint": "Ce serveur est en retard sur la dernière version ({latest}). Relancez l’installateur pour le mettre à jour.",
+        "aheadHint": "Ce serveur est plus récent que la dernière version publiée ({latest})."
       },
       "hub": {
         "title": "Hubs",
@@ -356,9 +457,24 @@
         "osUnix": "macOS / Linux",
         "osWindows": "Windows"
       },
+      "localServer": {
+        "title": "Serveur local",
+        "description": "Exécutez le serveur Myra sur cet ordinateur et connectez-vous-y directement en localhost — sans hub ni connexion Internet.",
+        "installedRunning": "Installé et actif sur le port {port}",
+        "installedStopped": "Installé (version {version}) — arrêté",
+        "notInstalled": "Pas encore configuré — un serveur temporaire tourne pour cette session.",
+        "secured": "Protégé par un jeton d'accès local",
+        "setUp": "Configurer le serveur local",
+        "update": "Mettre à jour vers {version}",
+        "uninstall": "Supprimer le serveur local",
+        "setupDone": "Serveur local configuré.",
+        "setupFailed": "Configuration du serveur local impossible.",
+        "removed": "Serveur local supprimé.",
+        "removeFailed": "Suppression du serveur local impossible."
+      },
       "remote": {
         "title": "Accès distant",
-        "description": "Rendez cet ordinateur accessible depuis l'application web, où que vous soyez. Myra tourne en arrière-plan comme service par utilisateur, rattaché à votre hub.",
+        "description": "Accédez au serveur local de cet ordinateur depuis l'application web, où que vous soyez. Ajoute votre hub par-dessus le serveur local, en exécutant Myra en arrière-plan comme service par utilisateur rattaché à votre hub.",
         "reachable": "Cet ordinateur est accessible via {hub} en tant que {label}",
         "localOnly": "Local uniquement — cet ordinateur n'est pas accessible à distance.",
         "enable": "Rendre cet ordinateur accessible",
@@ -412,6 +528,81 @@
         "configured": "Configuré"
       }
     },
+    "integrations": {
+      "title": "Intégrations",
+      "description": "Instances d'intégration configurées. Utilisez un plugin plusieurs fois — chacune avec sa config, son secret, ses déclencheurs et les machines où elle est déployée.",
+      "new": "Nouvelle intégration",
+      "empty": "Aucune intégration pour l'instant. Créez-en une pour envoyer les mises à jour de tâches vers Slack, recevoir des webhooks, et plus.",
+      "edit": "Modifier",
+      "delete": "Supprimer",
+      "toggleAria": "Activer/désactiver {label}",
+      "firesOn": "Se déclenche sur : {events}",
+      "noTriggers": "Aucun déclencheur",
+      "noMachines": "Aucune machine",
+      "deleteConfirm": "Supprimer l'intégration « {label} » de toutes les machines ?",
+      "deletePartial": "Certaines machines n'ont pas pu être mises à jour — réessayez.",
+      "webhookWarning": {
+        "title": "Les webhooks tournent dans le serveur local",
+        "body": "Ils ne se déclenchent que pendant l'exécution de Myra et s'arrêtent à la fermeture de l'app ou à l'extinction. Pour une diffusion 24/7, installez le service en arrière-plan ou utilisez une instance distante."
+      },
+      "wizard": {
+        "titleNew": "Nouvelle intégration",
+        "titleEdit": "Modifier l'intégration",
+        "subtitle": "Configurez une instance de plugin et déployez-la sur vos machines.",
+        "stepPlugin": "Plugin",
+        "stepConfigure": "Configurer",
+        "stepMachines": "Machines",
+        "pickPlugin": "Choisissez un plugin à configurer.",
+        "noPlugins": "Aucun plugin webhook installé. Déposez-en un dans ~/.myra-agents/plugins.",
+        "label": "Libellé",
+        "labelPlaceholder": "ex. #eng-alerts",
+        "events": "Déclencheurs",
+        "eventsHint": "Statuts de tâche qui déclenchent le webhook sortant de cette intégration.",
+        "template": "Modèle de message",
+        "templateHint": "Mustache simplifié — utilisez les variables card.title et card.status. Laissez vide pour le modèle par défaut du plugin.",
+        "pickMachines": "Choisissez les machines liées qui exécutent cette intégration.",
+        "offline": "hors ligne",
+        "inboundUrl": "URL entrante (par machine) — à coller chez l'émetteur",
+        "secretNote": "Les secrets sont poussés dès maintenant dans le trousseau de chaque machine sélectionnée. Les trousseaux ne peuvent pas être copiés entre machines : une machine ajoutée plus tard redemandera le secret.",
+        "secretSet": "Défini",
+        "cancel": "Annuler",
+        "back": "Retour",
+        "next": "Suivant",
+        "deploy": "Déployer",
+        "save": "Enregistrer",
+        "deployOk": "« {label} » déployée.",
+        "deployPartial": "Déployée, mais {count} machine(s) en échec — vérifiez les connexions et réessayez."
+      }
+    },
+    "sync": {
+      "title": "Sync chiffrée",
+      "description": "Synchronisez vos intégrations et leurs secrets entre vos appareils, chiffrés de bout en bout. Le cloud ne voit jamais vos secrets ni vos clés.",
+      "unavailable": "La sync nécessite le cloud Myra. Configurez une URL de hub pour l'activer.",
+      "signInRequired": "Connectez-vous pour configurer la sync chiffrée entre vos appareils.",
+      "deviceLabel": "Nom de cet appareil",
+      "deviceLabelPlaceholder": "ex. MacBook Pro",
+      "setUp": "Configurer la sync",
+      "setUpHint": "Génère la clé de cet appareil et un code de récupération, puis chiffre une clé de coffre que seuls vos appareils peuvent ouvrir.",
+      "joinTitle": "Déjà synchronisé sur un autre appareil ?",
+      "join": "Rejoindre avec le code de récupération",
+      "joinHint": "Saisissez le code de récupération de votre premier appareil pour déchiffrer le coffre ici — fonctionne même si vos autres appareils sont hors ligne.",
+      "recoveryPlaceholder": "XXXX-XXXX-XXXX-…",
+      "thisDevice": "Cet appareil",
+      "lockedHint": "Cet appareil est enrôlé mais verrouillé. Déverrouillez pour synchroniser.",
+      "unlock": "Déverrouiller",
+      "e2eTitle": "Chiffré de bout en bout",
+      "e2eBody": "Les intégrations et les secrets sont chiffrés sur cet appareil avant d'atteindre le cloud. Le hub ne relaie que du chiffré.",
+      "devices": "Appareils",
+      "revoke": "Révoquer",
+      "revokeConfirm": "Révoquer « {label} » ? Cela fait tourner la clé de coffre afin que l'appareil retiré ne puisse plus lire les changements futurs — vous recevrez un nouveau code de récupération.",
+      "revoked": "« {label} » révoqué — clé de coffre renouvelée.",
+      "leave": "Quitter la sync sur cet appareil",
+      "syncNow": "Synchroniser",
+      "recoveryTitle": "Sauvegardez votre code de récupération",
+      "recoveryWarning": "Affiché une seule fois. C'est le seul moyen de récupérer votre coffre depuis un nouvel appareil si tous vos autres appareils sont hors ligne. Conservez-le en lieu sûr — impossible de le réafficher.",
+      "recoveryAck": "J'ai sauvegardé mon code de récupération en lieu sûr.",
+      "recoveryDone": "Terminé"
+    },
     "agents": {
       "title": "Préréglages d'agent",
       "description": "Configurez les agents IA pour vos tâches",
@@ -430,7 +621,8 @@
       "customAgent": "Agent personnalisé",
       "workingDirPlaceholder": "Répertoire par défaut (optionnel)",
       "maxConcurrent": "Agents simultanés max",
-      "maxConcurrentHint": "Nombre d’agents pouvant s’exécuter en même temps. 0 = illimité ; les lancements en trop sont mis en file."
+      "maxConcurrentHint": "Nombre d’agents pouvant s’exécuter en même temps. 0 = illimité ; les lancements en trop sont mis en file.",
+      "options": "Options"
     },
     "preferences": {
       "title": "Préférences",
@@ -462,7 +654,7 @@
       "exportBoard": "Exporter le tableau",
       "exportDescription": "Télécharger le tableau actuel au format JSON.",
       "importBoard": "Importer un tableau",
-      "importDescription": "Restaurer des cartes depuis un fichier JSON exporté précédemment.",
+      "importDescription": "Restaurer des tâches depuis un fichier JSON exporté précédemment.",
       "clearLogs": "Effacer les logs",
       "clearLogsDescription": "Supprimer les journaux d'exécution après confirmation.",
       "clearLogsConfirm": "Effacer tous les logs ? Cette action est irréversible."
@@ -491,5 +683,44 @@
     "body": "Myra Pro vous permet d'accéder à vos agents où que vous soyez. L'application gratuite est réservée au bureau — passez à Pro pour utiliser l'application web et superviser vos machines à distance.",
     "signInTitle": "Déjà Pro ? Connectez-vous à votre hub",
     "signIn": "Se connecter"
+  },
+  "agents": {
+    "checking": "Vérification…",
+    "installed": "Installé",
+    "installedVersion": "Installé · v{version}",
+    "notInstalled": "Non installé",
+    "install": "Installer",
+    "installAuto": "Installer automatiquement",
+    "installManually": "Installer manuellement",
+    "installGateTitle": "{binary} n'est pas installé",
+    "installGateDescription": "Installez-le pour configurer et lancer cet agent.",
+    "configureAnyway": "Configurer quand même",
+    "installing": "Installation…",
+    "howToInstall": "Comment l'installer",
+    "installTitle": "Installer {binary}",
+    "installDescription": "Exécutez l'une de ces commandes dans un terminal, ou utilisez l'installation en un clic. Relancez ensuite la vérification.",
+    "installSucceeded": "{binary} installé avec succès",
+    "installFailed": "Échec de l'installation de {binary}",
+    "commandCopied": "Commande copiée dans le presse-papiers",
+    "copyCommand": "Copier la commande",
+    "openDocs": "Ouvrir la documentation",
+    "recheck": "Vérifier à nouveau",
+    "pickWorkingDir": "Choisir un dossier",
+    "optionWorktree": "Exécuter dans un git worktree",
+    "allOptions": "Toutes les options",
+    "searchOptions": "Rechercher une option…",
+    "noOptionFound": "Aucune option trouvée",
+    "customFlag": "Option personnalisée",
+    "flags": {
+      "--dangerously-skip-permissions": "Ignorer les permissions (dangereux)",
+      "--share": "Partager la session",
+      "--thinking": "Afficher la réflexion",
+      "--model": "Modèle",
+      "--variant": "Effort"
+    },
+    "defaultOption": "Par défaut",
+    "searchModels": "Rechercher un modèle…",
+    "loadingModels": "Chargement des modèles…",
+    "noModelFound": "Aucun modèle trouvé"
   }
 }

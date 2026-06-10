@@ -1,0 +1,28 @@
+# Maestro web e2e — Plugins tab.
+#
+# Validates the Plugins settings panel: installed plugins are listed with their
+# enable toggle and declared config fields. In particular it asserts the Slack
+# plugin's webhook-URL field renders as a plain, visible text input (its URL
+# placeholder shows) rather than a masked secret — i.e. the `slack` manifest's
+# WEBHOOK_URL config is `type: "string"`, not `type: "secret"`.
+#
+# Non-mutating: only reads the panel.
+#
+# Prereqs: dev server on http://localhost:1420 (cd app && bun dev) with the
+# `slack` plugin installed and enabled (~/.myra-agents/plugins/slack).
+#
+#   maestro test app/tests/e2e/plugins.yaml
+url: http://localhost:1420
+tags:
+  - plugins
+---
+- openLink: http://localhost:1420/settings
+- tapOn: "Plugins"
+
+- assertVisible: "Plugins"
+- assertVisible: "Plugins installed under ~/.myra-agents/plugins.*"
+- assertVisible: "slack"
+# The visible webhook-URL field (plaintext string config, not a masked secret):
+# its placeholder is shown on screen.
+- assertVisible: "https://hooks.slack.com/services/.*"
+- takeScreenshot: plugins-panel

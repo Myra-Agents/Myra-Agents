@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { CircleUser, EllipsisVertical, LogIn, LogOut, Settings } from "lucide-react";
+import { CircleUser, EllipsisVertical, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,23 +16,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
-import { useAuth } from "@/hooks/use-auth";
+import { APP_CONFIG } from "@/config/app-config";
 import { getInitials } from "@/lib/utils";
 
 /**
- * Sidebar footer account row (restored from the upstream admin template).
- * Wired to the real hub session: shows the signed-in account (or a guest
- * placeholder) with a dropdown for Settings + sign in/out.
+ * Sidebar footer row. The user connection (sign in/out + account identity) was
+ * removed — this is now a static, local-only entry that just carries the menu to
+ * Settings. Restore the `useAuth`-driven account row from git history to bring
+ * back sign-in/out.
  */
 export function NavUser() {
   const t = useTranslations("nav.account");
   const { isMobile } = useSidebar();
-  const { account, isAuthenticated, signIn, signOut, busy } = useAuth();
 
-  const email = account?.email ?? account?.userId ?? "";
-  // No display name on the account record — derive one from the email local part.
-  const name = isAuthenticated ? email.split("@")[0] || t("signedIn") : t("guest");
-  const subtitle = isAuthenticated ? email : t("notSignedIn");
+  const name = APP_CONFIG.name;
+  const subtitle = t("account");
 
   return (
     <SidebarMenu>
@@ -86,18 +84,6 @@ export function NavUser() {
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            {isAuthenticated ? (
-              <DropdownMenuItem disabled={busy} onSelect={() => void signOut()}>
-                <LogOut />
-                {t("signOut")}
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem disabled={busy} onSelect={() => void signIn()}>
-                <LogIn />
-                {t("signIn")}
-              </DropdownMenuItem>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

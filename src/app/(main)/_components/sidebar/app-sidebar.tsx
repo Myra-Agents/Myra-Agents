@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useShallow } from "zustand/react/shallow";
 
@@ -22,7 +23,7 @@ import { useShortcutStore } from "@/stores/shortcut-store";
 
 import { MacSidebarControls } from "../window-controls";
 import { NavMain } from "./nav-main";
-import { NavUser } from "./nav-user";
+// import { NavUser } from "./nav-user";
 import { SidebarSupportCard } from "./sidebar-support-card";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -53,8 +54,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       collapsible={collapsible}
       className="md:!top-[var(--titlebar-h,0px)] md:!h-[calc(100svh_-_var(--titlebar-h,0px))]"
     >
-      <SidebarHeader>
+      {/* Same geometry as the content header row (px-3 + w-18 spacer + gap-2)
+          so the rail top lines up with the header. No toggle here: the peek
+          closes on mouse-out (and ⌘B still works everywhere). */}
+      <div className="flex h-10 shrink-0 items-center gap-2 pl-3">
         <MacSidebarControls />
+      </div>
+      <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -89,7 +95,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <SidebarSupportCard />
-        <NavUser />
+        {/* <NavUser /> — masqué pour le moment; restaurer en décommentant (voir nav-user.tsx) */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip={t("account.settings")}
+              className="group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:[&>span]:hidden"
+            >
+              <Link prefetch={false} href="/settings">
+                <Settings />
+                <span>{t("account.settings")}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <div className="px-3 pb-1 text-center text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
           v{APP_CONFIG.version}
         </div>

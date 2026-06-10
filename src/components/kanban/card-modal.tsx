@@ -5,6 +5,8 @@ import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, us
 import { FolderIcon, RotateCcwIcon, XIcon, ZapIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { AgentOptions } from "@/components/agents/agent-options";
+import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +73,8 @@ export function CardModal({
   const [agentPresetId, setAgentPresetId] = useState(
     card?.agentPresetId ?? defaultAgentId ?? agentPresets[0]?.id ?? "",
   );
+  const [agentFlags, setAgentFlags] = useState<string[] | undefined>(card?.agentFlags);
+  const [useWorktree, setUseWorktree] = useState<boolean | undefined>(card?.useWorktree);
   const [selectedTemplateId, setSelectedTemplateId] = useState(NO_TEMPLATE);
   const [templateName, setTemplateName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -89,6 +93,8 @@ export function CardModal({
       setTagInput("");
       setStatus(card?.status ?? initialStatus);
       setAgentPresetId(card?.agentPresetId ?? defaultAgentId ?? agentPresets[0]?.id ?? "");
+      setAgentFlags(card?.agentFlags);
+      setUseWorktree(card?.useWorktree);
       setSelectedTemplateId(NO_TEMPLATE);
       setTemplateName("");
       setTargetConnId(primaryId);
@@ -124,6 +130,19 @@ export function CardModal({
     if (event.key === "Backspace" && !tagInput) {
       setTagList((current) => current.slice(0, -1));
     }
+  };
+
+  const selectedPreset = useMemo(
+    () => agentPresets.find((preset) => preset.id === agentPresetId),
+    [agentPresets, agentPresetId],
+  );
+
+  const handlePresetChange = (value: string) => {
+    setAgentPresetId(value);
+    // Card-level overrides belong to the previous preset — drop them so the
+    // options editor falls back to the newly selected preset's defaults.
+    setAgentFlags(undefined);
+    setUseWorktree(undefined);
   };
 
   const handleTemplateChange = (value: string) => {
@@ -163,6 +182,8 @@ export function CardModal({
           tags: tagList.join(", "),
           agentPresetId: agentPresetId || undefined,
           workingDir: workingDir.trim() || undefined,
+          agentFlags,
+          useWorktree,
         },
         status,
         mode === "add" ? targetConnId : undefined,
@@ -186,6 +207,8 @@ export function CardModal({
           tags: tagList.join(", "),
           agentPresetId: agentPresetId || undefined,
           workingDir: workingDir.trim() || undefined,
+          agentFlags,
+          useWorktree,
         },
         status,
       );
@@ -338,7 +361,7 @@ export function CardModal({
             {agentPresets.length > 0 && (
               <div className="space-y-2">
                 <Label>{t("agentPreset")}</Label>
-                <Select value={agentPresetId} onValueChange={setAgentPresetId}>
+                <Select value={agentPresetId} onValueChange={handlePresetChange}>
                   <SelectTrigger>
                     <SelectValue placeholder={t("agentPresetPlaceholder")} />
                   </SelectTrigger>
@@ -350,6 +373,15 @@ export function CardModal({
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedPreset && (
+                  <AgentOptions
+                    binary={selectedPreset.binary}
+                    flags={agentFlags ?? selectedPreset.flags ?? []}
+                    useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
+                    onFlagsChange={setAgentFlags}
+                    onWorktreeChange={setUseWorktree}
+                  />
+                )}
               </div>
             )}
 
@@ -360,13 +392,14 @@ export function CardModal({
                 <span className="font-normal text-muted-foreground">({t("optional")})</span>
               </Label>
               <div className="flex gap-2">
-                <Input
-                  id="card-working-dir"
-                  value={workingDir}
-                  onChange={(event) => setWorkingDir(event.target.value)}
-                  placeholder={t("workingDirPlaceholder")}
-                  className="font-mono text-xs"
-                />
+                <div className="flex-1">
+                  <WorkingDirField
+                    id="card-working-dir"
+                    value={workingDir}
+                    onChange={setWorkingDir}
+                    placeholder={t("workingDirPlaceholder")}
+                  />
+                </div>
                 {mode === "edit" && card && onOpenWorkingDir && (
                   <Button
                     type="button"
@@ -401,7 +434,7 @@ export function CardModal({
             </div>
 
             {onSaveTemplate && (
-              <div className="rounded-lg border bg-muted/40 p-3">
+              <div className="rounded-lg border bg-foreground/5 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
                     value={templateName}
@@ -438,7 +471,7 @@ export function CardModal({
             )}
 
             {mode === "edit" && runStats.count > 0 && (
-              <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/40 p-3 text-center">
+              <div className="grid grid-cols-3 gap-2 rounded-lg border bg-foreground/5 p-3 text-center">
                 <Stat label={t("stats.runs")} value={String(runStats.count)} />
                 <Stat label={t("stats.totalTime")} value={formatDuration(runStats.totalMs)} />
                 <Stat
