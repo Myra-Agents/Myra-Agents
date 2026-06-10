@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { invoke } from "@tauri-apps/api/core";
+import { LogicalSize } from "@tauri-apps/api/dpi";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import {
   AlertCircleIcon,
   AppWindowIcon,
@@ -35,11 +37,49 @@ async function cmd(name: string, args?: Record<string, unknown>): Promise<void> 
 export default function TrayPopover() {
   const { cards } = useKanban();
   const { connections } = useConnections();
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(id);
+  }, []);
+
+  // The status dot derives from the connection registry, which differs between
+  // the static prerender (no localStorage) and the live client — gate it behind
+  // mount so the first client render matches the server HTML (no hydration warning).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Make the window background transparent so the card's rounded corners show
+  // the desktop behind them, not an opaque square (the shared root layout sets
+  // an opaque body background for the main app).
+  useEffect(() => {
+    const html = document.documentElement.style.background;
+    const body = document.body.style.background;
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+    return () => {
+      document.documentElement.style.background = html;
+      document.body.style.background = body;
+    };
+  }, []);
+
+  // Size the native window to the panel's content height, so it never shows a
+  // big empty void below the actions. Re-runs whenever the content reflows.
+  useLayoutEffect(() => {
+    if (!isTauri()) return;
+    const el = rootRef.current;
+    if (!el) return;
+    const win = getCurrentWebviewWindow();
+    const apply = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      if (h > 0) void win.setSize(new LogicalSize(360, h));
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   const attention = useMemo(
@@ -49,7 +89,7 @@ export default function TrayPopover() {
   const running = useMemo(() => cards.filter((c) => c.status === "in_progress" || c.agentQueued), [cards]);
   const { daily, kpis } = useMemo(() => buildStats(cards), [cards]);
   const hasStats = daily.some((d) => d.completed + d.failed > 0);
-  const online = connections.some((c) => c.status === "connected");
+  const online = mounted && connections.some((c) => c.status === "connected");
 
   const openMain = (path: string, newTask = false) => cmd("open_main", { path, newTask });
 
@@ -72,7 +112,10 @@ export default function TrayPopover() {
   }, []);
 
   return (
-    <div className="bg-popover text-popover-foreground border-border flex h-screen w-screen flex-col overflow-hidden rounded-xl border text-sm">
+    <div
+      ref={rootRef}
+      className="bg-popover text-popover-foreground border-border flex w-screen flex-col overflow-hidden rounded-[18px] border text-sm"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3.5 pb-2.5">
         <div className="flex items-center gap-2.5">
@@ -105,7 +148,7 @@ export default function TrayPopover() {
       )}
 
       {/* Running agents */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-2">
+      <div className="max-h-64 overflow-y-auto px-2 pb-1">
         <div className="text-muted-foreground px-2 pb-1 text-xs">Agents</div>
         {running.length === 0 ? (
           <p className="text-muted-foreground px-2 py-1.5 text-xs">No agent running.</p>
