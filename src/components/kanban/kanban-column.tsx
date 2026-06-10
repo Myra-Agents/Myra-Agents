@@ -85,7 +85,7 @@ export function KanbanColumn({
         ref={setNodeRef}
         className={[
           "flex-1 flex flex-col gap-2 p-2 min-h-0 overflow-y-auto rounded-lg border border-dashed transition-colors duration-200",
-          isOver ? "border-primary/50 bg-primary/5" : "border-transparent bg-muted/30",
+          isOver ? "border-primary/50 bg-primary/10" : "border-transparent bg-foreground/5",
         ].join(" ")}
       >
         {cards.length === 0 && (
