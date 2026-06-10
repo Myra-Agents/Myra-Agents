@@ -723,6 +723,8 @@
     "searchModels": "Rechercher un modèle…",
     "loadingModels": "Chargement des modèles…",
     "noModelFound": "Aucun modèle trouvé",
+    "modelFree": "gratuit",
+    "modelCost": "{input} $ entrée · {output} $ sortie /M",
     "selectModel": "Sélectionner un modèle…",
     "effortNeedsModel": "Sélectionnez d'abord un modèle",
     "effortNoVariants": "Ce modèle n'a pas de variantes d'effort"

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckIcon, GitBranchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -14,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { AgentFlagDef, AgentModelsResult } from "@/types/settings";
+import type { AgentFlagDef, AgentModelCost, AgentModelsResult } from "@/types/settings";
 import { AGENT_FLAG_CATALOG, opencodeVariantsForModel, sortOpencodeVariants } from "@/types/settings";
 
 interface AgentOptionsProps {
@@ -40,6 +41,24 @@ function flagValue(flags: string[], def: AgentFlagDef): string {
   return eq >= 0 && token ? token.slice(eq + 1) : "";
 }
 
+/** $/M-token pricing for a model: green "free" badge, muted price, or nothing. */
+function ModelCostHint({ cost }: { cost?: AgentModelCost }) {
+  const t = useTranslations("agents");
+  if (!cost) return null;
+  if (cost.input === 0 && cost.output === 0) {
+    return (
+      <Badge variant="outline" className="border-green-500/30 bg-green-500/10 px-1.5 text-[10px] text-green-600">
+        {t("modelFree")}
+      </Badge>
+    );
+  }
+  return (
+    <span className="whitespace-nowrap text-[10px] text-muted-foreground">
+      {t("modelCost", { input: String(cost.input), output: String(cost.output) })}
+    </span>
+  );
+}
+
 /** Sentinel for "flag not set" in the effort dropdown (= the model's default effort). */
 const DEFAULT_VALUE = "__default__";
 
@@ -54,6 +73,7 @@ function ModelPicker({
   value,
   onChange,
   models,
+  cost,
   failed,
   onOpen,
 }: {
@@ -61,6 +81,7 @@ function ModelPicker({
   value: string;
   onChange: (value: string) => void;
   models: string[] | null;
+  cost?: Record<string, AgentModelCost>;
   failed: boolean;
   onOpen: () => void;
 }) {
@@ -110,7 +131,10 @@ function ModelPicker({
                   }}
                 >
                   <CheckIcon className={cn("size-3.5", value === model ? "opacity-100" : "opacity-0")} />
-                  <span className="font-mono text-xs">{model}</span>
+                  <span className="truncate font-mono text-xs">{model}</span>
+                  <span className="ml-auto">
+                    <ModelCostHint cost={cost?.[model]} />
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -270,14 +294,18 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
                 {t(`flags.${def.flag}`)}
               </span>
               {def.optionsRpc === "list_models" ? (
-                <ModelPicker
-                  def={def}
-                  value={value}
-                  onChange={(v) => setModelFlag(def, v)}
-                  models={modelsResult?.models ?? null}
-                  failed={modelsFailed}
-                  onOpen={() => setModelsRequested(true)}
-                />
+                <>
+                  <ModelPicker
+                    def={def}
+                    value={value}
+                    onChange={(v) => setModelFlag(def, v)}
+                    models={modelsResult?.models ?? null}
+                    cost={modelsResult?.cost}
+                    failed={modelsFailed}
+                    onOpen={() => setModelsRequested(true)}
+                  />
+                  {value !== "" && <ModelCostHint cost={modelsResult?.cost?.[value]} />}
+                </>
               ) : choices ? (
                 <Select
                   value={value || DEFAULT_VALUE}
