@@ -258,6 +258,13 @@ function Sidebar({
       data-peek={isPeeking ? "true" : undefined}
       data-slot="sidebar"
     >
+      {isPeeking && (
+        <div
+          data-slot="sidebar-peek-backdrop"
+          className="fade-in-0 fixed inset-0 z-50 animate-in bg-black/20 backdrop-blur-[2px] duration-150"
+          onClick={() => setPeek(false)}
+        />
+      )}
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"

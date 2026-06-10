@@ -176,7 +176,7 @@ export function MacSidebarControls() {
   return (
     <div
       aria-hidden="true"
-      className="h-10 w-19 shrink-0"
+      className="h-10 w-18 shrink-0"
       onMouseDown={startDragging}
       onDoubleClick={() => void toggleMaximize()}
     />
