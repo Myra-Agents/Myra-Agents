@@ -24,7 +24,7 @@ import { ConnectionsPanel } from "@/components/settings/connections-panel";
 // import { HubStatusCard } from "@/components/settings/hub-status-card";
 // Integrations, Plugins and Sync are parked for now — restore the imports with their tabs below.
 // import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
-import { LocalServerPanel } from "@/components/settings/local-server-panel";
+// import { LocalServerPanel } from "@/components/settings/local-server-panel";
 // import { PluginsPanel } from "@/components/settings/plugins-panel";
 // import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 // import { SyncPanel } from "@/components/settings/sync-panel";
@@ -336,7 +336,8 @@ export default function SettingsPage() {
           {/* User connection disabled — hub status + remote access removed. */}
           {/* {isPro && <HubStatusCard />} */}
           <ConnectionsPanel />
-          {isTauri() && <LocalServerPanel />}
+          {/* Local server setup disabled — temporary session server still runs in the background. */}
+          {/* {isTauri() && <LocalServerPanel />} */}
           {/* {isTauri() && isPro && <RemoteAccessPanel />} */}
         </TabsContent>
 
