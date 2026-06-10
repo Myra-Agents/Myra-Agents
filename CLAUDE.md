@@ -52,6 +52,22 @@ The window is frameless (`decorations: false`, `transparent: true`) — window
 controls live in `src/app/(main)/_components/window-controls.tsx`. Closing the
 window hides to the tray instead of quitting (see `on_window_event` in `lib.rs`).
 
+macOS uses native Overlay traffic lights (AppKit, configured in `tauri.conf.json`).
+Windows/Linux render a custom titlebar: Windows 11-style (full-height flat buttons,
+red hover on close) or Linux GNOME-style (colored circles). Platform is detected
+via `navigator.userAgent`.
+
+**Dev preview** — force a platform style in `bun run dev` (browser, no Tauri):
+
+```js
+// In the browser console at localhost:1420:
+localStorage.setItem("myra:dev:platform", "windows"); location.reload(); // Windows 11
+localStorage.setItem("myra:dev:platform", "linux");   location.reload(); // Linux GNOME
+localStorage.removeItem("myra:dev:platform");          location.reload(); // reset
+```
+
+Override is ignored in production builds.
+
 ## Architecture
 
 ### Desktop shell (`src-tauri/src/`)
