@@ -622,7 +622,8 @@
       "workingDirPlaceholder": "Default directory (optional)",
       "maxConcurrent": "Max concurrent agents",
       "maxConcurrentHint": "How many agents may run at once. 0 = unlimited; extra launches are queued.",
-      "options": "Options"
+      "options": "Options",
+      "checkingInstall": "Checking whether the agent is installed…"
     },
     "preferences": {
       "title": "Preferences",

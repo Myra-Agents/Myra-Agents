@@ -622,7 +622,8 @@
       "workingDirPlaceholder": "Répertoire par défaut (optionnel)",
       "maxConcurrent": "Agents simultanés max",
       "maxConcurrentHint": "Nombre d’agents pouvant s’exécuter en même temps. 0 = illimité ; les lancements en trop sont mis en file.",
-      "options": "Options"
+      "options": "Options",
+      "checkingInstall": "Vérification de l'installation de l'agent…"
     },
     "preferences": {
       "title": "Préférences",

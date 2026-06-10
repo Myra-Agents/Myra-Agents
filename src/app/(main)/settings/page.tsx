@@ -5,6 +5,7 @@ import { type ChangeEvent, useCallback, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   DownloadIcon,
+  Loader2Icon,
   PaletteIcon,
   PlusIcon,
   SaveIcon,
@@ -71,6 +72,9 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: Agen
   const [configureAnyway, setConfigureAnyway] = useState(false);
   // Gate only when we *can* install it (known binary) and a check confirmed it's missing.
   const gated = !configureAnyway && bin.missing && Boolean(bin.installInfo);
+  // Until the first check resolves we don't know fields-or-gate — show a loading
+  // row instead of flashing the config fields and swapping them out.
+  const pendingCheck = !bin.resolved && Boolean(bin.installInfo);
 
   return (
     <div className="space-y-2 rounded-md border p-3">
@@ -85,7 +89,12 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: Agen
           </Button>
         )}
       </div>
-      {gated ? (
+      {pendingCheck ? (
+        <div className="flex items-center justify-center gap-2 rounded-md border border-dashed px-4 py-6 text-muted-foreground text-xs">
+          <Loader2Icon className="size-3.5 animate-spin" />
+          {t("agents.checkingInstall")}
+        </div>
+      ) : gated ? (
         <AgentInstallGate state={bin} onConfigureAnyway={() => setConfigureAnyway(true)} />
       ) : (
         <>
