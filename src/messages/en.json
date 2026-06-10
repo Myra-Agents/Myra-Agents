@@ -722,6 +722,8 @@
     "defaultOption": "Default",
     "searchModels": "Search models…",
     "loadingModels": "Loading models…",
-    "noModelFound": "No model found"
+    "noModelFound": "No model found",
+    "effortNeedsModel": "Select a model first",
+    "effortNoVariants": "This model has no effort variants"
   }
 }

@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { AgentFlagDef, AgentModelsResult } from "@/types/settings";
-import { AGENT_FLAG_CATALOG, opencodeVariantsForModel } from "@/types/settings";
+import { AGENT_FLAG_CATALOG, opencodeVariantsForModel, sortOpencodeVariants } from "@/types/settings";
 
 interface AgentOptionsProps {
   /** Binary the preset runs — selects the flag catalog (e.g. "opencode"). */
@@ -44,44 +44,28 @@ function flagValue(flags: string[], def: AgentFlagDef): string {
 const DEFAULT_VALUE = "__default__";
 
 /**
- * Searchable model picker for a featured value flag. Choices come from the
- * `list_models` rpc (runs e.g. `opencode models` on the connected machine);
- * when the rpc is unavailable (older sidecar, binary missing) it degrades to a
- * free-text input so the flag stays editable.
+ * Searchable model picker for a featured value flag. Presentational — the
+ * `list_models` fetch lives in {@link AgentOptions} (the effort dropdown needs
+ * the per-model variants too); when the rpc is unavailable (older sidecar,
+ * binary missing) it degrades to a free-text input so the flag stays editable.
  */
 function ModelPicker({
-  binary,
   def,
   value,
   onChange,
+  models,
+  failed,
+  onOpen,
 }: {
-  binary: string;
   def: AgentFlagDef;
   value: string;
   onChange: (value: string) => void;
+  models: string[] | null;
+  failed: boolean;
+  onOpen: () => void;
 }) {
   const t = useTranslations("agents");
   const [open, setOpen] = useState(false);
-  const [models, setModels] = useState<string[] | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  // Lazy-load on first open: the rpc shells out to the agent CLI.
-  useEffect(() => {
-    if (!open || models !== null || failed) return;
-    let cancelled = false;
-    invoke<AgentModelsResult>("list_models", { binary })
-      .then((result) => {
-        if (cancelled) return;
-        if (result.models.length > 0) setModels(result.models);
-        else setFailed(true);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, models, failed, binary]);
 
   if (failed) {
     return (
@@ -96,7 +80,13 @@ function ModelPicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) onOpen();
+      }}
+    >
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="xs" title={def.flag} className="max-w-56">
           <span className="truncate font-mono">{value || t("defaultOption")}</span>
@@ -143,13 +133,16 @@ function ModelPicker({
  * Checkbox + dropdown + multiselect editor for an agent's CLI flags and the
  * worktree toggle. Featured boolean flags render as dedicated checkboxes;
  * featured value flags (model, effort) render as dropdowns — the model list is
- * fetched live from the agent CLI, the effort choices follow the selected
- * model's provider. Every catalog flag stays reachable through the "all
+ * fetched live from the agent CLI, the effort choices are the selected model's
+ * own variants. Every catalog flag stays reachable through the "all
  * options" popover; value-taking flags are stored as `--flag=value` tokens.
  */
 export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWorktreeChange }: AgentOptionsProps) {
   const t = useTranslations("agents");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [modelsResult, setModelsResult] = useState<AgentModelsResult | null>(null);
+  const [modelsFailed, setModelsFailed] = useState(false);
+  const [modelsRequested, setModelsRequested] = useState(false);
 
   const catalog = useMemo(() => AGENT_FLAG_CATALOG[binary.trim()] ?? [], [binary]);
   const featuredBools = catalog.filter((def) => def.featured && !def.takesValue);
@@ -189,13 +182,67 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
   const modelDef = featuredValues.find((def) => def.optionsRpc === "list_models");
   const modelValue = modelDef ? flagValue(flags, modelDef) : "";
 
-  // Static or provider-derived choices for a featured value flag. `--variant`
-  // is opencode's reasoning effort — its choices depend on the selected
-  // model's provider (the CLI has no way to enumerate them).
+  // Reset the fetched models when the preset's binary changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: binary is the reset trigger
+  useEffect(() => {
+    setModelsResult(null);
+    setModelsFailed(false);
+    setModelsRequested(false);
+  }, [binary]);
+
+  // Fetch models lazily — when the picker opens, or right away when a model is
+  // already set (the effort dropdown needs its variants). The rpc shells out
+  // to the agent CLI on the connected machine.
+  useEffect(() => {
+    if (!modelDef || modelsResult !== null || modelsFailed) return;
+    if (!modelsRequested && !modelValue) return;
+    let cancelled = false;
+    invoke<AgentModelsResult>("list_models", { binary: binary.trim() })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.models.length > 0) setModelsResult(result);
+        else setModelsFailed(true);
+      })
+      .catch(() => {
+        if (!cancelled) setModelsFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modelDef, modelsResult, modelsFailed, modelsRequested, modelValue, binary]);
+
+  // Effort choices for a model: exact per-model list from the rpc when the
+  // server provides one (absent/empty = the model has no variants), otherwise
+  // the static per-provider fallback. No model selected → none.
+  const variantChoicesFor = (model: string): string[] => {
+    if (!model) return [];
+    const fromRpc = modelsResult?.variants;
+    if (fromRpc) return sortOpencodeVariants(fromRpc[model] ?? []);
+    return opencodeVariantsForModel(model);
+  };
+
+  // Static, rpc-derived or provider-derived choices for a featured value flag.
+  // `--variant` is opencode's reasoning effort — its choices depend on the
+  // selected model.
   const choicesFor = (def: AgentFlagDef): string[] | undefined => {
     if (def.options) return def.options;
-    if (def.flag === "--variant") return opencodeVariantsForModel(modelValue);
+    if (def.flag === "--variant") return variantChoicesFor(modelValue);
     return undefined;
+  };
+
+  // Model changes go through here so a `--variant` the new model doesn't
+  // support is dropped in the same update.
+  const setModelFlag = (def: AgentFlagDef, value: string) => {
+    let next = flags.filter((token) => flagName(token) !== def.flag);
+    if (value) next = [...next, `${def.flag}=${value}`];
+    const variantDef = catalog.find((item) => item.flag === "--variant");
+    if (variantDef) {
+      const current = flagValue(next, variantDef);
+      if (current && !variantChoicesFor(value).includes(current)) {
+        next = next.filter((token) => flagName(token) !== variantDef.flag);
+      }
+    }
+    onFlagsChange(next);
   };
 
   return (
@@ -221,26 +268,31 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
         {featuredValues.map((def) => {
           const value = flagValue(flags, def);
           const choices = choicesFor(def);
+          // Effort is meaningless until a model is picked, and some models
+          // (e.g. opencode/big-pickle) support no variants at all.
+          const variantDisabled = def.flag === "--variant" && (!modelValue || choices?.length === 0);
+          const disabledHint = !modelValue ? t("effortNeedsModel") : t("effortNoVariants");
           return (
             <div key={def.flag} className="flex items-center gap-1.5">
               <span className="text-muted-foreground text-xs" title={def.flag}>
                 {t(`flags.${def.flag}`)}
               </span>
               {def.optionsRpc === "list_models" ? (
-                // key resets the fetched list when the preset's binary changes
                 <ModelPicker
-                  key={binary.trim()}
-                  binary={binary.trim()}
                   def={def}
                   value={value}
-                  onChange={(v) => setValueFlag(def, v)}
+                  onChange={(v) => setModelFlag(def, v)}
+                  models={modelsResult?.models ?? null}
+                  failed={modelsFailed}
+                  onOpen={() => setModelsRequested(true)}
                 />
               ) : choices ? (
                 <Select
                   value={value || DEFAULT_VALUE}
                   onValueChange={(v) => setValueFlag(def, v === DEFAULT_VALUE ? "" : v)}
+                  disabled={variantDisabled}
                 >
-                  <SelectTrigger size="sm" className="text-xs" title={def.flag}>
+                  <SelectTrigger size="sm" className="text-xs" title={variantDisabled ? disabledHint : def.flag}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
