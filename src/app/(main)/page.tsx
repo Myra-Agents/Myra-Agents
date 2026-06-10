@@ -14,8 +14,6 @@ import {
   CloudOffIcon,
   LoaderIcon,
   PlusIcon,
-  ServerIcon,
-  ServerOffIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Area, AreaChart, Bar, BarChart, XAxis } from "recharts";
@@ -26,7 +24,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { useHubStatus } from "@/hooks/use-hub-status";
 import { useKanban } from "@/hooks/use-kanban";
-import { useLocalServer } from "@/hooks/use-local-server";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useShortcutStore } from "@/stores/shortcut-store";
 import type { AgentRun, KanbanCard } from "@/types/kanban";
@@ -468,23 +465,10 @@ function RunStatusBadge({ status }: { status: AgentRun["status"] }) {
 /** Compact local-server + hub health, top-right of the page header. */
 function HealthChips() {
   const t = useTranslations("home.health");
-  const { status } = useLocalServer();
   const { configured, availability, instanceCount } = useHubStatus();
 
   return (
     <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground">
-      {status &&
-        (status.running ? (
-          <span className="flex items-center gap-1" title={t("serverRunning", { port: status.port })}>
-            <ServerIcon className="size-3.5 text-emerald-500" />
-            {t("server")}
-          </span>
-        ) : (
-          <span className="flex items-center gap-1" title={t("serverStopped")}>
-            <ServerOffIcon className="size-3.5 text-destructive" />
-            {t("server")}
-          </span>
-        ))}
       {configured &&
         (availability === "online" ? (
           <span className="flex items-center gap-1" title={t("hubOnline", { count: instanceCount })}>
