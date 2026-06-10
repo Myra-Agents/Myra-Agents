@@ -285,9 +285,10 @@ function Sidebar({
         }
         className={cn(
           "fixed inset-y-0 z-10 flex h-svh w-(--sidebar-width) transition-[left,right,width] duration-150 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          // Peek: float a narrower panel back in, above the content. The p-2
-          // detaches it from the window edges whatever the variant.
-          "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) group-data-[peek=true]:p-2 group-data-[peek=true]:border-r-0 data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
+          // Peek: slide a narrower, full-height panel back in over the
+          // content, flush with the window edge (Linear-style) — the native
+          // macOS traffic lights sit inside its top row.
+          "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -301,7 +302,7 @@ function Sidebar({
           data-slot="sidebar-inner"
           className={cn(
             "flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
-            "group-data-[peek=true]:rounded-lg group-data-[peek=true]:shadow-lg group-data-[peek=true]:ring-1 group-data-[peek=true]:ring-sidebar-border"
+            "group-data-[peek=true]:shadow-xl"
           )}
         >
           {children}
