@@ -17,7 +17,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { AgentOptions } from "@/components/agents/agent-options";
-import { AgentBinaryStatus } from "@/components/agents/binary-status";
+import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
 // User connection disabled — hub status, remote access and cloud sync are off.
@@ -49,6 +49,97 @@ type DataAction = "export" | "import" | "clear";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+interface AgentPresetCardProps {
+  preset: AgentPreset;
+  idx: number;
+  isDefault: boolean;
+  t: ReturnType<typeof useTranslations>;
+  onUpdate: (idx: number, patch: Partial<AgentPreset>) => void;
+  onRemove: (idx: number) => void;
+}
+
+/**
+ * One agent preset row. Calls `useBinaryStatus` once so the header badge and the
+ * install gate share a single `check_binary`. While the binary is a known,
+ * installable CLI that isn't present, the config fields are replaced by an
+ * install gate (auto / manual) — unless the user opts to configure anyway.
+ */
+function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: AgentPresetCardProps) {
+  const bin = useBinaryStatus(preset.binary);
+  const [configureAnyway, setConfigureAnyway] = useState(false);
+  // Gate only when we *can* install it (known binary) and a check confirmed it's missing.
+  const gated = !configureAnyway && bin.missing && Boolean(bin.installInfo);
+
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label className="font-semibold text-sm">{preset.name}</Label>
+          <AgentStatusBadge {...bin} />
+        </div>
+        {!isDefault && (
+          <Button variant="ghost" size="icon-xs" onClick={() => onRemove(idx)}>
+            <TrashIcon />
+          </Button>
+        )}
+      </div>
+      {gated ? (
+        <AgentInstallGate state={bin} onConfigureAnyway={() => setConfigureAnyway(true)} />
+      ) : (
+        <>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">{t("agents.name")}</Label>
+              <Input
+                value={preset.name}
+                onChange={(event) => onUpdate(idx, { name: event.target.value })}
+                className="h-7 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("agents.binary")}</Label>
+              <Input
+                value={preset.binary}
+                onChange={(event) => onUpdate(idx, { binary: event.target.value })}
+                className="h-7 font-mono text-xs"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("agents.argsTemplate")}</Label>
+            <Input
+              value={preset.argsTemplate}
+              onChange={(event) => onUpdate(idx, { argsTemplate: event.target.value })}
+              placeholder="{prompt}"
+              className="h-7 font-mono text-xs"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("agents.workingDir")}</Label>
+            <WorkingDirField
+              value={preset.workingDir ?? ""}
+              onChange={(value) => onUpdate(idx, { workingDir: value || undefined })}
+              placeholder={t("agents.workingDirPlaceholder")}
+              inputClassName="h-7"
+              compact
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">{t("agents.options")}</Label>
+            <AgentOptions
+              binary={preset.binary}
+              flags={preset.flags ?? []}
+              useWorktree={preset.useWorktree ?? false}
+              onFlagsChange={(flags) => onUpdate(idx, { flags })}
+              onWorktreeChange={(useWorktree) => onUpdate(idx, { useWorktree })}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function SettingsPage() {
@@ -356,66 +447,15 @@ export default function SettingsPage() {
               <Separator />
 
               {current.agents.map((preset, idx) => (
-                <div key={preset.id} className="space-y-2 rounded-md border p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Label className="font-semibold text-sm">{preset.name}</Label>
-                      <AgentBinaryStatus binary={preset.binary} />
-                    </div>
-                    {!DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id) && (
-                      <Button variant="ghost" size="icon-xs" onClick={() => removePreset(idx)}>
-                        <TrashIcon />
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t("agents.name")}</Label>
-                      <Input
-                        value={preset.name}
-                        onChange={(event) => updatePreset(idx, { name: event.target.value })}
-                        className="h-7 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t("agents.binary")}</Label>
-                      <Input
-                        value={preset.binary}
-                        onChange={(event) => updatePreset(idx, { binary: event.target.value })}
-                        className="h-7 font-mono text-xs"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">{t("agents.argsTemplate")}</Label>
-                    <Input
-                      value={preset.argsTemplate}
-                      onChange={(event) => updatePreset(idx, { argsTemplate: event.target.value })}
-                      placeholder="{prompt}"
-                      className="h-7 font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">{t("agents.workingDir")}</Label>
-                    <WorkingDirField
-                      value={preset.workingDir ?? ""}
-                      onChange={(value) => updatePreset(idx, { workingDir: value || undefined })}
-                      placeholder={t("agents.workingDirPlaceholder")}
-                      inputClassName="h-7"
-                      compact
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">{t("agents.options")}</Label>
-                    <AgentOptions
-                      binary={preset.binary}
-                      flags={preset.flags ?? []}
-                      useWorktree={preset.useWorktree ?? false}
-                      onFlagsChange={(flags) => updatePreset(idx, { flags })}
-                      onWorktreeChange={(useWorktree) => updatePreset(idx, { useWorktree })}
-                    />
-                  </div>
-                </div>
+                <AgentPresetCard
+                  key={preset.id}
+                  preset={preset}
+                  idx={idx}
+                  isDefault={DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id)}
+                  t={t}
+                  onUpdate={updatePreset}
+                  onRemove={removePreset}
+                />
               ))}
             </CardContent>
           </Card>
