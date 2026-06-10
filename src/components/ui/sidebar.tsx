@@ -281,6 +281,7 @@ function Sidebar({
         ref={containerRef}
         data-slot="sidebar-container"
         data-side={side}
+        onMouseLeave={isPeeking ? () => setPeek(false) : undefined}
         onClickCapture={
           isPeeking
             ? (event) => {

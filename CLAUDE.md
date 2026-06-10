@@ -46,6 +46,30 @@ cd src-tauri && cargo check      # Rust backend
 npx biome check                  # lint/format (use --write to fix)
 ```
 
+**Which app instance am I launching?** Several builds can coexist on this Mac and
+they all share the bundle id `com.myra-agents.app` / name "Myra Agents": the dev
+build of this checkout (`target/debug/app`, a **raw binary**, not a `.app`
+bundle), dev builds from other git worktrees, release bundles inside *any*
+checkout's `src-tauri/target/release/bundle/macos/`, and an installed release in
+`/Applications`. Anything that resolves the app by **name or bundle id** —
+`open -a "Myra Agents"`, LaunchServices, AppleScript `tell application "Myra
+Agents"`, computer-use `open_application`, even app *activation* during
+screenshots — launches/relaunches whatever **bundle** LaunchServices has
+registered (typically a stale release from another checkout), never the dev
+binary. This can look like the old app "respawning" after being killed. To
+target the dev instance: launch it explicitly with `bun run tauri:dev` from the
+intended checkout/worktree, find it with `pgrep -fl "target/debug/app"` (the
+binary path tells worktrees apart), and bring it forward **by PID**
+(`osascript -e 'tell application "System Events" to set frontmost of (first
+application process whose unix id is <PID>) to true'`). If a stale bundle keeps
+hijacking name/bundle-id resolution, unregister it:
+`/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u "<path>/Myra Agents.app"`
+(reversible with `-f`). Note: macOS screen-capture tooling that filters by app
+bundle (computer-use screenshots) can't see the raw dev binary's window — verify
+UI in the browser at `localhost:1420` instead. Closing the window hides to tray
+— a live process without a window is normal; relaunch `tauri:dev` for a fresh
+window.
+
 `next.config` does a static export to `out/`, which Tauri loads as
 `frontendDist`. App identifier `com.myra-agents.app`, product name "Myra Agents".
 The window is frameless (`decorations: false`, `transparent: true`) — window
