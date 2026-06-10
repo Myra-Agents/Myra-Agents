@@ -38,6 +38,9 @@ export function useBinaryStatus(binary: string) {
   const t = useTranslations("agents");
   const [status, setStatus] = useState<BinaryStatus | null>(null);
   const [checking, setChecking] = useState(false);
+  // First check_binary round-trip done (success OR error) — until then callers
+  // should show a loading state instead of guessing gated/not-gated.
+  const [resolved, setResolved] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [instructionsOpen, setInstructionsOpen] = useState(false);
 
@@ -56,6 +59,7 @@ export function useBinaryStatus(binary: string) {
       setStatus(null);
     } finally {
       setChecking(false);
+      setResolved(true);
     }
   }, [name]);
 
@@ -82,6 +86,7 @@ export function useBinaryStatus(binary: string) {
     name,
     status,
     checking,
+    resolved,
     installing,
     installInfo,
     instructionsOpen,
