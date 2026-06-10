@@ -5,8 +5,7 @@ import { AppSidebar } from "@/app/(main)/_components/sidebar/app-sidebar";
 // import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { RequirePro } from "@/components/require-pro";
 // import { RemoteAccessConsent } from "@/components/settings/remote-access-consent";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +14,12 @@ import { GlobalShortcuts } from "./_components/global-shortcuts";
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
-import { WindowControls, WindowDragRegion } from "./_components/window-controls";
+import {
+  HeaderSidebarTrigger,
+  MacHeaderControlsSpacer,
+  WindowControls,
+  WindowDragRegion,
+} from "./_components/window-controls";
 
 // Static export (Tauri desktop) build: no server-side cookies. Use defaults;
 // client-side PreferencesStoreProvider hydrates from document.cookie afterwards.
@@ -30,7 +34,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       className="min-h-[calc(100svh_-_var(--titlebar-h,0px))] pt-[var(--titlebar-h,0px)]"
       style={
         {
-          "--sidebar-width": "calc(var(--spacing) * 68)",
+          // Linear-style narrow sidebar.
+          "--sidebar-width": "15rem",
           // Wide enough for the macOS traffic lights to sit inside the rail
           // when the sidebar is collapsed (WhatsApp-style).
           "--sidebar-width-icon": "4.5rem",
@@ -52,17 +57,14 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       >
         <header
           className={cn(
-            "flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
+            "flex h-10 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-10",
             "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
           )}
         >
-          <div className="flex h-full w-full items-center gap-3 px-4 lg:px-6">
-            <div className="flex items-center gap-1 lg:gap-2">
-              <SidebarTrigger className="-ml-1" />
-              <Separator
-                orientation="vertical"
-                className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
-              />
+          <div className="flex h-full w-full items-center gap-2 px-3">
+            <div className="flex items-center gap-2">
+              <MacHeaderControlsSpacer />
+              <HeaderSidebarTrigger />
               <SearchDialog />
             </div>
             <WindowDragRegion />

@@ -136,13 +136,13 @@ export function SearchDialog() {
     <>
       <Button
         onClick={() => handleOpenChange(true)}
-        variant="link"
-        className="px-0! font-normal text-muted-foreground hover:no-underline"
+        variant="outline"
+        className="h-7 w-52 justify-start gap-2 rounded-md border-input/60 bg-muted/40 px-2.5 font-normal text-[13px] text-muted-foreground shadow-none hover:bg-muted/70 hover:text-muted-foreground"
       >
-        <Search data-icon="inline-start" />
+        <Search data-icon="inline-start" className="size-3.5!" />
         Search
-        <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
-          <span className="text-xs">⌘</span>J
+        <kbd className="ml-auto inline-flex h-4.5 select-none items-center gap-0.5 rounded border bg-muted px-1 font-medium text-[10px]">
+          <span>⌘</span>J
         </kbd>
       </Button>
       <CommandDialog open={open} onOpenChange={handleOpenChange}>
