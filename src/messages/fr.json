@@ -294,6 +294,44 @@
       "fri": "Ven",
       "sat": "Sam",
       "sun": "Dim"
+    },
+    "ideas": {
+      "heading": "Plus d'idées",
+      "dailyBrief": {
+        "label": "Brief quotidien",
+        "name": "Brief quotidien",
+        "cardTitle": "Brief quotidien",
+        "description": "Résumé matinal de l'activité du dépôt et du tableau.",
+        "prompt": "Résume ce qui a changé dans le dépôt depuis hier : nouveaux commits, PR ouvertes, checks en échec, et les cartes en attente de ma part. Garde un brief court en puces."
+      },
+      "standupPrep": {
+        "label": "Prépa daily scrum",
+        "name": "Prépa daily scrum",
+        "cardTitle": "Prépa daily scrum",
+        "description": "Points à dire au daily standup, prêts avant la réunion.",
+        "prompt": "Prépare mes notes pour le daily scrum en trois parties : Hier (commits poussés et cartes passées en Terminé), Aujourd'hui (cartes En cours et À faire que je compte traiter), Blocages (cartes bloquées en Retour attendu ou En attente de revue, et checks en échec). Garde chaque point sur une ligne courte."
+      },
+      "weeklyReview": {
+        "label": "Revue hebdomadaire",
+        "name": "Revue hebdomadaire",
+        "cardTitle": "Revue hebdomadaire",
+        "description": "Revue de fin de semaine du tableau et nettoyage des cartes inactives.",
+        "prompt": "Passe en revue le tableau Kanban : liste les cartes immobiles depuis plus d'une semaine, signale celles bloquées en Retour attendu ou En attente de revue, et propose une prochaine étape pour chacune."
+      },
+      "depUpdates": {
+        "label": "Mises à jour des dépendances",
+        "name": "Mises à jour des dépendances",
+        "cardTitle": "Mises à jour des dépendances",
+        "description": "Vérifie les dépendances obsolètes et propose des mises à jour.",
+        "prompt": "Vérifie les dépendances obsolètes, identifie celles qu'on peut mettre à jour sans risque, et prépare la mise à niveau avec une note sur les éventuels changements cassants."
+      },
+      "testSweep": {
+        "label": "Passe de tests",
+        "name": "Passe de tests",
+        "cardTitle": "Passe de tests",
+        "description": "Lance la suite de tests et signale les échecs.",
+        "prompt": "Lance toute la suite de tests. En cas d'échec, résume les échecs et la cause la plus probable pour chacun."
+      }
     }
   },
   "planner": {

@@ -294,6 +294,44 @@
       "fri": "Fri",
       "sat": "Sat",
       "sun": "Sun"
+    },
+    "ideas": {
+      "heading": "More ideas",
+      "dailyBrief": {
+        "label": "Daily brief",
+        "name": "Daily brief",
+        "cardTitle": "Daily brief",
+        "description": "Morning summary of overnight repo activity and the board.",
+        "prompt": "Summarize what changed in the repo since yesterday: new commits, open PRs, failing checks, and any cards waiting on me. Keep it to a short bulleted brief."
+      },
+      "standupPrep": {
+        "label": "Scrum daily prep",
+        "name": "Scrum daily prep",
+        "cardTitle": "Scrum daily prep",
+        "description": "Talking points for the daily standup, ready before the meeting.",
+        "prompt": "Prepare my daily scrum standup notes in three sections: Yesterday (commits I pushed and cards I moved to Done), Today (cards in In Progress and Todo I plan to work on), Blockers (cards stuck in Waiting Feedback or Awaiting Review, and any failing checks). Keep each point one short line."
+      },
+      "weeklyReview": {
+        "label": "Weekly review",
+        "name": "Weekly review",
+        "cardTitle": "Weekly review",
+        "description": "End-of-week board review and stale-card cleanup.",
+        "prompt": "Review the Kanban board: list cards that haven't moved in over a week, flag anything stuck in Waiting Feedback or Awaiting Review, and propose next steps for each."
+      },
+      "depUpdates": {
+        "label": "Dependency updates",
+        "name": "Dependency updates",
+        "cardTitle": "Dependency updates",
+        "description": "Check for outdated dependencies and propose bumps.",
+        "prompt": "Check for outdated dependencies, identify which are safe to bump, and draft the upgrade with a short note on any breaking changes."
+      },
+      "testSweep": {
+        "label": "Test sweep",
+        "name": "Test sweep",
+        "cardTitle": "Test sweep",
+        "description": "Run the test suite and report failures.",
+        "prompt": "Run the full test suite. If anything fails, summarize the failures and the most likely cause for each."
+      }
     }
   },
   "planner": {
