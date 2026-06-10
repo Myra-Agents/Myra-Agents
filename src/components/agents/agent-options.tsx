@@ -15,8 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { AgentFlagDef, AgentModelCost, AgentModelsResult } from "@/types/settings";
-import { AGENT_FLAG_CATALOG, opencodeVariantsForModel, sortOpencodeVariants } from "@/types/settings";
+import type { AgentFlagDef, AgentFlagsResult, AgentModelCost, AgentModelsResult } from "@/types/settings";
+import { AGENT_FLAG_CATALOG, mergeFlagCatalog, opencodeVariantsForModel, sortOpencodeVariants } from "@/types/settings";
 
 interface AgentOptionsProps {
   /** Binary the preset runs — selects the flag catalog (e.g. "opencode"). */
@@ -159,8 +159,15 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
   const [modelsResult, setModelsResult] = useState<AgentModelsResult | null>(null);
   const [modelsFailed, setModelsFailed] = useState(false);
   const [modelsRequested, setModelsRequested] = useState(false);
+  const [liveFlags, setLiveFlags] = useState<AgentFlagDef[] | null>(null);
+  const [flagsRequested, setFlagsRequested] = useState(false);
 
-  const catalog = useMemo(() => AGENT_FLAG_CATALOG[binary.trim()] ?? [], [binary]);
+  // Static catalog (curated metadata) extended with whatever the installed CLI
+  // actually advertises — fetched live so new opencode flags appear untouched.
+  const catalog = useMemo(() => {
+    const base = AGENT_FLAG_CATALOG[binary.trim()] ?? [];
+    return liveFlags ? mergeFlagCatalog(base, liveFlags) : base;
+  }, [binary, liveFlags]);
   const featuredBools = catalog.filter((def) => def.featured && !def.takesValue);
   const featuredValues = catalog.filter((def) => def.featured && def.takesValue);
   const knownFlags = useMemo(() => new Set(catalog.map((def) => def.flag)), [catalog]);
@@ -198,13 +205,32 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
   const modelDef = featuredValues.find((def) => def.optionsRpc === "list_models");
   const modelValue = modelDef ? flagValue(flags, modelDef) : "";
 
-  // Reset the fetched models when the preset's binary changes.
+  // Reset the fetched models/flags when the preset's binary changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: binary is the reset trigger
   useEffect(() => {
     setModelsResult(null);
     setModelsFailed(false);
     setModelsRequested(false);
+    setLiveFlags(null);
+    setFlagsRequested(false);
   }, [binary]);
+
+  // Fetch the live flag list when the "all options" popover first opens. A
+  // failure pins the static catalog (empty live list) instead of retrying.
+  useEffect(() => {
+    if (!flagsRequested || liveFlags !== null) return;
+    let cancelled = false;
+    invoke<AgentFlagsResult>("list_flags", { binary: binary.trim() })
+      .then((result) => {
+        if (!cancelled) setLiveFlags(result.flags);
+      })
+      .catch(() => {
+        if (!cancelled) setLiveFlags([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [flagsRequested, liveFlags, binary]);
 
   // Fetch models lazily — when the picker opens, or right away when a model is
   // already set (the effort dropdown needs its variants). The rpc shells out
@@ -340,7 +366,13 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
         })}
 
         {catalog.length > 0 && (
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <Popover
+            open={pickerOpen}
+            onOpenChange={(next) => {
+              setPickerOpen(next);
+              if (next) setFlagsRequested(true);
+            }}
+          >
             <PopoverTrigger asChild>
               <Button type="button" variant="outline" size="xs">
                 <SlidersHorizontalIcon className="size-3" />
