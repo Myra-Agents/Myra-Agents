@@ -13,6 +13,8 @@ export interface NavMainItem {
   title: string;
   url: string;
   icon?: LucideIcon;
+  /** Longer hover hint shown in the sidebar tooltip. */
+  description?: string;
   subItems?: NavSubItem[];
   comingSoon?: boolean;
   newTab?: boolean;
@@ -36,6 +38,7 @@ export const sidebarItems: NavGroup[] = [
         title: "Home",
         url: "/",
         icon: House,
+        description: "Your overview — recent activity and what needs attention across boards.",
       },
       // {
       //   title: "Inbox",
@@ -58,11 +61,13 @@ export const sidebarItems: NavGroup[] = [
         title: "Kanban",
         url: "/kanban",
         icon: Kanban,
+        description: "Track your agents' tasks across columns — drag cards to move work along.",
       },
       {
         title: "Schedules",
         url: "/schedules",
         icon: Calendar,
+        description: "Set up recurring and cron-triggered runs so agents fire on their own.",
       },
       // Day Planner is parked for now — re-enable with the ClipboardList icon import.
       // {
@@ -74,6 +79,7 @@ export const sidebarItems: NavGroup[] = [
         title: "Logs",
         url: "/logs",
         icon: ScrollText,
+        description: "Inspect run history and detailed execution output for every agent.",
       },
       // {
       //   title: "Views",
