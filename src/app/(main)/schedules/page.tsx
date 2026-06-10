@@ -167,8 +167,8 @@ export default function SchedulesPage() {
       ) : (
         <div className="space-y-2">
           {sorted.map((task) => (
-            <Card key={task.id} className={!task.enabled ? "opacity-60" : ""}>
-              <CardContent className="flex items-center gap-4 p-4">
+            <Card key={task.id} className={`py-0 ${!task.enabled ? "opacity-60" : ""}`}>
+              <CardContent className="flex items-center gap-4 px-4 py-2.5">
                 <Switch
                   checked={task.enabled}
                   onCheckedChange={(v) => toggleEnabled(task.id, v)}
