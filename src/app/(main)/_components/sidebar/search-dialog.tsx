@@ -137,7 +137,7 @@ export function SearchDialog() {
       <Button
         onClick={() => handleOpenChange(true)}
         variant="outline"
-        className="h-7 w-52 justify-start gap-2 rounded-md border-input/60 bg-muted/40 px-2.5 font-normal text-[13px] text-muted-foreground shadow-none hover:bg-muted/70 hover:text-muted-foreground"
+        className="h-7 w-52 justify-start gap-2 rounded-md border-input/60 bg-foreground/5 px-2.5 font-normal text-[13px] text-muted-foreground shadow-none hover:bg-foreground/10 hover:text-muted-foreground"
       >
         <Search data-icon="inline-start" className="size-3.5!" />
         Search

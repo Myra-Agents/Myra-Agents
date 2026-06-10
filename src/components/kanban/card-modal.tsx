@@ -434,7 +434,7 @@ export function CardModal({
             </div>
 
             {onSaveTemplate && (
-              <div className="rounded-lg border bg-muted/40 p-3">
+              <div className="rounded-lg border bg-foreground/5 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
                     value={templateName}
@@ -471,7 +471,7 @@ export function CardModal({
             )}
 
             {mode === "edit" && runStats.count > 0 && (
-              <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/40 p-3 text-center">
+              <div className="grid grid-cols-3 gap-2 rounded-lg border bg-foreground/5 p-3 text-center">
                 <Stat label={t("stats.runs")} value={String(runStats.count)} />
                 <Stat label={t("stats.totalTime")} value={formatDuration(runStats.totalMs)} />
                 <Stat
