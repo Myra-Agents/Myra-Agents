@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import { useRouter } from "next/navigation";
 
+import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import { useShortcutStore } from "@/stores/shortcut-store";
@@ -25,6 +26,9 @@ export function TrayActionListener() {
   const requestNewCard = useShortcutStore((s) => s.requestNewCard);
 
   useEffect(() => {
+    // The tray only exists in the desktop shell; in a plain browser the Tauri
+    // event API has no backend and would throw on transformCallback.
+    if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
     void listen<TrayNavigate>("tray-navigate", ({ payload }) => {
       router.push(payload.path);
