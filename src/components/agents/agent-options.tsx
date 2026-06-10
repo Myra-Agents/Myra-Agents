@@ -379,7 +379,7 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
                 {t("allOptions")}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="start">
+            <PopoverContent className="w-[26rem] p-0" align="start">
               <Command>
                 <CommandInput placeholder={t("searchOptions")} />
                 <CommandList>
@@ -394,8 +394,12 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
                           onSelect={() => setFlag(def, !selected)}
                         >
                           <CheckIcon className={cn("size-3.5", selected ? "opacity-100" : "opacity-0")} />
-                          <span className={cn("font-mono text-xs", def.danger && "text-destructive")}>{def.flag}</span>
-                          <span className="ml-auto truncate text-[10px] text-muted-foreground">{def.hint}</span>
+                          <span className={cn("whitespace-nowrap font-mono text-xs", def.danger && "text-destructive")}>
+                            {def.flag}
+                          </span>
+                          <span className="ml-auto truncate text-[10px] text-muted-foreground" title={def.hint}>
+                            {def.hint}
+                          </span>
                         </CommandItem>
                       );
                     })}
