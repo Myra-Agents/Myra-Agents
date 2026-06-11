@@ -21,6 +21,7 @@ import { AgentOptions } from "@/components/agents/agent-options";
 import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { ConnectionsPanel } from "@/components/settings/connections-panel";
+import { LocalModelsPanel } from "@/components/settings/local-models-panel";
 // User connection disabled — hub status, remote access and cloud sync are off.
 // import { HubStatusCard } from "@/components/settings/hub-status-card";
 // Integrations, Plugins and Sync are parked for now — restore the imports with their tabs below.
@@ -141,8 +142,12 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: Agen
               binary={preset.binary}
               flags={preset.flags ?? []}
               useWorktree={preset.useWorktree ?? false}
+              launchVia={preset.launchVia ?? "direct"}
+              ollamaModel={preset.ollamaModel ?? ""}
               onFlagsChange={(flags) => onUpdate(idx, { flags })}
               onWorktreeChange={(useWorktree) => onUpdate(idx, { useWorktree })}
+              onLaunchViaChange={(launchVia) => onUpdate(idx, { launchVia })}
+              onOllamaModelChange={(ollamaModel) => onUpdate(idx, { ollamaModel })}
             />
           </div>
         </>
@@ -333,6 +338,7 @@ export default function SettingsPage() {
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
+          <TabsTrigger value="localModels">{t("tabs.localModels")}</TabsTrigger>
           {/* Integrations, Sync and Plugins are parked for now.
           <TabsTrigger value="integrations">{t("tabs.integrations")}</TabsTrigger>
           <TabsTrigger value="sync">{t("tabs.sync")}</TabsTrigger>
@@ -469,6 +475,10 @@ export default function SettingsPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="localModels" className="space-y-6">
+          <LocalModelsPanel />
         </TabsContent>
 
         {/* Integrations, Sync and Plugins are parked for now.
