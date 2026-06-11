@@ -82,14 +82,17 @@ export function useOllama() {
   }, [refresh]);
 
   const pull = useCallback(
-    async (model: string) => {
+    async (model: string): Promise<OllamaPullProgress | null> => {
       const tag = model.trim();
-      if (!tag) return;
+      if (!tag) return null;
       // Seed an immediate "queued" frame so the UI shows activity pre-stream.
       setPulling((prev) => ({ ...prev, [tag]: { model: tag, status: "queued" } }));
       try {
-        await invoke("ollama_pull", { model: tag });
+        // The rpc resolves with the terminal frame — `status: "success"` on a
+        // completed pull, `"cancelled"` when stopped — so callers can tell them apart.
+        const result = await invoke<OllamaPullProgress>("ollama_pull", { model: tag });
         await refresh();
+        return result;
       } finally {
         setPulling((prev) => {
           const next = { ...prev };

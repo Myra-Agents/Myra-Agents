@@ -82,8 +82,12 @@ export function LocalModelManager({ ollama }: { ollama: UseOllama }) {
 
   const doPull = async (tag: string) => {
     try {
-      await pull(tag);
-      toast.success(t("local.pullDone", { model: tag }));
+      const result = await pull(tag);
+      if (result?.status === "cancelled") {
+        toast.info(t("local.pullCancelled", { model: tag }));
+      } else {
+        toast.success(t("local.pullDone", { model: tag }));
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("local.pullFailed", { model: tag }));
     }
