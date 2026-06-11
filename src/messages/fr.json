@@ -19,11 +19,6 @@
     "loading": "Chargement...",
     "newTask": "Nouvelle tâche",
     "viewAll": "Tout voir",
-    "empty": {
-      "title": "Rien ici pour l'instant",
-      "body": "Créez votre première tâche et lancez un agent dessus — tout ce qui se passe apparaîtra ici.",
-      "cta": "Créer une tâche"
-    },
     "attention": {
       "title": "Requiert votre attention",
       "question": "Question",
