@@ -75,7 +75,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
             </div>
           </div>
         </header>
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <RequirePro>{children}</RequirePro>
         </div>
       </SidebarInset>

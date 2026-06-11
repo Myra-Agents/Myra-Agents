@@ -101,6 +101,22 @@ export function useOllama() {
     [refresh],
   );
 
+  const cancelPull = useCallback(async (model: string) => {
+    const tag = model.trim();
+    try {
+      await invoke("ollama_pull_cancel", { model: tag });
+    } catch (e) {
+      console.error("[useOllama] cancel failed:", e);
+    }
+    // Clear optimistically; the in-flight `pull` also clears on its terminal frame.
+    setPulling((prev) => {
+      const next = { ...prev };
+      delete next[tag];
+      delete next[`${tag}:latest`];
+      return next;
+    });
+  }, []);
+
   const remove = useCallback(
     async (model: string) => {
       setBusy(true);
@@ -114,7 +130,7 @@ export function useOllama() {
     [refresh],
   );
 
-  return { status, loading, busy, pulling, refresh, install, serve, pull, remove };
+  return { status, loading, busy, pulling, refresh, install, serve, pull, cancelPull, remove };
 }
 
 export type UseOllama = ReturnType<typeof useOllama>;
