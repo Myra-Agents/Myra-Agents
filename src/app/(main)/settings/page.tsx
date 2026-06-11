@@ -300,8 +300,14 @@ export default function SettingsPage() {
   };
 
   const updatePreset = (idx: number, patch: Partial<AgentPreset>) => {
-    const agents = current.agents.map((preset, index) => (index === idx ? { ...preset, ...patch } : preset));
-    update({ agents });
+    // Functional update: a single interaction can patch several fields in one
+    // tick (e.g. the model picker sets flags + launchVia + ollamaModel together);
+    // composing on `prev` keeps every patch instead of the last write winning.
+    setDraft((prev) => {
+      const base = prev ?? settings;
+      const agents = base.agents.map((preset, index) => (index === idx ? { ...preset, ...patch } : preset));
+      return { ...base, agents };
+    });
   };
 
   const removePreset = (idx: number) => {

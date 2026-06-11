@@ -425,7 +425,7 @@ export function UnifiedModelPicker({
                 <CommandGroup heading={t("local.cloudGroup")}>
                   {(cloudModels ?? []).map((model) => (
                     <CommandItem key={model} value={`cloud ${model}`} onSelect={() => selectCloud(model)}>
-                      <div className="flex w-full items-center gap-2">
+                      <div className="flex min-h-6 w-full items-center gap-2">
                         <Gutter>
                           {!local && cloudValue === model && <CheckIcon className="size-3.5 text-primary" />}
                         </Gutter>
@@ -440,7 +440,7 @@ export function UnifiedModelPicker({
               <CommandGroup heading={t("local.localGroup")}>
                 {!ready ? (
                   <CommandItem value="ollama enable local models" onSelect={() => setDialogOpen(true)}>
-                    <div className="flex w-full items-center gap-2">
+                    <div className="flex min-h-6 w-full items-center gap-2">
                       <Gutter>
                         <BoltIcon className="size-3.5 text-primary" />
                       </Gutter>
@@ -451,7 +451,7 @@ export function UnifiedModelPicker({
                   <>
                     {installedModels.map((m) => (
                       <CommandItem key={m.name} value={`local ${m.name}`} onSelect={() => selectLocal(m.name)}>
-                        <div className="flex w-full items-center gap-2">
+                        <div className="flex min-h-6 w-full items-center gap-2">
                           <Gutter>
                             {local && ollamaModel === m.name ? (
                               <CheckIcon className="size-3.5 text-primary" />
@@ -475,9 +475,11 @@ export function UnifiedModelPicker({
                           value={`local pull ${m.tag} ${m.label}`}
                           // Pulling shouldn't dismiss — let the row show progress.
                           onSelect={() => !busy && void startPull(m.tag)}
-                          className="flex-col items-stretch gap-1"
+                          // Only grow into a two-line row while actually pulling;
+                          // idle rows keep the same height as every other row.
+                          className={cn(busy && "flex-col items-stretch gap-1")}
                         >
-                          <div className="flex w-full items-center gap-2">
+                          <div className="flex min-h-6 w-full items-center gap-2">
                             <Gutter>
                               {busy ? (
                                 <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
@@ -492,12 +494,12 @@ export function UnifiedModelPicker({
                               {m.size} · {m.minRam}
                             </span>
                           </div>
-                          <PullProgressLine progress={progress} />
+                          {busy && <PullProgressLine progress={progress} />}
                         </CommandItem>
                       );
                     })}
                     <CommandItem value="ollama manage models" onSelect={() => setDialogOpen(true)}>
-                      <div className="flex w-full items-center gap-2">
+                      <div className="flex min-h-6 w-full items-center gap-2">
                         <Gutter>
                           <Settings2Icon className="size-3.5 text-muted-foreground" />
                         </Gutter>
