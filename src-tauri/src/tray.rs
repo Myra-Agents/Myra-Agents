@@ -31,6 +31,15 @@ pub struct TrayState {
     last_dismiss: Mutex<Option<Instant>>,
 }
 
+impl TrayState {
+    /// True if the popover was dismissed within `dur`. Lets the macOS reopen
+    /// handler tell a tray-click-driven reopen (which would resurrect the
+    /// hidden main window) apart from a genuine Dock-icon reopen.
+    pub fn dismissed_within(&self, dur: Duration) -> bool {
+        self.last_dismiss.lock().ok().and_then(|g| *g).map(|t| t.elapsed() < dur).unwrap_or(false)
+    }
+}
+
 /// Payload for `tray-navigate`, consumed by the main window's listener to route
 /// and (optionally) trigger the new-task flow.
 #[derive(Clone, Serialize)]
