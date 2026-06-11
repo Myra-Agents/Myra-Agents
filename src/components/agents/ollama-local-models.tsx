@@ -398,7 +398,7 @@ export function UnifiedModelPicker({
     setOpen(false);
   };
 
-  const triggerLabel = local && ollamaModel ? ollamaModel : cloudValue || placeholder;
+  const triggerLabel = local && ollamaModel ? `local/${ollamaModel}` : cloudValue || placeholder;
 
   return (
     <>
@@ -411,7 +411,6 @@ export function UnifiedModelPicker({
       >
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" size="xs" className="max-w-64" title={triggerLabel}>
-            {local && <BoltIcon className="size-3 text-primary" />}
             <span className={cn("truncate", local || cloudValue ? "font-mono" : "text-muted-foreground")}>
               {triggerLabel}
             </span>
