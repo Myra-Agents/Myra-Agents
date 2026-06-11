@@ -824,18 +824,23 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
           <div className="space-y-2">
             <Label>{t("form.scheduleKind")}</Label>
             <div className="flex flex-wrap items-end gap-2">
-              <Select value={kindType} onValueChange={(v) => handleKindChange(v as ScheduleKindType)}>
-                <SelectTrigger className="w-32 shrink-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="once">{t("kind.once")}</SelectItem>
-                  <SelectItem value="daily">{t("kind.daily")}</SelectItem>
-                  <SelectItem value="weekly">{t("kind.weekly")}</SelectItem>
-                  <SelectItem value="interval">{t("kind.interval")}</SelectItem>
-                  <SelectItem value="cron">{t("kind.custom")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col gap-1">
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  {t("form.typeLabel")}
+                </Label>
+                <Select value={kindType} onValueChange={(v) => handleKindChange(v as ScheduleKindType)}>
+                  <SelectTrigger className="w-32 shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="once">{t("kind.once")}</SelectItem>
+                    <SelectItem value="daily">{t("kind.daily")}</SelectItem>
+                    <SelectItem value="weekly">{t("kind.weekly")}</SelectItem>
+                    <SelectItem value="interval">{t("kind.interval")}</SelectItem>
+                    <SelectItem value="cron">{t("kind.custom")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Structured field(s) for the kind, inline to the right. */}
               {kindType !== "cron" && (

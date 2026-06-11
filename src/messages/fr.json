@@ -275,7 +275,8 @@
       "optional": "optionnel",
       "override": "Surcharger",
       "cronEquivalent": "Cron",
-      "cronNotExpressible": "n/d"
+      "cronNotExpressible": "n/d",
+      "typeLabel": "Type"
     },
     "loading": "Chargement des planifications…",
     "newSchedule": "Nouvelle planification",

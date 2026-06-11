@@ -275,7 +275,8 @@
       "optional": "optional",
       "override": "Override",
       "cronEquivalent": "Cron",
-      "cronNotExpressible": "n/a"
+      "cronNotExpressible": "n/a",
+      "typeLabel": "Type"
     },
     "loading": "Loading schedules…",
     "newSchedule": "New Schedule",
