@@ -720,6 +720,7 @@
       "pull": "Télécharger",
       "cancel": "Annuler",
       "pullDone": "{model} téléchargé",
+      "pullCancelled": "Téléchargement de {model} annulé",
       "pullFailed": "Échec du téléchargement de {model}",
       "remove": "Supprimer",
       "refresh": "Rafraîchir",

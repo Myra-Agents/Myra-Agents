@@ -82,8 +82,12 @@ export function LocalModelManager({ ollama }: { ollama: UseOllama }) {
 
   const doPull = async (tag: string) => {
     try {
-      await pull(tag);
-      toast.success(t("local.pullDone", { model: tag }));
+      const result = await pull(tag);
+      if (result?.status === "cancelled") {
+        toast.info(t("local.pullCancelled", { model: tag }));
+      } else {
+        toast.success(t("local.pullDone", { model: tag }));
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("local.pullFailed", { model: tag }));
     }
@@ -394,7 +398,7 @@ export function UnifiedModelPicker({
     setOpen(false);
   };
 
-  const triggerLabel = local && ollamaModel ? ollamaModel : cloudValue || placeholder;
+  const triggerLabel = local && ollamaModel ? `local/${ollamaModel}` : cloudValue || placeholder;
 
   return (
     <>
@@ -407,7 +411,6 @@ export function UnifiedModelPicker({
       >
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" size="xs" className="max-w-64" title={triggerLabel}>
-            {local && <BoltIcon className="size-3 text-primary" />}
             <span className={cn("truncate", local || cloudValue ? "font-mono" : "text-muted-foreground")}>
               {triggerLabel}
             </span>

@@ -720,6 +720,7 @@
       "pull": "Pull",
       "cancel": "Cancel",
       "pullDone": "{model} pulled",
+      "pullCancelled": "{model} download cancelled",
       "pullFailed": "Failed to pull {model}",
       "remove": "Remove",
       "refresh": "Refresh",
