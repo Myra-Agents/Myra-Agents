@@ -717,6 +717,7 @@
       "customNote": "Any tag from ollama.com/library",
       "minRam": "{ram} RAM",
       "pull": "Pull",
+      "cancel": "Cancel",
       "pullDone": "{model} pulled",
       "pullFailed": "Failed to pull {model}",
       "remove": "Remove",

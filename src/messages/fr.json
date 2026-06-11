@@ -717,6 +717,7 @@
       "customNote": "N'importe quel tag de ollama.com/library",
       "minRam": "{ram} de RAM",
       "pull": "Télécharger",
+      "cancel": "Annuler",
       "pullDone": "{model} téléchargé",
       "pullFailed": "Échec du téléchargement de {model}",
       "remove": "Supprimer",

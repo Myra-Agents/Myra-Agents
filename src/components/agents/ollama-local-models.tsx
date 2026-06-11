@@ -12,6 +12,7 @@ import {
   RefreshCwIcon,
   Settings2Icon,
   TrashIcon,
+  XIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -73,7 +74,7 @@ function PullProgressLine({ progress }: { progress?: OllamaPullProgress }) {
  */
 export function LocalModelManager({ ollama }: { ollama: UseOllama }) {
   const t = useTranslations("agents");
-  const { status, pulling, pull, remove } = ollama;
+  const { status, pulling, pull, cancelPull, remove } = ollama;
   const [customTag, setCustomTag] = useState("");
 
   const installed = new Set((status?.models ?? []).map((m) => m.name.replace(/:latest$/, "")));
@@ -128,21 +129,29 @@ export function LocalModelManager({ ollama }: { ollama: UseOllama }) {
                     {model.size} · {t("local.minRam", { ram: model.minRam })} · {model.blurb}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  className="ml-auto shrink-0"
-                  disabled={isPulling(model.tag)}
-                  onClick={() => void doPull(model.tag)}
-                >
-                  {isPulling(model.tag) ? (
-                    <Loader2Icon className="size-3 animate-spin" />
-                  ) : (
+                {isPulling(model.tag) ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => void cancelPull(model.tag)}
+                  >
+                    <XIcon className="size-3" />
+                    {t("local.cancel")}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    className="ml-auto shrink-0"
+                    onClick={() => void doPull(model.tag)}
+                  >
                     <DownloadIcon className="size-3" />
-                  )}
-                  {t("local.pull")}
-                </Button>
+                    {t("local.pull")}
+                  </Button>
+                )}
               </div>
               <PullProgressLine progress={progress} />
             </div>
@@ -366,7 +375,7 @@ export function UnifiedModelPicker({
 }) {
   const t = useTranslations("agents");
   const ollama = useOllama();
-  const { status, pulling, pull } = ollama;
+  const { status, pulling, pull, cancelPull } = ollama;
   const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -490,9 +499,23 @@ export function UnifiedModelPicker({
                             <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground text-xs">
                               {m.tag}
                             </span>
-                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                              {m.size} · {m.minRam}
-                            </span>
+                            {busy ? (
+                              <button
+                                type="button"
+                                title={t("local.cancel")}
+                                className="shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void cancelPull(m.tag);
+                                }}
+                              >
+                                <XIcon className="size-3.5" />
+                              </button>
+                            ) : (
+                              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                                {m.size} · {m.minRam}
+                              </span>
+                            )}
                           </div>
                           {busy && <PullProgressLine progress={progress} />}
                         </CommandItem>
