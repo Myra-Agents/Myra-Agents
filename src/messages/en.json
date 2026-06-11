@@ -251,7 +251,8 @@
       "daily": "Daily",
       "weekly": "Weekly",
       "interval": "Interval",
-      "cron": "Cron"
+      "cron": "Cron",
+      "custom": "Custom (cron)"
     },
     "form": {
       "name": "Name",
@@ -276,7 +277,10 @@
       "copyName": "Copy name",
       "agentPreset": "Agent preset",
       "workingDir": "Working directory",
-      "optional": "optional"
+      "optional": "optional",
+      "override": "Override",
+      "cronEquivalent": "Cron",
+      "cronNotExpressible": "n/a"
     },
     "loading": "Loading schedules…",
     "newSchedule": "New Schedule",

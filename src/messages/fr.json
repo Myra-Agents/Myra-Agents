@@ -251,7 +251,8 @@
       "daily": "Quotidien",
       "weekly": "Hebdomadaire",
       "interval": "Intervalle",
-      "cron": "Cron"
+      "cron": "Cron",
+      "custom": "Personnalisé (cron)"
     },
     "form": {
       "name": "Nom",
@@ -276,7 +277,10 @@
       "copyName": "Copier le nom",
       "agentPreset": "Préréglage d’agent",
       "workingDir": "Répertoire de travail",
-      "optional": "optionnel"
+      "optional": "optionnel",
+      "override": "Surcharger",
+      "cronEquivalent": "Cron",
+      "cronNotExpressible": "n/d"
     },
     "loading": "Chargement des planifications…",
     "newSchedule": "Nouvelle planification",

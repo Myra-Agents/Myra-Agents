@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   CheckCircle2Icon,
+  ChevronRightIcon,
   ClockIcon,
   CoffeeIcon,
   CopyIcon,
@@ -23,7 +24,6 @@ import {
   UsersIcon,
   XCircleIcon,
   XIcon,
-  ZapIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
 import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
+import { cronToSchedule, scheduleToCron } from "@/lib/schedule-cron";
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type {
@@ -307,6 +308,12 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
   const [agentFlags, setAgentFlags] = useState<string[] | undefined>(seed?.agentFlags);
   const [useWorktree, setUseWorktree] = useState<boolean | undefined>(seed?.useWorktree);
   const [workingDir, setWorkingDir] = useState(seed?.workingDir ?? "");
+  const [launchVia, setLaunchVia] = useState<"direct" | "ollama" | undefined>(seed?.launchVia);
+  const [ollamaModel, setOllamaModel] = useState<string | undefined>(seed?.ollamaModel);
+
+  // Raw text of the "cron equivalent" field while the user types; null = follow
+  // the structured schedule (so the cron shows the derived form).
+  const [cronDraft, setCronDraft] = useState<string | null>(null);
 
   // Live preset connectivity-test state, keyed by preset id (seeded from cache).
   const [testResults, setTestResults] = useState<Record<string, StoredTestResult | null>>({});
@@ -364,6 +371,8 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
     // options editor falls back to the newly selected preset's defaults.
     setAgentFlags(undefined);
     setUseWorktree(undefined);
+    setLaunchVia(undefined);
+    setOllamaModel(undefined);
     const preset = agentPresets.find((p) => p.id === value);
     // Auto-test on select unless a passing result is already cached.
     if (preset && testResults[value]?.status !== "passed") void runPresetTest(preset);
@@ -410,12 +419,12 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
         prompt: metaPrompt,
         flags: agentFlags ?? selectedPreset.flags ?? [],
         workingDir: workingDir.trim() ? workingDir.trim() : (selectedPreset.workingDir ?? null),
-        launchVia: selectedPreset.launchVia ?? "direct",
-        ollamaModel: selectedPreset.ollamaModel ?? null,
+        launchVia: launchVia ?? selectedPreset.launchVia ?? "direct",
+        ollamaModel: ollamaModel ?? selectedPreset.ollamaModel ?? null,
       });
       return res?.output ?? null;
     },
-    [selectedPreset, agentFlags, workingDir, t],
+    [selectedPreset, agentFlags, workingDir, launchVia, ollamaModel, t],
   );
 
   const handleGeneratePrompt = async () => {
@@ -460,6 +469,28 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
   const handleKindChange = (type: ScheduleKindType) => {
     setKindType(type);
     setSchedule(defaultScheduleKind(type));
+    setCronDraft(null); // structured edit → cron field follows again
+  };
+
+  // Edits to the structured fields go through here so the cron field re-derives.
+  const handleScheduleChange = (next: ScheduleKind) => {
+    setSchedule(next);
+    setCronDraft(null);
+  };
+
+  // Cron field value: the user's draft while typing, else the derived form.
+  const cronValue = cronDraft ?? scheduleToCron(schedule) ?? "";
+  const cronExpressible = schedule.type === "cron" || scheduleToCron(schedule) !== null;
+
+  // Editing the cron text re-derives the kind: a daily/weekly/interval match
+  // selects that type, anything else falls back to a raw cron ("custom").
+  const handleCronChange = (text: string) => {
+    setCronDraft(text);
+    const parsed = cronToSchedule(text);
+    if (parsed) {
+      setSchedule(parsed);
+      setKindType(parsed.type);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -479,6 +510,8 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
         agentFlags,
         useWorktree,
         workingDir: workingDir.trim() || undefined,
+        launchVia,
+        ollamaModel,
       };
       if (task) {
         await onSave({ ...input, id: task.id });
@@ -545,6 +578,111 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
               rows={2}
               placeholder={t("form.descriptionPlaceholder")}
             />
+          </div>
+
+          {agentPresets.length > 0 && (
+            <div className="space-y-2 rounded-lg border bg-foreground/5 p-3">
+              <Label>{t("form.agentPreset")}</Label>
+              <Select value={agentPresetId} onValueChange={handlePresetChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("agent.needPreset")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentPresets.map((preset) => {
+                    const r = testResults[preset.id];
+                    return (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        <span className="flex items-center gap-2">
+                          {preset.name}
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+                              r?.status === "passed"
+                                ? "bg-green-500/15 text-green-600"
+                                : r?.status === "failed"
+                                  ? "bg-red-500/15 text-red-600"
+                                  : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {r?.status === "passed" ? (
+                              <CheckCircle2Icon className="size-2.5" />
+                            ) : r?.status === "failed" ? (
+                              <XCircleIcon className="size-2.5" />
+                            ) : null}
+                            {r?.status === "passed"
+                              ? t("agent.tested")
+                              : r?.status === "failed"
+                                ? t("agent.testFailed")
+                                : t("agent.untested")}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+
+              {selectedPreset && testingId === agentPresetId && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2Icon className="size-3 animate-spin" />
+                  {t("agent.testing", { name: selectedPreset.name })}
+                </p>
+              )}
+              {selectedPreset && presetBlocked && selectedTest?.status === "failed" && (
+                <div className="space-y-1.5">
+                  <p className="flex items-center gap-1.5 text-xs text-destructive">
+                    <XCircleIcon className="size-3" />
+                    {t("agent.blocked")}
+                  </p>
+                  {selectedTest.reason && (
+                    <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
+                      {selectedTest.reason}
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
+                    disabled={testingId !== null}
+                  >
+                    <FlaskConicalIcon className="size-3" />
+                    {t("agent.retry")}
+                  </Button>
+                </div>
+              )}
+
+              {selectedPreset && (
+                <details className="group rounded-md border bg-background/40 px-2.5 py-2">
+                  <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground text-xs hover:text-foreground">
+                    <ChevronRightIcon className="size-3 transition-transform group-open:rotate-90" />
+                    {t("form.override")}
+                  </summary>
+                  <div className="pt-2">
+                    <AgentOptions
+                      binary={selectedPreset.binary}
+                      flags={agentFlags ?? selectedPreset.flags ?? []}
+                      useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
+                      launchVia={launchVia ?? selectedPreset.launchVia ?? "direct"}
+                      ollamaModel={ollamaModel ?? selectedPreset.ollamaModel ?? ""}
+                      onFlagsChange={setAgentFlags}
+                      onWorktreeChange={setUseWorktree}
+                      onLaunchViaChange={setLaunchVia}
+                      onOllamaModelChange={setOllamaModel}
+                    />
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <FolderIcon className="size-3.5 text-muted-foreground" />
+              {t("form.workingDir")}
+              <span className="font-normal text-muted-foreground">({t("form.optional")})</span>
+            </Label>
+            <WorkingDirField value={workingDir} onChange={setWorkingDir} placeholder={selectedPreset?.workingDir ?? ""} />
           </div>
 
           <div className="space-y-2">
@@ -626,128 +764,45 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
             )}
           </div>
 
-          {agentPresets.length > 0 && (
-            <div className="space-y-2 rounded-lg border bg-foreground/5 p-3">
-              <Label className="flex items-center gap-2">
-                <Badge className="border-orange-500/20 bg-orange-500/10 text-[10px] text-orange-600">
-                  <ZapIcon className="size-2.5" />
-                  {t("agent.section")}
-                </Badge>
-                {t("form.agentPreset")}
-              </Label>
-              <Select value={agentPresetId} onValueChange={handlePresetChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("agent.needPreset")} />
+          <div className="space-y-2">
+            <Label>{t("form.scheduleKind")}</Label>
+            <div className="flex flex-wrap items-end gap-2">
+              <Select value={kindType} onValueChange={(v) => handleKindChange(v as ScheduleKindType)}>
+                <SelectTrigger className="w-32 shrink-0">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {agentPresets.map((preset) => {
-                    const r = testResults[preset.id];
-                    return (
-                      <SelectItem key={preset.id} value={preset.id}>
-                        <span className="flex items-center gap-2">
-                          {preset.name}
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
-                              r?.status === "passed"
-                                ? "bg-green-500/15 text-green-600"
-                                : r?.status === "failed"
-                                  ? "bg-red-500/15 text-red-600"
-                                  : "bg-muted text-muted-foreground",
-                            )}
-                          >
-                            {r?.status === "passed" ? (
-                              <CheckCircle2Icon className="size-2.5" />
-                            ) : r?.status === "failed" ? (
-                              <XCircleIcon className="size-2.5" />
-                            ) : null}
-                            {r?.status === "passed"
-                              ? t("agent.tested")
-                              : r?.status === "failed"
-                                ? t("agent.testFailed")
-                                : t("agent.untested")}
-                          </span>
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
+                  <SelectItem value="once">{t("kind.once")}</SelectItem>
+                  <SelectItem value="daily">{t("kind.daily")}</SelectItem>
+                  <SelectItem value="weekly">{t("kind.weekly")}</SelectItem>
+                  <SelectItem value="interval">{t("kind.interval")}</SelectItem>
+                  <SelectItem value="cron">{t("kind.custom")}</SelectItem>
                 </SelectContent>
               </Select>
 
-              {selectedPreset && testingId === agentPresetId && (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2Icon className="size-3 animate-spin" />
-                  {t("agent.testing", { name: selectedPreset.name })}
-                </p>
-              )}
-              {selectedPreset && presetBlocked && selectedTest?.status === "failed" && (
-                <div className="space-y-1.5">
-                  <p className="flex items-center gap-1.5 text-xs text-destructive">
-                    <XCircleIcon className="size-3" />
-                    {t("agent.blocked")}
-                  </p>
-                  {selectedTest.reason && (
-                    <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
-                      {selectedTest.reason}
-                    </p>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
-                    disabled={testingId !== null}
-                  >
-                    <FlaskConicalIcon className="size-3" />
-                    {t("agent.retry")}
-                  </Button>
+              {/* Structured field(s) for the kind, inline to the right. */}
+              {kindType !== "cron" && (
+                <div className="flex flex-1 flex-wrap items-end gap-2">
+                  <ScheduleKindFields schedule={schedule} onChange={handleScheduleChange} inline />
                 </div>
               )}
 
-              {selectedPreset && (
-                <AgentOptions
-                  binary={selectedPreset.binary}
-                  flags={agentFlags ?? selectedPreset.flags ?? []}
-                  useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
-                  launchVia={selectedPreset.launchVia ?? "direct"}
-                  ollamaModel={selectedPreset.ollamaModel ?? ""}
-                  onFlagsChange={setAgentFlags}
-                  onWorktreeChange={setUseWorktree}
-                />
-              )}
-
-              <div className="space-y-1">
-                <Label className="flex items-center gap-2 text-xs">
-                  <FolderIcon className="size-3.5 text-muted-foreground" />
-                  {t("form.workingDir")}
-                  <span className="font-normal text-muted-foreground">({t("form.optional")})</span>
+              {/* Cron equivalent — two-way with the structured fields. */}
+              <div className="flex flex-col gap-1">
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  {t("form.cronEquivalent")}
                 </Label>
-                <WorkingDirField
-                  value={workingDir}
-                  onChange={setWorkingDir}
-                  placeholder={selectedPreset?.workingDir ?? ""}
+                <Input
+                  value={cronValue}
+                  onChange={(e) => handleCronChange(e.target.value)}
+                  placeholder={cronExpressible ? "0 9 * * *" : t("form.cronNotExpressible")}
+                  disabled={!cronExpressible && kindType !== "cron"}
+                  className="h-9 w-36 font-mono text-xs"
+                  title={t("form.cronEquivalent")}
                 />
               </div>
             </div>
-          )}
-
-          <div className="space-y-2">
-            <Label>{t("form.scheduleKind")}</Label>
-            <Select value={kindType} onValueChange={(v) => handleKindChange(v as ScheduleKindType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="once">{t("kind.once")}</SelectItem>
-                <SelectItem value="daily">{t("kind.daily")}</SelectItem>
-                <SelectItem value="weekly">{t("kind.weekly")}</SelectItem>
-                <SelectItem value="interval">{t("kind.interval")}</SelectItem>
-                <SelectItem value="cron">{t("kind.cron")}</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-
-          <ScheduleKindFields schedule={schedule} onChange={setSchedule} />
 
           <div className="flex items-center gap-2">
             <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -768,47 +823,69 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
   );
 }
 
-function ScheduleKindFields({ schedule, onChange }: { schedule: ScheduleKind; onChange: (s: ScheduleKind) => void }) {
+function ScheduleKindFields({
+  schedule,
+  onChange,
+  inline = false,
+}: {
+  schedule: ScheduleKind;
+  onChange: (s: ScheduleKind) => void;
+  inline?: boolean;
+}) {
   const t = useTranslations("schedules");
   const weekdays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
+  // Wrap a labelled control: compact (tiny label, fixed-height input) when inline
+  // so it sits on the schedule-type row, otherwise the original stacked block.
+  const field = (label: string, control: React.ReactNode) =>
+    inline ? (
+      <div className="flex flex-col gap-1">
+        <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</Label>
+        {control}
+      </div>
+    ) : (
+      <div className="space-y-2">
+        <Label>{label}</Label>
+        {control}
+      </div>
+    );
+
   switch (schedule.type) {
     case "once":
-      return (
-        <div className="space-y-2">
-          <Label>{t("form.dateTime")}</Label>
-          <Input
-            type="datetime-local"
-            value={schedule.at}
-            onChange={(e) => onChange({ type: "once", at: e.target.value })}
-          />
-        </div>
+      return field(
+        t("form.dateTime"),
+        <Input
+          type="datetime-local"
+          value={schedule.at}
+          onChange={(e) => onChange({ type: "once", at: e.target.value })}
+          className={inline ? "h-9 w-52" : undefined}
+        />,
       );
     case "daily":
-      return (
-        <div className="space-y-2">
-          <Label>{t("form.time")}</Label>
-          <Input
-            type="time"
-            value={schedule.time}
-            onChange={(e) => onChange({ type: "daily", time: e.target.value })}
-          />
-        </div>
+      return field(
+        t("form.time"),
+        <Input
+          type="time"
+          value={schedule.time}
+          onChange={(e) => onChange({ type: "daily", time: e.target.value })}
+          className={inline ? "h-9 w-28" : undefined}
+        />,
       );
     case "weekly":
       return (
-        <div className="space-y-3">
-          <div className="space-y-2">
-            <Label>{t("form.time")}</Label>
+        <>
+          {field(
+            t("form.time"),
             <Input
               type="time"
               value={schedule.time}
               onChange={(e) => onChange({ ...schedule, time: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t("form.days")}</Label>
-            <div className="flex gap-1 flex-wrap">
+              className={inline ? "h-9 w-28" : undefined}
+            />,
+          )}
+          {field(
+            t("form.days"),
+            <div className="flex flex-wrap gap-1">
               {weekdays.map((dayKey, i) => {
                 const dayNum = i + 1;
                 const active = schedule.days.includes(dayNum);
@@ -829,43 +906,43 @@ function ScheduleKindFields({ schedule, onChange }: { schedule: ScheduleKind; on
                   </Button>
                 );
               })}
-            </div>
-          </div>
-        </div>
+            </div>,
+          )}
+        </>
       );
     case "interval":
       return (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>{t("form.startTime")}</Label>
+        <>
+          {field(
+            t("form.startTime"),
             <Input
               type="time"
               value={schedule.start}
               onChange={(e) => onChange({ ...schedule, start: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>{t("form.minutes")}</Label>
+              className={inline ? "h-9 w-28" : undefined}
+            />,
+          )}
+          {field(
+            t("form.minutes"),
             <Input
               type="number"
               min={1}
               value={schedule.minutes}
               onChange={(e) => onChange({ ...schedule, minutes: Number(e.target.value) || 60 })}
-            />
-          </div>
-        </div>
+              className={inline ? "h-9 w-20" : undefined}
+            />,
+          )}
+        </>
       );
     case "cron":
-      return (
-        <div className="space-y-2">
-          <Label>{t("form.cronExpression")}</Label>
-          <Input
-            value={schedule.expr}
-            onChange={(e) => onChange({ type: "cron", expr: e.target.value })}
-            placeholder={t("form.cronPlaceholder")}
-            className="font-mono text-xs"
-          />
-        </div>
+      return field(
+        t("form.cronExpression"),
+        <Input
+          value={schedule.expr}
+          onChange={(e) => onChange({ type: "cron", expr: e.target.value })}
+          placeholder={t("form.cronPlaceholder")}
+          className={cn("font-mono text-xs", inline && "h-9 w-40")}
+        />,
       );
   }
 }
