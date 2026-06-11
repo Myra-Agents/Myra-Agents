@@ -19,11 +19,6 @@
     "loading": "Loading...",
     "newTask": "New Task",
     "viewAll": "View all",
-    "empty": {
-      "title": "Nothing here yet",
-      "body": "Create your first task and launch an agent on it — everything happening will show up here.",
-      "cta": "Create a task"
-    },
     "attention": {
       "title": "Needs your attention",
       "question": "Question",

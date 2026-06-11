@@ -74,10 +74,8 @@ export default function HomePage() {
     );
   }
 
-  const boardEmpty = cards.filter((c) => c.status !== "trashed").length === 0;
-
   return (
-    <div className="flex flex-col gap-6 p-4 max-w-5xl mx-auto w-full">
+    <div className="flex flex-col gap-8 p-4 max-w-5xl mx-auto w-full">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold tracking-tight">{t("title")}</h1>
         <div className="flex items-center gap-3">
@@ -89,123 +87,108 @@ export default function HomePage() {
         </div>
       </div>
 
-      {boardEmpty ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-            <p className="text-sm font-medium">{t("empty.title")}</p>
-            <p className="text-muted-foreground text-sm max-w-sm">{t("empty.body")}</p>
-            <Button size="sm" className="mt-2" onClick={handleNewCard}>
-              <PlusIcon className="size-4" />
-              {t("empty.cta")}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Section icon={CircleAlertIcon} title={t("attention.title")} count={attention.length}>
-            {attention.length === 0 ? (
-              <SectionEmpty label={t("attention.empty")} />
-            ) : (
-              attention.map((card) => (
-                <CardRow key={card.id} card={card} onClick={() => router.push("/kanban")}>
-                  <Badge variant={card.status === "waiting_feedback" ? "secondary" : "outline"} className="text-[10px]">
-                    {card.status === "waiting_feedback" ? t("attention.question") : t("attention.review")}
-                  </Badge>
-                  {card.agentQuestion && (
-                    <p className="text-[11px] text-muted-foreground truncate max-w-48">{card.agentQuestion}</p>
-                  )}
-                </CardRow>
-              ))
-            )}
-          </Section>
-
-          <Section icon={LoaderIcon} title={t("running.title")} count={running.length}>
-            {running.length === 0 ? (
-              <SectionEmpty label={t("running.empty")} />
-            ) : (
-              running.map((card) => (
-                <CardRow key={card.id} card={card} onClick={() => router.push("/kanban")}>
-                  {card.agentQueued ? (
-                    <Badge variant="outline" className="text-[10px]">
-                      {t("running.queued")}
-                    </Badge>
-                  ) : (
-                    <Badge variant="default" className="text-[10px]">
-                      {t("running.running")}
-                    </Badge>
-                  )}
-                  {card.agentRunStartedAt && (
-                    <span className="text-[11px] text-muted-foreground tabular-nums">
-                      {formatElapsed(card.agentRunStartedAt, now)}
-                    </span>
-                  )}
-                </CardRow>
-              ))
-            )}
-          </Section>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Section
-              icon={AlarmClockIcon}
-              title={t("upcoming.title")}
-              count={upcoming.length}
-              viewAll={{ label: t("viewAll"), href: "/schedules" }}
-            >
-              {upcoming.length === 0 ? (
-                <SectionEmpty label={t("upcoming.empty")} />
-              ) : (
-                upcoming.map((task) => (
-                  <Card
-                    key={task.id}
-                    className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors"
-                    onClick={() => router.push("/schedules")}
-                  >
-                    <CardContent className="flex items-center gap-3 px-3 py-2">
-                      <span className="font-mono text-xs text-muted-foreground tabular-nums">
-                        {formatHm(task.nextRunAt)}
-                      </span>
-                      <p className="text-sm font-medium truncate">{task.name}</p>
-                    </CardContent>
-                  </Card>
-                ))
+      <Section icon={CircleAlertIcon} title={t("attention.title")} count={attention.length}>
+        {attention.length === 0 ? (
+          <SectionEmpty label={t("attention.empty")} />
+        ) : (
+          attention.map((card) => (
+            <CardRow key={card.id} card={card} onClick={() => router.push("/kanban")}>
+              <Badge variant={card.status === "waiting_feedback" ? "secondary" : "outline"} className="text-[10px]">
+                {card.status === "waiting_feedback" ? t("attention.question") : t("attention.review")}
+              </Badge>
+              {card.agentQuestion && (
+                <p className="text-[11px] text-muted-foreground truncate max-w-48">{card.agentQuestion}</p>
               )}
-            </Section>
+            </CardRow>
+          ))
+        )}
+      </Section>
 
-            <Section
-              icon={ActivityIcon}
-              title={t("recent.title")}
-              count={recentRuns.length}
-              viewAll={{ label: t("viewAll"), href: "/logs" }}
-            >
-              {recentRuns.length === 0 ? (
-                <SectionEmpty label={t("recent.empty")} />
+      <Section icon={LoaderIcon} title={t("running.title")} count={running.length}>
+        {running.length === 0 ? (
+          <SectionEmpty label={t("running.empty")} />
+        ) : (
+          running.map((card) => (
+            <CardRow key={card.id} card={card} onClick={() => router.push("/kanban")}>
+              {card.agentQueued ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {t("running.queued")}
+                </Badge>
               ) : (
-                recentRuns.map(({ card, run }) => (
-                  <Card
-                    key={`${card.id}-${run.id}`}
-                    className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors"
-                    onClick={() => router.push("/logs")}
-                  >
-                    <CardContent className="flex items-center gap-3 px-3 py-2">
-                      <RunStatusBadge status={run.status} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{card.title}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {new Date(run.startedAt).toLocaleString()}
-                          {run.endedAt && ` — ${formatDuration(run.startedAt, run.endedAt)}`}
-                          {typeof run.cost === "number" && ` — $${run.cost.toFixed(2)}`}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+                <Badge variant="default" className="text-[10px]">
+                  {t("running.running")}
+                </Badge>
               )}
-            </Section>
-          </div>
+              {card.agentRunStartedAt && (
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {formatElapsed(card.agentRunStartedAt, now)}
+                </span>
+              )}
+            </CardRow>
+          ))
+        )}
+      </Section>
 
-          <StatsSection cards={cards} />
-        </>
-      )}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section
+          icon={AlarmClockIcon}
+          title={t("upcoming.title")}
+          count={upcoming.length}
+          viewAll={{ label: t("viewAll"), href: "/schedules" }}
+        >
+          {upcoming.length === 0 ? (
+            <SectionEmpty label={t("upcoming.empty")} />
+          ) : (
+            upcoming.map((task) => (
+              <Card
+                key={task.id}
+                className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors"
+                onClick={() => router.push("/schedules")}
+              >
+                <CardContent className="flex min-h-13 items-center gap-3 px-3 py-3">
+                  <span className="font-mono text-xs text-muted-foreground tabular-nums">
+                    {formatHm(task.nextRunAt)}
+                  </span>
+                  <p className="text-sm font-medium truncate">{task.name}</p>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Section>
+
+        <Section
+          icon={ActivityIcon}
+          title={t("recent.title")}
+          count={recentRuns.length}
+          viewAll={{ label: t("viewAll"), href: "/logs" }}
+        >
+          {recentRuns.length === 0 ? (
+            <SectionEmpty label={t("recent.empty")} />
+          ) : (
+            recentRuns.map(({ card, run }) => (
+              <Card
+                key={`${card.id}-${run.id}`}
+                className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors"
+                onClick={() => router.push("/logs")}
+              >
+                <CardContent className="flex min-h-13 items-center gap-3 px-3 py-3">
+                  <RunStatusBadge status={run.status} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{card.title}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(run.startedAt).toLocaleString()}
+                      {run.endedAt && ` — ${formatDuration(run.startedAt, run.endedAt)}`}
+                      {typeof run.cost === "number" && ` — $${run.cost.toFixed(2)}`}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </Section>
+      </div>
+
+      <StatsSection cards={cards} />
     </div>
   );
 }
@@ -250,7 +233,7 @@ function StatsSection({ cards }: { cards: KanbanCard[] }) {
         <Card className="rounded-lg py-0">
           <CardContent className="px-3 py-2">
             <p className="text-[11px] text-muted-foreground mb-1">{t("runsPerDay", { days: CHART_DAYS })}</p>
-            <ChartContainer config={runsConfig} className="h-[120px] w-full">
+            <ChartContainer config={runsConfig} className="h-[160px] w-full">
               <BarChart data={daily} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} interval="preserveStartEnd" />
                 <ChartTooltip content={<ChartTooltipContent />} />
@@ -263,7 +246,7 @@ function StatsSection({ cards }: { cards: KanbanCard[] }) {
         <Card className="rounded-lg py-0">
           <CardContent className="px-3 py-2">
             <p className="text-[11px] text-muted-foreground mb-1">{t("costPerDay", { days: CHART_DAYS })}</p>
-            <ChartContainer config={costConfig} className="h-[120px] w-full">
+            <ChartContainer config={costConfig} className="h-[160px] w-full">
               <AreaChart data={daily} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={10} interval="preserveStartEnd" />
                 <ChartTooltip content={<ChartTooltipContent />} />
@@ -286,7 +269,7 @@ function StatsSection({ cards }: { cards: KanbanCard[] }) {
 function KpiTile({ label, value }: { label: string; value: string }) {
   return (
     <Card className="rounded-lg py-0">
-      <CardContent className="px-3 py-2">
+      <CardContent className="flex min-h-20 flex-col justify-center gap-1 px-3 py-3">
         <p className="text-[11px] text-muted-foreground">{label}</p>
         <p className="text-lg font-semibold tabular-nums">{value}</p>
       </CardContent>
@@ -329,7 +312,7 @@ function Section({
           </Button>
         )}
       </div>
-      <div className="space-y-1">{children}</div>
+      <div className="space-y-2">{children}</div>
     </section>
   );
 }
@@ -337,7 +320,7 @@ function Section({
 function SectionEmpty({ label }: { label: string }) {
   return (
     <Card className="rounded-lg py-0">
-      <CardContent className="px-3 py-2">
+      <CardContent className="flex min-h-24 items-center justify-center px-3 py-8">
         <p className="text-muted-foreground text-xs text-center">{label}</p>
       </CardContent>
     </Card>
@@ -347,7 +330,7 @@ function SectionEmpty({ label }: { label: string }) {
 function CardRow({ card, onClick, children }: { card: KanbanCard; onClick: () => void; children: React.ReactNode }) {
   return (
     <Card className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors" onClick={onClick}>
-      <CardContent className="flex items-center gap-3 px-3 py-2">
+      <CardContent className="flex min-h-13 items-center gap-3 px-3 py-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{card.title}</p>
         </div>
