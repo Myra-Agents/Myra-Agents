@@ -691,6 +691,8 @@
       "useLocal": "Utiliser un modèle local (Ollama)",
       "ollamaReady": "Ollama prêt",
       "enableCta": "⚡ Activer les modèles locaux",
+      "cloudGroup": "Cloud",
+      "localGroup": "Local · Ollama",
       "selectModel": "Choisir un modèle",
       "noModelsYet": "Aucun modèle téléchargé",
       "manageModels": "Gérer les modèles",
