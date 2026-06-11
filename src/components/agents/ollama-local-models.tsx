@@ -7,6 +7,7 @@ import {
   CheckCircle2Icon,
   CheckIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   Loader2Icon,
   PlayIcon,
   RefreshCwIcon,
@@ -172,6 +173,15 @@ export function LocalModelManager({ ollama }: { ollama: UseOllama }) {
             placeholder={t("local.customPlaceholder")}
             className="h-8 font-mono text-xs"
           />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            title={t("local.browseModels")}
+            onClick={() => openExternal("https://ollama.com/search")}
+          >
+            <ExternalLinkIcon className="size-3.5" />
+          </Button>
           <Button
             type="button"
             size="sm"
