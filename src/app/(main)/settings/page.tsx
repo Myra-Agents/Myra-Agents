@@ -34,7 +34,17 @@ import { LocalModelsPanel } from "@/components/settings/local-models-panel";
 // import { PluginsPanel } from "@/components/settings/plugins-panel";
 // import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 // import { SyncPanel } from "@/components/settings/sync-panel";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -47,6 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
+import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
@@ -59,26 +70,14 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-type StoredTestResult = { status: "passed" | "failed"; ts: number; reason?: string };
-
-function loadTestResult(id: string): StoredTestResult | null {
-  try {
-    const raw = localStorage.getItem(`myra:agent-test:${id}`);
-    return raw ? (JSON.parse(raw) as StoredTestResult) : null;
-  } catch {
-    return null;
-  }
-}
-
-function persistTestResult(id: string, status: "passed" | "failed", reason?: string) {
-  try {
-    localStorage.setItem(`myra:agent-test:${id}`, JSON.stringify({ status, ts: Date.now(), reason }));
-  } catch {
-    // ignore
-  }
-}
-
-const EXEC_FIELDS = new Set<keyof AgentPreset>(["binary", "argsTemplate", "flags", "launchVia", "ollamaModel", "useWorktree"]);
+const EXEC_FIELDS = new Set<keyof AgentPreset>([
+  "binary",
+  "argsTemplate",
+  "flags",
+  "launchVia",
+  "ollamaModel",
+  "useWorktree",
+]);
 
 interface AgentPresetCardProps {
   preset: AgentPreset;
@@ -102,7 +101,19 @@ interface AgentPresetCardProps {
  */
 type TestState = "idle" | "testing" | "passed" | "failed";
 
-function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, onDuplicate, isDirty, needsTest, saving, onSave }: AgentPresetCardProps) {
+function AgentPresetCard({
+  preset,
+  idx,
+  isDefault,
+  t,
+  onUpdate,
+  onRemove,
+  onDuplicate,
+  isDirty,
+  needsTest,
+  saving,
+  onSave,
+}: AgentPresetCardProps) {
   const bin = useBinaryStatus(preset.binary);
   const [configureAnyway, setConfigureAnyway] = useState(false);
   const [showAdvancedArgs, setShowAdvancedArgs] = useState(false);
@@ -215,11 +226,7 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, onDupl
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label className="text-xs text-muted-foreground">{t("agents.advancedArgs")}</Label>
-              <Switch
-                checked={showAdvancedArgs}
-                onCheckedChange={setShowAdvancedArgs}
-                className="scale-75"
-              />
+              <Switch checked={showAdvancedArgs} onCheckedChange={setShowAdvancedArgs} className="scale-75" />
             </div>
             {showAdvancedArgs && (
               <div className="space-y-1 pt-1">
@@ -266,7 +273,13 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, onDupl
               </span>
             </summary>
             <p className="mt-1 rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] break-all">
-              {[preset.binary, (preset.argsTemplate ?? "{prompt}").replace("{prompt}", '"hello"'), ...(preset.flags ?? [])].filter(Boolean).join(" ")}
+              {[
+                preset.binary,
+                (preset.argsTemplate ?? "{prompt}").replace("{prompt}", '"hello"'),
+                ...(preset.flags ?? []),
+              ]
+                .filter(Boolean)
+                .join(" ")}
             </p>
           </details>
           {storedResult?.status === "failed" && storedResult.reason && testState === "idle" && (

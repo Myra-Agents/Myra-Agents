@@ -251,7 +251,8 @@
       "daily": "Daily",
       "weekly": "Weekly",
       "interval": "Interval",
-      "cron": "Cron"
+      "cron": "Cron",
+      "custom": "Custom (cron)"
     },
     "form": {
       "name": "Name",
@@ -271,7 +272,15 @@
       "description": "Description",
       "cardTitlePlaceholder": "Title of the generated task",
       "tagsPlaceholder": "infra, daily",
-      "cronPlaceholder": "0 9 * * 1-5"
+      "cronPlaceholder": "0 9 * * 1-5",
+      "descriptionPlaceholder": "e.g. Audit dependencies and open PRs for safe updates",
+      "copyName": "Copy name",
+      "agentPreset": "Agent preset",
+      "workingDir": "Working directory",
+      "optional": "optional",
+      "override": "Override",
+      "cronEquivalent": "Cron",
+      "cronNotExpressible": "n/a"
     },
     "loading": "Loading schedules…",
     "newSchedule": "New Schedule",
@@ -284,7 +293,9 @@
       "cancel": "Cancel",
       "update": "Update",
       "create": "Create",
-      "saving": "Saving…"
+      "saving": "Saving…",
+      "generate": "Generate",
+      "suggestTags": "Suggest"
     },
     "days": {
       "mon": "Mon",
@@ -332,6 +343,23 @@
         "description": "Run the test suite and report failures.",
         "prompt": "Run the full test suite. If anything fails, summarize the failures and the most likely cause for each."
       }
+    },
+    "agent": {
+      "section": "Agent",
+      "tested": "tested",
+      "untested": "not tested",
+      "testFailed": "test failed",
+      "testing": "Testing {name}…",
+      "testFailedToast": "{name} failed its connectivity test",
+      "blocked": "This preset failed its test — fix it or pick another before creating.",
+      "retry": "Retry test",
+      "needPreset": "Select an agent preset first",
+      "devOnly": "Only available in the desktop app",
+      "generateHint": "Draft from the name and description using this agent",
+      "generateError": "The agent could not generate a result",
+      "generateEmpty": "The agent returned nothing usable",
+      "promptMeta": "Write a single, concise agent task prompt (imperative, 2-5 sentences) for a recurring scheduled coding-agent run named \"{name}\". Context: \"{description}\". Output ONLY the prompt text the agent should follow — no preamble, no quotes, no markdown.",
+      "tagsMeta": "Propose 2 to 5 short lowercase keyword tags for a scheduled task named \"{name}\" described as \"{description}\". Output ONLY a comma-separated list of tags, nothing else."
     }
   },
   "planner": {

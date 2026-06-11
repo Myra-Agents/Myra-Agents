@@ -251,7 +251,8 @@
       "daily": "Quotidien",
       "weekly": "Hebdomadaire",
       "interval": "Intervalle",
-      "cron": "Cron"
+      "cron": "Cron",
+      "custom": "Personnalisé (cron)"
     },
     "form": {
       "name": "Nom",
@@ -271,7 +272,15 @@
       "description": "Description",
       "cardTitlePlaceholder": "Titre de la tâche générée",
       "tagsPlaceholder": "infra, quotidien",
-      "cronPlaceholder": "0 9 * * 1-5"
+      "cronPlaceholder": "0 9 * * 1-5",
+      "descriptionPlaceholder": "ex. Auditer les dépendances et ouvrir des PR pour les mises à jour sûres",
+      "copyName": "Copier le nom",
+      "agentPreset": "Préréglage d’agent",
+      "workingDir": "Répertoire de travail",
+      "optional": "optionnel",
+      "override": "Surcharger",
+      "cronEquivalent": "Cron",
+      "cronNotExpressible": "n/d"
     },
     "loading": "Chargement des planifications…",
     "newSchedule": "Nouvelle planification",
@@ -284,7 +293,9 @@
       "cancel": "Annuler",
       "update": "Mettre à jour",
       "create": "Créer",
-      "saving": "Enregistrement…"
+      "saving": "Enregistrement…",
+      "generate": "Générer",
+      "suggestTags": "Suggérer"
     },
     "days": {
       "mon": "Lun",
@@ -332,6 +343,23 @@
         "description": "Lance la suite de tests et signale les échecs.",
         "prompt": "Lance toute la suite de tests. En cas d'échec, résume les échecs et la cause la plus probable pour chacun."
       }
+    },
+    "agent": {
+      "section": "Agent",
+      "tested": "testé",
+      "untested": "non testé",
+      "testFailed": "test échoué",
+      "testing": "Test de {name}…",
+      "testFailedToast": "{name} a échoué au test de connectivité",
+      "blocked": "Ce préréglage a échoué au test — corrige-le ou choisis-en un autre avant de créer.",
+      "retry": "Relancer le test",
+      "needPreset": "Sélectionne d’abord un préréglage d’agent",
+      "devOnly": "Disponible uniquement dans l’application desktop",
+      "generateHint": "Rédige à partir du nom et de la description avec cet agent",
+      "generateError": "L’agent n’a pas pu générer de résultat",
+      "generateEmpty": "L’agent n’a rien renvoyé d’exploitable",
+      "promptMeta": "Rédige un unique prompt de tâche concis (impératif, 2 à 5 phrases) pour une exécution planifiée récurrente nommée « {name} ». Contexte : « {description} ». Donne UNIQUEMENT le texte du prompt que l’agent doit suivre — sans préambule, sans guillemets, sans markdown.",
+      "tagsMeta": "Propose 2 à 5 étiquettes courtes en minuscules pour une tâche planifiée nommée « {name} » décrite comme « {description} ». Donne UNIQUEMENT une liste séparée par des virgules, rien d’autre."
     }
   },
   "planner": {
