@@ -359,7 +359,12 @@
       "generateError": "The agent could not generate a result",
       "generateEmpty": "The agent returned nothing usable",
       "promptMeta": "Write a single, concise agent task prompt (imperative, 2-5 sentences) for a recurring scheduled coding-agent run named \"{name}\". Context: \"{description}\". Output ONLY the prompt text the agent should follow — no preamble, no quotes, no markdown.",
-      "tagsMeta": "Propose 2 to 5 short lowercase keyword tags for a scheduled task named \"{name}\" described as \"{description}\". Output ONLY a comma-separated list of tags, nothing else."
+      "tagsMeta": "Propose 2 to 5 short lowercase keyword tags for a scheduled task named \"{name}\" described as \"{description}\". Output ONLY a comma-separated list of tags, nothing else.",
+      "needContext": "Add a name and a description first so the agent has context",
+      "previewTitle": "Suggested prompt — review before using",
+      "previewQuestion": "The agent raised a question — refine the description, then regenerate",
+      "useDraft": "Use",
+      "dismissDraft": "Dismiss"
     }
   },
   "planner": {

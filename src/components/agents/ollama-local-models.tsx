@@ -430,7 +430,7 @@ export function UnifiedModelPicker({
         <PopoverContent className="w-96 p-0" align="start">
           <Command>
             <CommandInput placeholder={t("searchModels")} />
-            <CommandList className="max-h-80">
+            <CommandList className="max-h-[min(20rem,var(--radix-popover-content-available-height))]">
               <CommandEmpty>{cloudModels === null ? t("loadingModels") : t("noModelFound")}</CommandEmpty>
 
               {!cloudFailed && (cloudModels?.length ?? 0) > 0 && (

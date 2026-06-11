@@ -359,7 +359,12 @@
       "generateError": "L’agent n’a pas pu générer de résultat",
       "generateEmpty": "L’agent n’a rien renvoyé d’exploitable",
       "promptMeta": "Rédige un unique prompt de tâche concis (impératif, 2 à 5 phrases) pour une exécution planifiée récurrente nommée « {name} ». Contexte : « {description} ». Donne UNIQUEMENT le texte du prompt que l’agent doit suivre — sans préambule, sans guillemets, sans markdown.",
-      "tagsMeta": "Propose 2 à 5 étiquettes courtes en minuscules pour une tâche planifiée nommée « {name} » décrite comme « {description} ». Donne UNIQUEMENT une liste séparée par des virgules, rien d’autre."
+      "tagsMeta": "Propose 2 à 5 étiquettes courtes en minuscules pour une tâche planifiée nommée « {name} » décrite comme « {description} ». Donne UNIQUEMENT une liste séparée par des virgules, rien d’autre.",
+      "needContext": "Ajoute d’abord un nom et une description pour donner du contexte à l’agent",
+      "previewTitle": "Prompt suggéré — relis avant d’utiliser",
+      "previewQuestion": "L’agent a soulevé une question — précise la description puis régénère",
+      "useDraft": "Utiliser",
+      "dismissDraft": "Ignorer"
     }
   },
   "planner": {

@@ -11,6 +11,7 @@ import {
   CopyIcon,
   FlaskConicalIcon,
   FolderIcon,
+  HelpCircleIcon,
   ListChecksIcon,
   ListPlusIcon,
   Loader2Icon,
@@ -284,7 +285,7 @@ function cleanGenerated(raw: string): string {
 
 function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, onClose }: ScheduleEditModalProps) {
   const t = useTranslations("schedules");
-  const { settings } = useSettings();
+  const { settings, save: saveSettings } = useSettings();
   const agentPresets = settings.agents;
   const defaultAgentId = settings.defaultAgentId;
 
@@ -319,6 +320,9 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
   const [testResults, setTestResults] = useState<Record<string, StoredTestResult | null>>({});
   const [testingId, setTestingId] = useState<string | null>(null);
   const [generating, setGenerating] = useState<null | "prompt" | "tags">(null);
+  // A generated prompt waiting for the user to accept/dismiss (so questions the
+  // agent raises are surfaced rather than silently dropped into the field).
+  const [promptDraft, setPromptDraft] = useState<string | null>(null);
 
   const selectedPreset = useMemo(() => agentPresets.find((p) => p.id === agentPresetId), [agentPresets, agentPresetId]);
   const selectedTest = agentPresetId ? (testResults[agentPresetId] ?? null) : null;
@@ -333,7 +337,12 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
     setTestResults((cur) => {
       if (Object.keys(cur).length > 0) return cur;
       const map: Record<string, StoredTestResult | null> = {};
-      for (const p of agentPresets) map[p.id] = loadTestResult(p.id);
+      for (const p of agentPresets) {
+        // Prefer the local cache; fall back to the durable "tested" flag stored
+        // on the preset in settings (e.g. a fresh machine with no cache yet).
+        map[p.id] =
+          loadTestResult(p.id) ?? (p.lastTestedAt ? { status: "passed", ts: Date.parse(p.lastTestedAt) } : null);
+      }
       return map;
     });
   }, [agentPresets, defaultAgentId]);
@@ -351,6 +360,14 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
         });
         const result = persistTestResult(preset.id, "passed");
         setTestResults((cur) => ({ ...cur, [preset.id]: result }));
+        // Persist the pass into settings data so the "tested" state is durable
+        // (survives reloads, shared with Settings) — not just a localStorage cache.
+        void saveSettings({
+          ...settings,
+          agents: settings.agents.map((p) =>
+            p.id === preset.id ? { ...p, lastTestedAt: new Date().toISOString() } : p,
+          ),
+        });
         return true;
       } catch (err) {
         const reason = err instanceof Error ? err.message : typeof err === "string" ? err : undefined;
@@ -362,7 +379,7 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
         setTestingId(null);
       }
     },
-    [t],
+    [t, settings, saveSettings],
   );
 
   const handlePresetChange = (value: string) => {
@@ -427,16 +444,22 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
     [selectedPreset, agentFlags, workingDir, launchVia, ollamaModel, t],
   );
 
+  // Both drafters need a name + description to give the agent any context.
+  const hasContext = name.trim().length > 0 && cardDescription.trim().length > 0;
+
   const handleGeneratePrompt = async () => {
+    if (!hasContext) {
+      toast.error(t("agent.needContext"));
+      return;
+    }
     setGenerating("prompt");
     try {
-      const meta = t("agent.promptMeta", {
-        name: name.trim() || "(unnamed)",
-        description: cardDescription.trim() || "(none)",
-      });
+      const meta = t("agent.promptMeta", { name: name.trim(), description: cardDescription.trim() });
       const out = await runAgentComplete(meta);
       const text = out ? cleanGenerated(out) : "";
-      if (text) setAgentPrompt(text);
+      // Show the result as a draft to review (so questions surface) instead of
+      // overwriting the field outright.
+      if (text) setPromptDraft(text);
       else if (out !== null) toast.error(t("agent.generateEmpty"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("agent.generateError"));
@@ -446,12 +469,13 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
   };
 
   const handleSuggestTags = async () => {
+    if (!hasContext) {
+      toast.error(t("agent.needContext"));
+      return;
+    }
     setGenerating("tags");
     try {
-      const meta = t("agent.tagsMeta", {
-        name: name.trim() || "(unnamed)",
-        description: cardDescription.trim() || "(none)",
-      });
+      const meta = t("agent.tagsMeta", { name: name.trim(), description: cardDescription.trim() });
       const out = await runAgentComplete(meta);
       const proposed = (out ? cleanGenerated(out) : "").split(/[,\n]/).map(normalizeTag).filter(Boolean).slice(0, 6);
       if (proposed.length === 0) {
@@ -524,10 +548,13 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
   };
 
   const canGenerate = Boolean(selectedPreset) && !presetBlocked && generating === null;
+  // Heuristic: a draft containing a question mark is likely the agent asking for
+  // clarification rather than a ready-to-use prompt — flag it so the user answers.
+  const promptDraftIsQuestion = promptDraft !== null && promptDraft.includes("?");
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="no-scrollbar sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ListPlusIcon className="size-4 text-muted-foreground" />
@@ -710,6 +737,36 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
               rows={3}
               className="font-mono text-xs"
             />
+            {promptDraft !== null && (
+              <div className="space-y-1.5 rounded-md border bg-foreground/5 p-2.5">
+                <div className="flex items-center gap-1.5 font-medium text-xs">
+                  {promptDraftIsQuestion ? (
+                    <HelpCircleIcon className="size-3.5 text-amber-500" />
+                  ) : (
+                    <SparklesIcon className="size-3.5 text-muted-foreground" />
+                  )}
+                  {promptDraftIsQuestion ? t("agent.previewQuestion") : t("agent.previewTitle")}
+                </div>
+                <p className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-background px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
+                  {promptDraft}
+                </p>
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button"
+                    size="xs"
+                    onClick={() => {
+                      setAgentPrompt(promptDraft);
+                      setPromptDraft(null);
+                    }}
+                  >
+                    {t("agent.useDraft")}
+                  </Button>
+                  <Button type="button" size="xs" variant="ghost" onClick={() => setPromptDraft(null)}>
+                    {t("agent.dismissDraft")}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -797,7 +854,7 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
                   onChange={(e) => handleCronChange(e.target.value)}
                   placeholder={cronExpressible ? "0 9 * * *" : t("form.cronNotExpressible")}
                   disabled={!cronExpressible && kindType !== "cron"}
-                  className="h-9 w-36 font-mono text-xs"
+                  className="h-8 w-36 font-mono text-xs"
                   title={t("form.cronEquivalent")}
                 />
               </div>
@@ -858,7 +915,7 @@ function ScheduleKindFields({
           type="datetime-local"
           value={schedule.at}
           onChange={(e) => onChange({ type: "once", at: e.target.value })}
-          className={inline ? "h-9 w-52" : undefined}
+          className={inline ? "h-8 w-52" : undefined}
         />,
       );
     case "daily":
@@ -868,7 +925,7 @@ function ScheduleKindFields({
           type="time"
           value={schedule.time}
           onChange={(e) => onChange({ type: "daily", time: e.target.value })}
-          className={inline ? "h-9 w-28" : undefined}
+          className={inline ? "h-8 w-28" : undefined}
         />,
       );
     case "weekly":
@@ -880,7 +937,7 @@ function ScheduleKindFields({
               type="time"
               value={schedule.time}
               onChange={(e) => onChange({ ...schedule, time: e.target.value })}
-              className={inline ? "h-9 w-28" : undefined}
+              className={inline ? "h-8 w-28" : undefined}
             />,
           )}
           {field(
@@ -919,7 +976,7 @@ function ScheduleKindFields({
               type="time"
               value={schedule.start}
               onChange={(e) => onChange({ ...schedule, start: e.target.value })}
-              className={inline ? "h-9 w-28" : undefined}
+              className={inline ? "h-8 w-28" : undefined}
             />,
           )}
           {field(
@@ -929,7 +986,7 @@ function ScheduleKindFields({
               min={1}
               value={schedule.minutes}
               onChange={(e) => onChange({ ...schedule, minutes: Number(e.target.value) || 60 })}
-              className={inline ? "h-9 w-20" : undefined}
+              className={inline ? "h-8 w-20" : undefined}
             />,
           )}
         </>
@@ -941,7 +998,7 @@ function ScheduleKindFields({
           value={schedule.expr}
           onChange={(e) => onChange({ type: "cron", expr: e.target.value })}
           placeholder={t("form.cronPlaceholder")}
-          className={cn("font-mono text-xs", inline && "h-9 w-40")}
+          className={cn("font-mono text-xs", inline && "h-8 w-40")}
         />,
       );
   }

@@ -137,7 +137,7 @@ function ModelPicker({
       <PopoverContent className="w-80 p-0" align="start">
         <Command>
           <CommandInput placeholder={t("searchModels")} />
-          <CommandList>
+          <CommandList className="max-h-[min(18rem,var(--radix-popover-content-available-height))]">
             <CommandEmpty>{models === null ? t("loadingModels") : t("noModelFound")}</CommandEmpty>
             <CommandGroup>
               {(models ?? []).map((model) => (
