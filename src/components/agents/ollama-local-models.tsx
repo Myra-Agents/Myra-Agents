@@ -10,7 +10,6 @@ import {
   Loader2Icon,
   PlayIcon,
   RefreshCwIcon,
-  Settings2Icon,
   TrashIcon,
   XIcon,
 } from "lucide-react";
@@ -375,14 +374,12 @@ export function UnifiedModelPicker({
 }) {
   const t = useTranslations("agents");
   const ollama = useOllama();
-  const { status, pulling, pull, cancelPull } = ollama;
+  const { status } = ollama;
   const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const ready = Boolean(status?.installed && status.running && status.launchCapable);
   const installedModels = status?.models ?? [];
-  const installedSet = new Set(installedModels.map((m) => m.name.replace(/:latest$/, "")));
-  const catalogToPull = OLLAMA_MODEL_CATALOG.filter((m) => !installedSet.has(m.tag.replace(/:latest$/, "")));
   const local = launchVia === "ollama";
 
   const selectCloud = (model: string) => {
@@ -395,14 +392,6 @@ export function UnifiedModelPicker({
     onOllamaModelChange(name);
     onLaunchViaChange("ollama");
     setOpen(false);
-  };
-  const startPull = async (tag: string) => {
-    try {
-      await pull(tag); // keep the popover open; the row shows progress
-      toast.success(t("local.pullDone", { model: tag }));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t("local.pullFailed", { model: tag }));
-    }
   };
 
   const triggerLabel = local && ollamaModel ? ollamaModel : cloudValue || placeholder;
@@ -462,11 +451,7 @@ export function UnifiedModelPicker({
                       <CommandItem key={m.name} value={`local ${m.name}`} onSelect={() => selectLocal(m.name)}>
                         <div className="flex min-h-6 w-full items-center gap-2">
                           <Gutter>
-                            {local && ollamaModel === m.name ? (
-                              <CheckIcon className="size-3.5 text-primary" />
-                            ) : (
-                              <span className="size-1.5 rounded-full bg-green-500" />
-                            )}
+                            {local && ollamaModel === m.name && <CheckIcon className="size-3.5 text-primary" />}
                           </Gutter>
                           <span className="min-w-0 flex-1 truncate font-mono text-xs">{m.name}</span>
                           <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
@@ -475,58 +460,13 @@ export function UnifiedModelPicker({
                         </div>
                       </CommandItem>
                     ))}
-                    {catalogToPull.map((m) => {
-                      const progress = pulling[m.tag] ?? pulling[`${m.tag}:latest`];
-                      const busy = Boolean(progress);
-                      return (
-                        <CommandItem
-                          key={m.tag}
-                          value={`local pull ${m.tag} ${m.label}`}
-                          // Pulling shouldn't dismiss — let the row show progress.
-                          onSelect={() => !busy && void startPull(m.tag)}
-                          // Only grow into a two-line row while actually pulling;
-                          // idle rows keep the same height as every other row.
-                          className={cn(busy && "flex-col items-stretch gap-1")}
-                        >
-                          <div className="flex min-h-6 w-full items-center gap-2">
-                            <Gutter>
-                              {busy ? (
-                                <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
-                              ) : (
-                                <DownloadIcon className="size-3.5 text-muted-foreground" />
-                              )}
-                            </Gutter>
-                            <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground text-xs">
-                              {m.tag}
-                            </span>
-                            {busy ? (
-                              <button
-                                type="button"
-                                title={t("local.cancel")}
-                                className="shrink-0 text-muted-foreground hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void cancelPull(m.tag);
-                                }}
-                              >
-                                <XIcon className="size-3.5" />
-                              </button>
-                            ) : (
-                              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                                {m.size} · {m.minRam}
-                              </span>
-                            )}
-                          </div>
-                          {busy && <PullProgressLine progress={progress} />}
-                        </CommandItem>
-                      );
-                    })}
-                    <CommandItem value="ollama manage models" onSelect={() => setDialogOpen(true)}>
+                    {/* Pulling new models lives in the manage dialog, not the picker. */}
+                    <CommandItem value="ollama download other local model" onSelect={() => setDialogOpen(true)}>
                       <div className="flex min-h-6 w-full items-center gap-2">
                         <Gutter>
-                          <Settings2Icon className="size-3.5 text-muted-foreground" />
+                          <DownloadIcon className="size-3.5 text-muted-foreground" />
                         </Gutter>
-                        <span className="text-muted-foreground text-xs">{t("local.manageModels")}</span>
+                        <span className="text-muted-foreground text-xs">{t("local.downloadOther")}</span>
                       </div>
                     </CommandItem>
                   </>

@@ -696,6 +696,7 @@
       "selectModel": "Choisir un modèle",
       "noModelsYet": "Aucun modèle téléchargé",
       "manageModels": "Gérer les modèles",
+      "downloadOther": "Télécharger un autre modèle local",
       "dialogTitle": "Modèles locaux avec Ollama",
       "dialogDescription": "Exécutez des agents de code sur un modèle de cette machine — sans cloud, sans clé API.",
       "installNow": "Installer Ollama",
