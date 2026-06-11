@@ -14,10 +14,19 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useOllama } from "@/hooks/use-ollama";
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { AgentFlagDef, AgentFlagsResult, AgentModelCost, AgentModelsResult } from "@/types/settings";
-import { AGENT_FLAG_CATALOG, mergeFlagCatalog, opencodeVariantsForModel, sortOpencodeVariants } from "@/types/settings";
+import {
+  AGENT_FLAG_CATALOG,
+  mergeFlagCatalog,
+  OLLAMA_LAUNCH_HARNESSES,
+  opencodeVariantsForModel,
+  sortOpencodeVariants,
+} from "@/types/settings";
+
+import { OllamaModelControl } from "./ollama-local-models";
 
 interface AgentOptionsProps {
   /** Binary the preset runs — selects the flag catalog (e.g. "opencode"). */
@@ -26,6 +35,44 @@ interface AgentOptionsProps {
   useWorktree: boolean;
   onFlagsChange: (flags: string[]) => void;
   onWorktreeChange: (useWorktree: boolean) => void;
+  /**
+   * Local-model launch mode for the preset. When `onLaunchViaChange` (and
+   * `onOllamaModelChange`) are provided and the binary is an Ollama-launchable
+   * harness, the local-model control is shown; omit them (e.g. per-card editor)
+   * to hide it.
+   */
+  launchVia?: "direct" | "ollama";
+  ollamaModel?: string;
+  onLaunchViaChange?: (launchVia: "direct" | "ollama") => void;
+  onOllamaModelChange?: (model: string) => void;
+}
+
+/**
+ * Local-model control wrapper — owns the `useOllama` hook so it only fetches
+ * status when actually rendered (one harness preset that can run locally), not
+ * for every preset card.
+ */
+function LocalModelSection({
+  launchVia,
+  ollamaModel,
+  onLaunchViaChange,
+  onOllamaModelChange,
+}: {
+  launchVia: "direct" | "ollama";
+  ollamaModel: string;
+  onLaunchViaChange: (launchVia: "direct" | "ollama") => void;
+  onOllamaModelChange: (model: string) => void;
+}) {
+  const ollama = useOllama();
+  return (
+    <OllamaModelControl
+      ollama={ollama}
+      enabled={launchVia === "ollama"}
+      model={ollamaModel}
+      onEnabledChange={(on) => onLaunchViaChange(on ? "ollama" : "direct")}
+      onModelChange={onOllamaModelChange}
+    />
+  );
 }
 
 function flagName(token: string): string {
@@ -154,8 +201,23 @@ function ModelPicker({
  * own variants. Every catalog flag stays reachable through the "all
  * options" popover; value-taking flags are stored as `--flag=value` tokens.
  */
-export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWorktreeChange }: AgentOptionsProps) {
+export function AgentOptions({
+  binary,
+  flags,
+  useWorktree,
+  onFlagsChange,
+  onWorktreeChange,
+  launchVia = "direct",
+  ollamaModel = "",
+  onLaunchViaChange,
+  onOllamaModelChange,
+}: AgentOptionsProps) {
   const t = useTranslations("agents");
+  // Show the local-model control only when the owner wired the handlers and the
+  // harness is one `ollama launch` knows how to drive.
+  const canRunLocal =
+    Boolean(onLaunchViaChange && onOllamaModelChange) &&
+    (OLLAMA_LAUNCH_HARNESSES as readonly string[]).includes(binary.trim());
   const [pickerOpen, setPickerOpen] = useState(false);
   const [modelsResult, setModelsResult] = useState<AgentModelsResult | null>(null);
   const [modelsFailed, setModelsFailed] = useState(false);
@@ -290,6 +352,14 @@ export function AgentOptions({ binary, flags, useWorktree, onFlagsChange, onWork
 
   return (
     <div className="space-y-2">
+      {canRunLocal && onLaunchViaChange && onOllamaModelChange && (
+        <LocalModelSection
+          launchVia={launchVia}
+          ollamaModel={ollamaModel}
+          onLaunchViaChange={onLaunchViaChange}
+          onOllamaModelChange={onOllamaModelChange}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Label className="flex cursor-pointer items-center gap-2 font-normal text-xs">
           <Checkbox checked={useWorktree} onCheckedChange={(checked) => onWorktreeChange(checked === true)} />

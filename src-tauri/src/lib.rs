@@ -656,5 +656,35 @@ pub fn run() {
                 }
             }
         }
+
+        // macOS: clicking the menu-bar tray icon activates the app, which AppKit
+        // turns into a reopen that resurrects the hidden main window. When the
+        // reopen lands right after a popover dismiss (i.e. the click that just
+        // closed the popover), undo it so the tray toggle stays a toggle. A
+        // genuine Dock reopen (no recent dismiss) is left alone. AppKit performs
+        // its default show *after* this callback returns, so we also hide once
+        // more on a short delay to win that race.
+        #[cfg(target_os = "macos")]
+        if let RunEvent::Reopen { .. } = event {
+            let recent = app_handle
+                .try_state::<TrayState>()
+                .map(|s| s.dismissed_within(Duration::from_millis(600)))
+                .unwrap_or(false);
+            if recent {
+                if let Some(win) = app_handle.get_webview_window("main") {
+                    let _ = win.hide();
+                }
+                let handle = app_handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(120));
+                    let inner = handle.clone();
+                    let _ = handle.run_on_main_thread(move || {
+                        if let Some(win) = inner.get_webview_window("main") {
+                            let _ = win.hide();
+                        }
+                    });
+                });
+            }
+        }
     });
 }
