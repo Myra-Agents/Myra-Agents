@@ -1,44 +1,59 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
-import { useSchedules } from "@/hooks/use-schedules";
-import type { ScheduledTask, CreateScheduleInput, UpdateScheduleInput, ScheduleKind, ScheduleKindType } from "@/types/schedule";
-import { describeSchedule, formatHm, defaultScheduleKind } from "@/types/schedule";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { isTauri } from "@tauri-apps/api/core";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  PlusIcon,
-  PlayIcon,
-  TrashIcon,
-  PencilIcon,
+  CheckCircle2Icon,
   ClockIcon,
   CoffeeIcon,
-  UsersIcon,
-  ListChecksIcon,
-  PackageIcon,
+  CopyIcon,
   FlaskConicalIcon,
+  FolderIcon,
+  ListChecksIcon,
+  ListPlusIcon,
+  Loader2Icon,
   type LucideIcon,
+  PackageIcon,
+  PencilIcon,
+  PlayIcon,
+  PlusIcon,
+  SparklesIcon,
+  TrashIcon,
+  UsersIcon,
+  XCircleIcon,
+  XIcon,
+  ZapIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import { AgentOptions } from "@/components/agents/agent-options";
+import { WorkingDirField } from "@/components/agents/working-dir-field";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useSchedules } from "@/hooks/use-schedules";
+import { useSettings } from "@/hooks/use-settings";
+import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
+import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
+import { invoke } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
+import type {
+  CreateScheduleInput,
+  ScheduledTask,
+  ScheduleKind,
+  ScheduleKindType,
+  UpdateScheduleInput,
+} from "@/types/schedule";
+import { defaultScheduleKind, describeSchedule, formatHm } from "@/types/schedule";
+import type { AgentPreset } from "@/types/settings";
 
 interface SchedulePreset {
   id: string;
@@ -51,24 +66,26 @@ interface SchedulePreset {
 // editor prefilled — labels/copy come from i18n (`schedules.ideas.<id>.*`).
 const SCHEDULE_PRESETS: SchedulePreset[] = [
   { id: "dailyBrief", icon: CoffeeIcon, schedule: { type: "daily", time: "09:00" }, tags: ["brief"] },
-  { id: "standupPrep", icon: UsersIcon, schedule: { type: "weekly", days: [1, 2, 3, 4, 5], time: "08:45" }, tags: ["standup"] },
-  { id: "weeklyReview", icon: ListChecksIcon, schedule: { type: "weekly", days: [1], time: "09:00" }, tags: ["review"] },
+  {
+    id: "standupPrep",
+    icon: UsersIcon,
+    schedule: { type: "weekly", days: [1, 2, 3, 4, 5], time: "08:45" },
+    tags: ["standup"],
+  },
+  {
+    id: "weeklyReview",
+    icon: ListChecksIcon,
+    schedule: { type: "weekly", days: [1], time: "09:00" },
+    tags: ["review"],
+  },
   { id: "depUpdates", icon: PackageIcon, schedule: { type: "weekly", days: [1], time: "10:00" }, tags: ["deps"] },
   { id: "testSweep", icon: FlaskConicalIcon, schedule: { type: "daily", time: "08:00" }, tags: ["tests"] },
 ];
 
 export default function SchedulesPage() {
   const t = useTranslations("schedules");
-  const {
-    schedules,
-    loading,
-    error,
-    createSchedule,
-    updateSchedule,
-    deleteSchedule,
-    toggleEnabled,
-    triggerNow,
-  } = useSchedules();
+  const { schedules, loading, error, createSchedule, updateSchedule, deleteSchedule, toggleEnabled, triggerNow } =
+    useSchedules();
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
@@ -135,6 +152,12 @@ export default function SchedulesPage() {
     return ta - tb;
   });
 
+  // Tag suggestions for the editor: every tag already used across schedules.
+  const availableTags = useMemo(
+    () => [...new Set(schedules.flatMap((s) => s.tags.map(normalizeTag)).filter(Boolean))],
+    [schedules],
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -169,10 +192,7 @@ export default function SchedulesPage() {
           {sorted.map((task) => (
             <Card key={task.id} className={`py-0 ${!task.enabled ? "opacity-60" : ""}`}>
               <CardContent className="flex items-center gap-4 px-4 py-2.5">
-                <Switch
-                  checked={task.enabled}
-                  onCheckedChange={(v) => toggleEnabled(task.id, v)}
-                />
+                <Switch checked={task.enabled} onCheckedChange={(v) => toggleEnabled(task.id, v)} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{task.name}</p>
                   <p className="text-xs text-muted-foreground">{describeSchedule(task.schedule)}</p>
@@ -232,6 +252,7 @@ export default function SchedulesPage() {
         open={editModalOpen}
         task={editingTask}
         initial={presetInput}
+        availableTags={availableTags}
         onSave={handleSave}
         onClose={() => setEditModalOpen(false)}
       />
@@ -243,23 +264,198 @@ interface ScheduleEditModalProps {
   open: boolean;
   task: ScheduledTask | null;
   initial?: CreateScheduleInput | null;
+  availableTags?: string[];
   onSave: (input: CreateScheduleInput | UpdateScheduleInput) => Promise<void>;
   onClose: () => void;
 }
 
-function ScheduleEditModal({ open, task, initial, onSave, onClose }: ScheduleEditModalProps) {
+/** Strip common agent-CLI noise (code fences, surrounding quotes) from a
+ *  one-shot completion so the raw model text lands cleanly in the field. */
+function cleanGenerated(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^```[a-zA-Z]*\n?/, "")
+    .replace(/\n?```$/, "")
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .trim();
+}
+
+function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, onClose }: ScheduleEditModalProps) {
   const t = useTranslations("schedules");
+  const { settings } = useSettings();
+  const agentPresets = settings.agents;
+  const defaultAgentId = settings.defaultAgentId;
+
   // Editing an existing task wins; otherwise seed from a clicked "More ideas" preset.
   const seed = task ?? initial ?? null;
   const [name, setName] = useState(seed?.name ?? "");
   const [cardTitle, setCardTitle] = useState(seed?.cardTitle ?? "");
   const [cardDescription, setCardDescription] = useState(seed?.cardDescription ?? "");
   const [agentPrompt, setAgentPrompt] = useState(seed?.agentPrompt ?? "");
-  const [tags, setTags] = useState(seed?.tags.join(", ") ?? "");
+  const [tagList, setTagList] = useState<string[]>(() => [
+    ...new Set((seed?.tags ?? []).map(normalizeTag).filter(Boolean)),
+  ]);
+  const [tagInput, setTagInput] = useState("");
   const [kindType, setKindType] = useState<ScheduleKindType>(seed?.schedule.type ?? "daily");
   const [schedule, setSchedule] = useState<ScheduleKind>(seed?.schedule ?? defaultScheduleKind("daily"));
   const [enabled, setEnabled] = useState(seed?.enabled ?? true);
   const [saving, setSaving] = useState(false);
+
+  // Agent run config inherited by every materialized card (mirrors New Task).
+  const [agentPresetId, setAgentPresetId] = useState(seed?.agentPresetId ?? "");
+  const [agentFlags, setAgentFlags] = useState<string[] | undefined>(seed?.agentFlags);
+  const [useWorktree, setUseWorktree] = useState<boolean | undefined>(seed?.useWorktree);
+  const [workingDir, setWorkingDir] = useState(seed?.workingDir ?? "");
+
+  // Live preset connectivity-test state, keyed by preset id (seeded from cache).
+  const [testResults, setTestResults] = useState<Record<string, StoredTestResult | null>>({});
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState<null | "prompt" | "tags">(null);
+
+  const selectedPreset = useMemo(() => agentPresets.find((p) => p.id === agentPresetId), [agentPresets, agentPresetId]);
+  const selectedTest = agentPresetId ? (testResults[agentPresetId] ?? null) : null;
+  // A preset whose live test failed can't be accepted; one mid-test blocks too.
+  const presetBlocked = Boolean(selectedPreset) && (selectedTest?.status === "failed" || testingId === agentPresetId);
+
+  // Seed the default preset + cached test results once settings finish loading.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time seed when presets load
+  useEffect(() => {
+    if (agentPresets.length === 0) return;
+    setAgentPresetId((cur) => (cur ? cur : (seed?.agentPresetId ?? defaultAgentId ?? agentPresets[0]?.id ?? "")));
+    setTestResults((cur) => {
+      if (Object.keys(cur).length > 0) return cur;
+      const map: Record<string, StoredTestResult | null> = {};
+      for (const p of agentPresets) map[p.id] = loadTestResult(p.id);
+      return map;
+    });
+  }, [agentPresets, defaultAgentId]);
+
+  /** Run `test_agent` for a preset, cache + reflect the result. Returns pass. */
+  const runPresetTest = useCallback(
+    async (preset: AgentPreset): Promise<boolean> => {
+      if (!isTauri()) return true; // No sidecar in the browser — don't block dev.
+      setTestingId(preset.id);
+      try {
+        await invoke("test_agent", {
+          binary: preset.binary,
+          argsTemplate: preset.argsTemplate,
+          workingDir: preset.workingDir ?? null,
+        });
+        const result = persistTestResult(preset.id, "passed");
+        setTestResults((cur) => ({ ...cur, [preset.id]: result }));
+        return true;
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : typeof err === "string" ? err : undefined;
+        const result = persistTestResult(preset.id, "failed", reason);
+        setTestResults((cur) => ({ ...cur, [preset.id]: result }));
+        toast.error(t("agent.testFailedToast", { name: preset.name }));
+        return false;
+      } finally {
+        setTestingId(null);
+      }
+    },
+    [t],
+  );
+
+  const handlePresetChange = (value: string) => {
+    setAgentPresetId(value);
+    // Card-level overrides belong to the previous preset — drop them so the
+    // options editor falls back to the newly selected preset's defaults.
+    setAgentFlags(undefined);
+    setUseWorktree(undefined);
+    const preset = agentPresets.find((p) => p.id === value);
+    // Auto-test on select unless a passing result is already cached.
+    if (preset && testResults[value]?.status !== "passed") void runPresetTest(preset);
+  };
+
+  // ── tags ───────────────────────────────────────────────────────────────
+  const tagSuggestions = useMemo(() => {
+    const needle = normalizeTag(tagInput);
+    return [...new Set(availableTags.map(normalizeTag))]
+      .filter((tag) => tag && !tagList.includes(tag) && (!needle || tag.includes(needle)))
+      .slice(0, 8);
+  }, [availableTags, tagInput, tagList]);
+
+  const addTag = useCallback((value: string) => {
+    const tag = normalizeTag(value);
+    if (!tag) return;
+    setTagList((cur) => (cur.includes(tag) ? cur : [...cur, tag]));
+    setTagInput("");
+  }, []);
+  const removeTag = (tag: string) => setTagList((cur) => cur.filter((x) => x !== tag));
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagInput);
+    } else if (e.key === "Backspace" && !tagInput) {
+      setTagList((cur) => cur.slice(0, -1));
+    }
+  };
+
+  // ── LLM one-shot generation (runs the selected preset's agent) ──────────
+  const runAgentComplete = useCallback(
+    async (metaPrompt: string): Promise<string | null> => {
+      if (!selectedPreset) {
+        toast.error(t("agent.needPreset"));
+        return null;
+      }
+      if (!isTauri()) {
+        toast.error(t("agent.devOnly"));
+        return null;
+      }
+      const res = await invoke<{ output?: string }>("agent_complete", {
+        binary: selectedPreset.binary,
+        argsTemplate: selectedPreset.argsTemplate,
+        prompt: metaPrompt,
+        flags: agentFlags ?? selectedPreset.flags ?? [],
+        workingDir: workingDir.trim() ? workingDir.trim() : (selectedPreset.workingDir ?? null),
+        launchVia: selectedPreset.launchVia ?? "direct",
+        ollamaModel: selectedPreset.ollamaModel ?? null,
+      });
+      return res?.output ?? null;
+    },
+    [selectedPreset, agentFlags, workingDir, t],
+  );
+
+  const handleGeneratePrompt = async () => {
+    setGenerating("prompt");
+    try {
+      const meta = t("agent.promptMeta", {
+        name: name.trim() || "(unnamed)",
+        description: cardDescription.trim() || "(none)",
+      });
+      const out = await runAgentComplete(meta);
+      const text = out ? cleanGenerated(out) : "";
+      if (text) setAgentPrompt(text);
+      else if (out !== null) toast.error(t("agent.generateEmpty"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("agent.generateError"));
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  const handleSuggestTags = async () => {
+    setGenerating("tags");
+    try {
+      const meta = t("agent.tagsMeta", {
+        name: name.trim() || "(unnamed)",
+        description: cardDescription.trim() || "(none)",
+      });
+      const out = await runAgentComplete(meta);
+      const proposed = (out ? cleanGenerated(out) : "").split(/[,\n]/).map(normalizeTag).filter(Boolean).slice(0, 6);
+      if (proposed.length === 0) {
+        if (out !== null) toast.error(t("agent.generateEmpty"));
+        return;
+      }
+      setTagList((cur) => [...new Set([...cur, ...proposed])]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("agent.generateError"));
+    } finally {
+      setGenerating(null);
+    }
+  };
 
   const handleKindChange = (type: ScheduleKindType) => {
     setKindType(type);
@@ -268,7 +464,7 @@ function ScheduleEditModal({ open, task, initial, onSave, onClose }: ScheduleEdi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !cardTitle.trim()) return;
+    if (!name.trim() || !cardTitle.trim() || presetBlocked) return;
     setSaving(true);
     try {
       const input: CreateScheduleInput = {
@@ -276,9 +472,13 @@ function ScheduleEditModal({ open, task, initial, onSave, onClose }: ScheduleEdi
         cardTitle: cardTitle.trim(),
         cardDescription,
         agentPrompt,
-        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        tags: tagList,
         schedule,
         enabled,
+        agentPresetId: agentPresetId || undefined,
+        agentFlags,
+        useWorktree,
+        workingDir: workingDir.trim() || undefined,
       };
       if (task) {
         await onSave({ ...input, id: task.id });
@@ -290,38 +490,246 @@ function ScheduleEditModal({ open, task, initial, onSave, onClose }: ScheduleEdi
     }
   };
 
+  const canGenerate = Boolean(selectedPreset) && !presetBlocked && generating === null;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{task ? t("editSchedule") : t("newSchedule")}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <ListPlusIcon className="size-4 text-muted-foreground" />
+            {task ? t("editSchedule") : t("newSchedule")}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>{t("form.scheduleName")} *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form.scheduleNamePlaceholder")} required />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t("form.scheduleNamePlaceholder")}
+              required
+            />
           </div>
 
           <div className="space-y-2">
-            <Label>{t("form.cardTitle")} *</Label>
-            <Input value={cardTitle} onChange={(e) => setCardTitle(e.target.value)} placeholder={t("form.cardTitlePlaceholder")} required />
+            <div className="flex items-center justify-between">
+              <Label>{t("form.cardTitle")} *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="h-6 gap-1 text-muted-foreground"
+                onClick={() => setCardTitle(name)}
+                disabled={!name.trim()}
+                title={t("form.copyName")}
+              >
+                <CopyIcon className="size-3" />
+                {t("form.copyName")}
+              </Button>
+            </div>
+            <Input
+              value={cardTitle}
+              onChange={(e) => setCardTitle(e.target.value)}
+              placeholder={t("form.cardTitlePlaceholder")}
+              required
+            />
           </div>
 
           <div className="space-y-2">
             <Label>{t("form.description")}</Label>
-            <Textarea value={cardDescription} onChange={(e) => setCardDescription(e.target.value)} rows={2} />
+            <Textarea
+              value={cardDescription}
+              onChange={(e) => setCardDescription(e.target.value)}
+              rows={2}
+              placeholder={t("form.descriptionPlaceholder")}
+            />
           </div>
 
           <div className="space-y-2">
-            <Label>{t("form.agentPrompt")}</Label>
-            <Textarea value={agentPrompt} onChange={(e) => setAgentPrompt(e.target.value)} rows={3} className="font-mono text-xs" />
+            <div className="flex items-center justify-between">
+              <Label>{t("form.agentPrompt")}</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => void handleGeneratePrompt()}
+                disabled={!canGenerate}
+                title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
+              >
+                {generating === "prompt" ? (
+                  <Loader2Icon className="size-3 animate-spin" />
+                ) : (
+                  <SparklesIcon className="size-3" />
+                )}
+                {t("actions.generate")}
+              </Button>
+            </div>
+            <Textarea
+              value={agentPrompt}
+              onChange={(e) => setAgentPrompt(e.target.value)}
+              rows={3}
+              className="font-mono text-xs"
+            />
           </div>
 
           <div className="space-y-2">
-            <Label>{t("form.tags")}</Label>
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder={t("form.tagsPlaceholder")} />
+            <div className="flex items-center justify-between">
+              <Label>{t("form.tags")}</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => void handleSuggestTags()}
+                disabled={!canGenerate}
+                title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
+              >
+                {generating === "tags" ? (
+                  <Loader2Icon className="size-3 animate-spin" />
+                ) : (
+                  <SparklesIcon className="size-3" />
+                )}
+                {t("actions.suggestTags")}
+              </Button>
+            </div>
+            <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5">
+              {tagList.map((tag) => (
+                <Badge key={tag} variant="outline" className={tagClassName(tag, "h-6 gap-1 pr-1")}>
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="rounded-full p-0.5 hover:bg-background/60"
+                  >
+                    <XIcon className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                onBlur={() => addTag(tagInput)}
+                placeholder={tagList.length === 0 ? t("form.tagsPlaceholder") : ""}
+                className="h-7 min-w-32 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+              />
+            </div>
+            {tagSuggestions.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {tagSuggestions.map((tag) => (
+                  <Button key={tag} type="button" variant="outline" size="xs" onClick={() => addTag(tag)}>
+                    {tag}
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {agentPresets.length > 0 && (
+            <div className="space-y-2 rounded-lg border bg-foreground/5 p-3">
+              <Label className="flex items-center gap-2">
+                <Badge className="border-orange-500/20 bg-orange-500/10 text-[10px] text-orange-600">
+                  <ZapIcon className="size-2.5" />
+                  {t("agent.section")}
+                </Badge>
+                {t("form.agentPreset")}
+              </Label>
+              <Select value={agentPresetId} onValueChange={handlePresetChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("agent.needPreset")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentPresets.map((preset) => {
+                    const r = testResults[preset.id];
+                    return (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        <span className="flex items-center gap-2">
+                          {preset.name}
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+                              r?.status === "passed"
+                                ? "bg-green-500/15 text-green-600"
+                                : r?.status === "failed"
+                                  ? "bg-red-500/15 text-red-600"
+                                  : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {r?.status === "passed" ? (
+                              <CheckCircle2Icon className="size-2.5" />
+                            ) : r?.status === "failed" ? (
+                              <XCircleIcon className="size-2.5" />
+                            ) : null}
+                            {r?.status === "passed"
+                              ? t("agent.tested")
+                              : r?.status === "failed"
+                                ? t("agent.testFailed")
+                                : t("agent.untested")}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+
+              {selectedPreset && testingId === agentPresetId && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2Icon className="size-3 animate-spin" />
+                  {t("agent.testing", { name: selectedPreset.name })}
+                </p>
+              )}
+              {selectedPreset && presetBlocked && selectedTest?.status === "failed" && (
+                <div className="space-y-1.5">
+                  <p className="flex items-center gap-1.5 text-xs text-destructive">
+                    <XCircleIcon className="size-3" />
+                    {t("agent.blocked")}
+                  </p>
+                  {selectedTest.reason && (
+                    <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
+                      {selectedTest.reason}
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
+                    disabled={testingId !== null}
+                  >
+                    <FlaskConicalIcon className="size-3" />
+                    {t("agent.retry")}
+                  </Button>
+                </div>
+              )}
+
+              {selectedPreset && (
+                <AgentOptions
+                  binary={selectedPreset.binary}
+                  flags={agentFlags ?? selectedPreset.flags ?? []}
+                  useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
+                  launchVia={selectedPreset.launchVia ?? "direct"}
+                  ollamaModel={selectedPreset.ollamaModel ?? ""}
+                  onFlagsChange={setAgentFlags}
+                  onWorktreeChange={setUseWorktree}
+                />
+              )}
+
+              <div className="space-y-1">
+                <Label className="flex items-center gap-2 text-xs">
+                  <FolderIcon className="size-3.5 text-muted-foreground" />
+                  {t("form.workingDir")}
+                  <span className="font-normal text-muted-foreground">({t("form.optional")})</span>
+                </Label>
+                <WorkingDirField
+                  value={workingDir}
+                  onChange={setWorkingDir}
+                  placeholder={selectedPreset?.workingDir ?? ""}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>{t("form.scheduleKind")}</Label>
@@ -347,8 +755,10 @@ function ScheduleEditModal({ open, task, initial, onSave, onClose }: ScheduleEdi
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>{t("actions.cancel")}</Button>
-            <Button type="submit" disabled={!name.trim() || !cardTitle.trim() || saving}>
+            <Button type="button" variant="outline" onClick={onClose}>
+              {t("actions.cancel")}
+            </Button>
+            <Button type="submit" disabled={!name.trim() || !cardTitle.trim() || presetBlocked || saving}>
               {saving ? t("actions.saving") : task ? t("actions.update") : t("actions.create")}
             </Button>
           </DialogFooter>
@@ -367,14 +777,22 @@ function ScheduleKindFields({ schedule, onChange }: { schedule: ScheduleKind; on
       return (
         <div className="space-y-2">
           <Label>{t("form.dateTime")}</Label>
-          <Input type="datetime-local" value={schedule.at} onChange={(e) => onChange({ type: "once", at: e.target.value })} />
+          <Input
+            type="datetime-local"
+            value={schedule.at}
+            onChange={(e) => onChange({ type: "once", at: e.target.value })}
+          />
         </div>
       );
     case "daily":
       return (
         <div className="space-y-2">
           <Label>{t("form.time")}</Label>
-          <Input type="time" value={schedule.time} onChange={(e) => onChange({ type: "daily", time: e.target.value })} />
+          <Input
+            type="time"
+            value={schedule.time}
+            onChange={(e) => onChange({ type: "daily", time: e.target.value })}
+          />
         </div>
       );
     case "weekly":
@@ -382,7 +800,11 @@ function ScheduleKindFields({ schedule, onChange }: { schedule: ScheduleKind; on
         <div className="space-y-3">
           <div className="space-y-2">
             <Label>{t("form.time")}</Label>
-            <Input type="time" value={schedule.time} onChange={(e) => onChange({ ...schedule, time: e.target.value })} />
+            <Input
+              type="time"
+              value={schedule.time}
+              onChange={(e) => onChange({ ...schedule, time: e.target.value })}
+            />
           </div>
           <div className="space-y-2">
             <Label>{t("form.days")}</Label>
@@ -391,10 +813,18 @@ function ScheduleKindFields({ schedule, onChange }: { schedule: ScheduleKind; on
                 const dayNum = i + 1;
                 const active = schedule.days.includes(dayNum);
                 return (
-                  <Button key={dayKey} type="button" size="xs" variant={active ? "default" : "outline"} onClick={() => {
-                    const days = active ? schedule.days.filter((d) => d != dayNum) : [...schedule.days, dayNum].sort();
-                    onChange({ ...schedule, days });
-                  }}>
+                  <Button
+                    key={dayKey}
+                    type="button"
+                    size="xs"
+                    variant={active ? "default" : "outline"}
+                    onClick={() => {
+                      const days = active
+                        ? schedule.days.filter((d) => d !== dayNum)
+                        : [...schedule.days, dayNum].sort();
+                      onChange({ ...schedule, days });
+                    }}
+                  >
                     {t(`days.${dayKey}`)}
                   </Button>
                 );
@@ -408,11 +838,20 @@ function ScheduleKindFields({ schedule, onChange }: { schedule: ScheduleKind; on
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label>{t("form.startTime")}</Label>
-            <Input type="time" value={schedule.start} onChange={(e) => onChange({ ...schedule, start: e.target.value })} />
+            <Input
+              type="time"
+              value={schedule.start}
+              onChange={(e) => onChange({ ...schedule, start: e.target.value })}
+            />
           </div>
           <div className="space-y-2">
             <Label>{t("form.minutes")}</Label>
-            <Input type="number" min={1} value={schedule.minutes} onChange={(e) => onChange({ ...schedule, minutes: Number(e.target.value) || 60 })} />
+            <Input
+              type="number"
+              min={1}
+              value={schedule.minutes}
+              onChange={(e) => onChange({ ...schedule, minutes: Number(e.target.value) || 60 })}
+            />
           </div>
         </div>
       );
@@ -420,7 +859,12 @@ function ScheduleKindFields({ schedule, onChange }: { schedule: ScheduleKind; on
       return (
         <div className="space-y-2">
           <Label>{t("form.cronExpression")}</Label>
-          <Input value={schedule.expr} onChange={(e) => onChange({ type: "cron", expr: e.target.value })} placeholder={t("form.cronPlaceholder")} className="font-mono text-xs" />
+          <Input
+            value={schedule.expr}
+            onChange={(e) => onChange({ type: "cron", expr: e.target.value })}
+            placeholder={t("form.cronPlaceholder")}
+            className="font-mono text-xs"
+          />
         </div>
       );
   }
