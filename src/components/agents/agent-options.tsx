@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useOllama } from "@/hooks/use-ollama";
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { AgentFlagDef, AgentFlagsResult, AgentModelCost, AgentModelsResult } from "@/types/settings";
@@ -26,7 +25,7 @@ import {
   sortOpencodeVariants,
 } from "@/types/settings";
 
-import { OllamaModelControl } from "./ollama-local-models";
+import { UnifiedModelPicker } from "./ollama-local-models";
 
 interface AgentOptionsProps {
   /** Binary the preset runs — selects the flag catalog (e.g. "opencode"). */
@@ -45,34 +44,6 @@ interface AgentOptionsProps {
   ollamaModel?: string;
   onLaunchViaChange?: (launchVia: "direct" | "ollama") => void;
   onOllamaModelChange?: (model: string) => void;
-}
-
-/**
- * Local-model control wrapper — owns the `useOllama` hook so it only fetches
- * status when actually rendered (one harness preset that can run locally), not
- * for every preset card.
- */
-function LocalModelSection({
-  launchVia,
-  ollamaModel,
-  onLaunchViaChange,
-  onOllamaModelChange,
-}: {
-  launchVia: "direct" | "ollama";
-  ollamaModel: string;
-  onLaunchViaChange: (launchVia: "direct" | "ollama") => void;
-  onOllamaModelChange: (model: string) => void;
-}) {
-  const ollama = useOllama();
-  return (
-    <OllamaModelControl
-      ollama={ollama}
-      enabled={launchVia === "ollama"}
-      model={ollamaModel}
-      onEnabledChange={(on) => onLaunchViaChange(on ? "ollama" : "direct")}
-      onModelChange={onOllamaModelChange}
-    />
-  );
 }
 
 function flagName(token: string): string {
@@ -352,14 +323,6 @@ export function AgentOptions({
 
   return (
     <div className="space-y-2">
-      {canRunLocal && onLaunchViaChange && onOllamaModelChange && (
-        <LocalModelSection
-          launchVia={launchVia}
-          ollamaModel={ollamaModel}
-          onLaunchViaChange={onLaunchViaChange}
-          onOllamaModelChange={onOllamaModelChange}
-        />
-      )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Label className="flex cursor-pointer items-center gap-2 font-normal text-xs">
           <Checkbox checked={useWorktree} onCheckedChange={(checked) => onWorktreeChange(checked === true)} />
@@ -391,18 +354,36 @@ export function AgentOptions({
                 {t(`flags.${def.flag}`)}
               </span>
               {def.optionsRpc === "list_models" ? (
-                <>
-                  <ModelPicker
-                    def={def}
-                    value={value}
-                    onChange={(v) => setModelFlag(def, v)}
-                    models={modelsResult?.models ?? null}
+                canRunLocal && onLaunchViaChange && onOllamaModelChange ? (
+                  // Local-capable harness: one picker with both the harness's
+                  // cloud models and the local Ollama models.
+                  <UnifiedModelPicker
+                    cloudModels={modelsResult?.models ?? null}
+                    cloudValue={value}
                     cost={modelsResult?.cost}
-                    failed={modelsFailed}
-                    onOpen={() => setModelsRequested(true)}
+                    cloudFailed={modelsFailed}
+                    onCloudOpen={() => setModelsRequested(true)}
+                    onCloudSelect={(v) => setModelFlag(def, v)}
+                    launchVia={launchVia}
+                    ollamaModel={ollamaModel}
+                    onLaunchViaChange={onLaunchViaChange}
+                    onOllamaModelChange={onOllamaModelChange}
+                    placeholder={t("selectModel")}
                   />
-                  {value !== "" && <ModelCostHint cost={modelsResult?.cost?.[value]} />}
-                </>
+                ) : (
+                  <>
+                    <ModelPicker
+                      def={def}
+                      value={value}
+                      onChange={(v) => setModelFlag(def, v)}
+                      models={modelsResult?.models ?? null}
+                      cost={modelsResult?.cost}
+                      failed={modelsFailed}
+                      onOpen={() => setModelsRequested(true)}
+                    />
+                    {value !== "" && <ModelCostHint cost={modelsResult?.cost?.[value]} />}
+                  </>
+                )
               ) : choices ? (
                 <Select
                   value={value || DEFAULT_VALUE}

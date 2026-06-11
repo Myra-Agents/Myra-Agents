@@ -5,10 +5,12 @@ import { useState } from "react";
 import {
   BoltIcon,
   CheckCircle2Icon,
+  CheckIcon,
   DownloadIcon,
   Loader2Icon,
   PlayIcon,
   RefreshCwIcon,
+  Settings2Icon,
   TrashIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -16,15 +18,16 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import type { UseOllama } from "@/hooks/use-ollama";
+import { useOllama } from "@/hooks/use-ollama";
 import { openExternal } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { OllamaPullProgress } from "@/types/settings";
+import type { AgentModelCost, OllamaPullProgress } from "@/types/settings";
 import { OLLAMA_INSTALL_INFO, OLLAMA_MODEL_CATALOG } from "@/types/settings";
 
 function formatBytes(bytes?: number): string {
@@ -298,92 +301,207 @@ export function OllamaInstallDialog({
   );
 }
 
+/** One cloud-model row's $/M cost as muted text, or a "free" badge. */
+function CostHint({ cost }: { cost?: AgentModelCost }) {
+  const t = useTranslations("agents");
+  if (!cost) return null;
+  if (cost.input === 0 && cost.output === 0) {
+    return (
+      <Badge variant="outline" className="border-green-500/30 bg-green-500/10 px-1.5 text-[10px] text-green-600">
+        {t("modelFree")}
+      </Badge>
+    );
+  }
+  return (
+    <span className="text-[10px] text-muted-foreground">
+      {t("modelCost", { input: String(cost.input), output: String(cost.output) })}
+    </span>
+  );
+}
+
 /**
- * The in-options control: a "use a local model" switch + the installed-model
- * picker, with the install dialog as the on-ramp. Drives `launchVia`/`ollamaModel`
- * on the owning preset. Rendered by {@link AgentOptions} only when the harness is
- * one Ollama can launch and the parent provides the change handlers.
+ * The model picker for an Ollama-launchable harness preset: one popover with a
+ * CLOUD group (the harness's own provider models, via `list_models`) **and** a
+ * LOCAL · OLLAMA group. Picking a cloud model sets the `--model` flag and runs
+ * direct; picking a local model sets `ollamaModel` + `launchVia="ollama"`.
+ * Not-yet-pulled catalogue models appear greyed with a download affordance and
+ * pull inline (progress in the row). Replaces the old separate switch+select box
+ * so local models live right inside the model dropdown.
  */
-export function OllamaModelControl({
-  ollama,
-  enabled,
-  model,
-  onEnabledChange,
-  onModelChange,
+export function UnifiedModelPicker({
+  cloudModels,
+  cloudValue,
+  cost,
+  cloudFailed,
+  onCloudOpen,
+  onCloudSelect,
+  launchVia,
+  ollamaModel,
+  onLaunchViaChange,
+  onOllamaModelChange,
+  placeholder,
 }: {
-  ollama: UseOllama;
-  enabled: boolean;
-  model: string;
-  onEnabledChange: (enabled: boolean) => void;
-  onModelChange: (model: string) => void;
+  cloudModels: string[] | null;
+  cloudValue: string;
+  cost?: Record<string, AgentModelCost>;
+  cloudFailed: boolean;
+  onCloudOpen: () => void;
+  onCloudSelect: (model: string) => void;
+  launchVia: "direct" | "ollama";
+  ollamaModel: string;
+  onLaunchViaChange: (launchVia: "direct" | "ollama") => void;
+  onOllamaModelChange: (model: string) => void;
+  placeholder: string;
 }) {
   const t = useTranslations("agents");
+  const ollama = useOllama();
+  const { status, pulling, pull } = ollama;
+  const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { status, loading } = ollama;
-  const ready = Boolean(status?.installed && status.running && status.launchCapable);
-  const models = status?.models ?? [];
 
-  const toggle = (next: boolean) => {
-    if (next && !ready) {
-      // Not ready → run the on-ramp first; the switch flips on once a model is set.
-      setDialogOpen(true);
-      return;
+  const ready = Boolean(status?.installed && status.running && status.launchCapable);
+  const installedModels = status?.models ?? [];
+  const installedSet = new Set(installedModels.map((m) => m.name.replace(/:latest$/, "")));
+  const catalogToPull = OLLAMA_MODEL_CATALOG.filter((m) => !installedSet.has(m.tag.replace(/:latest$/, "")));
+  const local = launchVia === "ollama";
+
+  const selectCloud = (model: string) => {
+    onCloudSelect(model);
+    onLaunchViaChange("direct");
+    onOllamaModelChange("");
+    setOpen(false);
+  };
+  const selectLocal = (name: string) => {
+    onOllamaModelChange(name);
+    onLaunchViaChange("ollama");
+    setOpen(false);
+  };
+  const startPull = async (tag: string) => {
+    try {
+      await pull(tag); // keep the popover open; the row shows progress
+      toast.success(t("local.pullDone", { model: tag }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("local.pullFailed", { model: tag }));
     }
-    onEnabledChange(next);
-    // Default to the first installed model so the run isn't left without one.
-    if (next && !model && models.length > 0) onModelChange(models[0].name);
   };
 
+  const triggerLabel = local && ollamaModel ? ollamaModel : cloudValue || placeholder;
+
   return (
-    <div className="space-y-2 rounded-md border border-dashed bg-muted/30 p-2.5">
-      <div className="flex items-center gap-2">
-        <BoltIcon className="size-3.5 text-primary" />
-        <span className="font-medium text-xs">{t("local.useLocal")}</span>
-        {ready && (
-          <Badge variant="outline" className="border-green-500/30 bg-green-500/10 px-1.5 text-[10px] text-green-600">
-            {t("local.ollamaReady")}
-          </Badge>
-        )}
-        <Switch className="ml-auto" checked={enabled && ready} disabled={loading} onCheckedChange={toggle} />
-      </div>
-
-      {enabled && ready && (
-        <div className="flex flex-wrap items-center gap-2">
-          {models.length > 0 ? (
-            <Select value={model} onValueChange={onModelChange}>
-              <SelectTrigger size="sm" className="h-7 w-56 text-xs">
-                <SelectValue placeholder={t("local.selectModel")} />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((m) => (
-                  <SelectItem key={m.name} value={m.name}>
-                    <span className="font-mono text-xs">{m.name}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <span className="text-[11px] text-muted-foreground">{t("local.noModelsYet")}</span>
-          )}
-          <Button type="button" variant="outline" size="xs" onClick={() => setDialogOpen(true)}>
-            <DownloadIcon className="size-3" />
-            {t("local.manageModels")}
+    <>
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (next) onCloudOpen();
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" size="xs" className="max-w-64" title={triggerLabel}>
+            {local && <BoltIcon className="size-3 text-primary" />}
+            <span className={cn("truncate", local || cloudValue ? "font-mono" : "text-muted-foreground")}>
+              {triggerLabel}
+            </span>
           </Button>
-        </div>
-      )}
+        </PopoverTrigger>
+        <PopoverContent className="w-96 p-0" align="start">
+          <Command>
+            <CommandInput placeholder={t("searchModels")} />
+            <CommandList className="max-h-80">
+              <CommandEmpty>{cloudModels === null ? t("loadingModels") : t("noModelFound")}</CommandEmpty>
 
-      {!ready && (
-        <button
-          type="button"
-          className="text-[11px] text-primary underline-offset-2 hover:underline"
-          onClick={() => setDialogOpen(true)}
-        >
-          {t("local.enableCta")}
-        </button>
-      )}
+              {!cloudFailed && (cloudModels?.length ?? 0) > 0 && (
+                <CommandGroup heading={t("local.cloudGroup")}>
+                  {(cloudModels ?? []).map((model) => (
+                    <CommandItem key={model} value={`cloud ${model}`} onSelect={() => selectCloud(model)}>
+                      <CheckIcon
+                        className={cn("size-3.5", !local && cloudValue === model ? "opacity-100" : "opacity-0")}
+                      />
+                      <span className="truncate font-mono text-xs">{model}</span>
+                      <span className="ml-auto">
+                        <CostHint cost={cost?.[model]} />
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+
+              <CommandGroup
+                heading={
+                  <span className="flex items-center gap-1.5">
+                    <BoltIcon className="size-3 text-primary" />
+                    {t("local.localGroup")}
+                  </span>
+                }
+              >
+                {!ready ? (
+                  <CommandItem value="ollama enable local models" onSelect={() => setDialogOpen(true)}>
+                    <BoltIcon className="size-3.5 text-primary" />
+                    <span className="text-primary text-xs">{t("local.enableCta")}</span>
+                  </CommandItem>
+                ) : (
+                  <>
+                    {installedModels.map((m) => (
+                      <CommandItem key={m.name} value={`local ${m.name}`} onSelect={() => selectLocal(m.name)}>
+                        <CheckIcon
+                          className={cn("size-3.5", local && ollamaModel === m.name ? "opacity-100" : "opacity-0")}
+                        />
+                        <span className="size-1.5 rounded-full bg-green-500" />
+                        <span className="truncate font-mono text-xs">{m.name}</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground">{formatBytes(m.size)}</span>
+                      </CommandItem>
+                    ))}
+                    {catalogToPull.map((m) => {
+                      const progress = pulling[m.tag] ?? pulling[`${m.tag}:latest`];
+                      const busy = Boolean(progress);
+                      return (
+                        <CommandItem
+                          key={m.tag}
+                          value={`local pull ${m.tag} ${m.label}`}
+                          // Pulling shouldn't dismiss — let the row show progress.
+                          onSelect={() => !busy && void startPull(m.tag)}
+                          className="flex-col items-stretch gap-1"
+                        >
+                          <div className="flex items-center gap-2">
+                            {busy ? (
+                              <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
+                            ) : (
+                              <DownloadIcon className="size-3.5 text-muted-foreground" />
+                            )}
+                            <span className="truncate font-mono text-muted-foreground text-xs">{m.tag}</span>
+                            <span className="ml-auto text-[10px] text-muted-foreground">
+                              {m.size} · {t("local.minRam", { ram: m.minRam })}
+                            </span>
+                          </div>
+                          <PullProgressLine progress={progress} />
+                        </CommandItem>
+                      );
+                    })}
+                    <CommandItem value="ollama manage models" onSelect={() => setDialogOpen(true)}>
+                      <Settings2Icon className="size-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground text-xs">{t("local.manageModels")}</span>
+                    </CommandItem>
+                  </>
+                )}
+              </CommandGroup>
+
+              {cloudFailed && (
+                <div className="p-2">
+                  <Input
+                    value={cloudValue}
+                    onChange={(e) => selectCloud(e.target.value)}
+                    placeholder={placeholder}
+                    className="h-7 font-mono text-xs"
+                  />
+                </div>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
       <OllamaInstallDialog ollama={ollama} open={dialogOpen} onOpenChange={setDialogOpen} />
-    </div>
+    </>
   );
 }
 
