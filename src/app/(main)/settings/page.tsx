@@ -5,6 +5,7 @@ import { type ChangeEvent, useCallback, useRef, useState } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   CheckCircle2Icon,
+  CopyIcon,
   DownloadIcon,
   FlaskConicalIcon,
   Loader2Icon,
@@ -33,6 +34,7 @@ import { LocalModelsPanel } from "@/components/settings/local-models-panel";
 // import { PluginsPanel } from "@/components/settings/plugins-panel";
 // import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 // import { SyncPanel } from "@/components/settings/sync-panel";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,6 +59,27 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
+type StoredTestResult = { status: "passed" | "failed"; ts: number; reason?: string };
+
+function loadTestResult(id: string): StoredTestResult | null {
+  try {
+    const raw = localStorage.getItem(`myra:agent-test:${id}`);
+    return raw ? (JSON.parse(raw) as StoredTestResult) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistTestResult(id: string, status: "passed" | "failed", reason?: string) {
+  try {
+    localStorage.setItem(`myra:agent-test:${id}`, JSON.stringify({ status, ts: Date.now(), reason }));
+  } catch {
+    // ignore
+  }
+}
+
+const EXEC_FIELDS = new Set<keyof AgentPreset>(["binary", "argsTemplate", "flags", "launchVia", "ollamaModel", "useWorktree"]);
+
 interface AgentPresetCardProps {
   preset: AgentPreset;
   idx: number;
@@ -64,9 +87,11 @@ interface AgentPresetCardProps {
   t: ReturnType<typeof useTranslations>;
   onUpdate: (idx: number, patch: Partial<AgentPreset>) => void;
   onRemove: (idx: number) => void;
+  onDuplicate: (idx: number) => void;
   isDirty: boolean;
+  needsTest: boolean;
   saving: boolean;
-  onSave: () => void;
+  onSave: () => Promise<void>;
 }
 
 /**
@@ -77,13 +102,14 @@ interface AgentPresetCardProps {
  */
 type TestState = "idle" | "testing" | "passed" | "failed";
 
-function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, isDirty, saving, onSave }: AgentPresetCardProps) {
+function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, onDuplicate, isDirty, needsTest, saving, onSave }: AgentPresetCardProps) {
   const bin = useBinaryStatus(preset.binary);
   const [configureAnyway, setConfigureAnyway] = useState(false);
   const [showAdvancedArgs, setShowAdvancedArgs] = useState(false);
   const [testState, setTestState] = useState<TestState>("idle");
+  const [storedResult, setStoredResult] = useState<StoredTestResult | null>(() => loadTestResult(preset.id));
 
-  const runTest = useCallback(async () => {
+  const handleTestAndSave = useCallback(async () => {
     setTestState("testing");
     try {
       await invoke("test_agent", {
@@ -91,12 +117,20 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, isDirt
         argsTemplate: preset.argsTemplate,
         workingDir: preset.workingDir ?? null,
       });
+      const result: StoredTestResult = { status: "passed", ts: Date.now() };
+      persistTestResult(preset.id, "passed");
+      setStoredResult(result);
       setTestState("passed");
-    } catch {
+      await onSave();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : typeof err === "string" ? err : undefined;
+      const result: StoredTestResult = { status: "failed", ts: Date.now(), reason };
+      persistTestResult(preset.id, "failed", reason);
+      setStoredResult(result);
       setTestState("failed");
     }
     setTimeout(() => setTestState("idle"), 3000);
-  }, [preset.binary, preset.argsTemplate, preset.workingDir]);
+  }, [preset.id, preset.binary, preset.argsTemplate, preset.workingDir, onSave]);
   // Gate only when we *can* install it (known binary) and a check confirmed it's missing.
   const gated = !configureAnyway && bin.missing && Boolean(bin.installInfo);
   // Until the first check resolves we don't know fields-or-gate — show a loading
@@ -109,12 +143,47 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, isDirt
         <div className="flex items-center gap-2">
           <Label className="font-semibold text-sm">{preset.name}</Label>
           <AgentStatusBadge {...bin} />
+          {storedResult && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                storedResult.status === "passed"
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              }`}
+            >
+              {storedResult.status === "passed" ? (
+                <CheckCircle2Icon className="size-2.5" />
+              ) : (
+                <XCircleIcon className="size-2.5" />
+              )}
+              {storedResult.status === "passed" ? t("agents.testedBadge") : t("agents.testFailedBadge")}
+            </span>
+          )}
         </div>
-        {!isDefault && (
-          <Button variant="ghost" size="icon-xs" onClick={() => onRemove(idx)}>
-            <TrashIcon />
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon-xs" onClick={() => onDuplicate(idx)} title={t("agents.duplicate")}>
+            <CopyIcon />
           </Button>
-        )}
+          {!isDefault && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon-xs">
+                  <TrashIcon />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("agents.removeConfirmTitle")}</AlertDialogTitle>
+                  <AlertDialogDescription>{t("agents.removeConfirmDescription")}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("agents.removeCancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onRemove(idx)}>{t("agents.removeConfirm")}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
       {pendingCheck ? (
         <div className="flex items-center justify-center gap-2 rounded-md border border-dashed px-4 py-6 text-muted-foreground text-xs">
@@ -189,38 +258,63 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, isDirt
               onOllamaModelChange={(ollamaModel) => onUpdate(idx, { ollamaModel })}
             />
           </div>
-          <div className="flex items-center justify-between pt-1">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void runTest()}
-              disabled={testState === "testing"}
-              title={t("agents.testTooltip")}
-            >
-              {testState === "testing" ? (
-                <Loader2Icon className="size-3.5 animate-spin" />
-              ) : testState === "passed" ? (
-                <CheckCircle2Icon className="size-3.5 text-green-600" />
-              ) : testState === "failed" ? (
-                <XCircleIcon className="size-3.5 text-destructive" />
-              ) : (
-                <FlaskConicalIcon className="size-3.5" />
+          <details className="group">
+            <summary className="cursor-pointer list-none text-[11px] text-muted-foreground hover:text-foreground">
+              <span className="inline-flex items-center gap-1">
+                <FlaskConicalIcon className="size-3" />
+                {t("agents.testCommand")}
+              </span>
+            </summary>
+            <p className="mt-1 rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] break-all">
+              {[preset.binary, (preset.argsTemplate ?? "{prompt}").replace("{prompt}", '"hello"'), ...(preset.flags ?? [])].filter(Boolean).join(" ")}
+            </p>
+          </details>
+          {storedResult?.status === "failed" && storedResult.reason && testState === "idle" && (
+            <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
+              {storedResult.reason}
+            </p>
+          )}
+          {isDirty && (
+            <div className="flex flex-col gap-1.5 pt-1">
+              <div className="flex justify-end">
+                {needsTest ? (
+                  <Button
+                    size="sm"
+                    onClick={() => void handleTestAndSave()}
+                    disabled={testState === "testing" || saving}
+                    title={t("agents.testAndSaveTooltip")}
+                  >
+                    {testState === "testing" ? (
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    ) : testState === "passed" ? (
+                      <CheckCircle2Icon className="size-3.5 text-green-500" />
+                    ) : testState === "failed" ? (
+                      <XCircleIcon className="size-3.5 text-destructive" />
+                    ) : (
+                      <FlaskConicalIcon className="size-3.5" />
+                    )}
+                    {testState === "testing"
+                      ? t("agents.testing")
+                      : testState === "passed"
+                        ? t("agents.testPassed")
+                        : testState === "failed"
+                          ? t("agents.testFailed")
+                          : t("agents.testAndSave")}
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={() => void onSave()} disabled={saving}>
+                    <SaveIcon className="size-3.5" />
+                    {saving ? t("actions.saving") : t("actions.save")}
+                  </Button>
+                )}
+              </div>
+              {testState === "failed" && storedResult?.reason && (
+                <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
+                  {storedResult.reason}
+                </p>
               )}
-              {testState === "testing"
-                ? t("agents.testing")
-                : testState === "passed"
-                  ? t("agents.testPassed")
-                  : testState === "failed"
-                    ? t("agents.testFailed")
-                    : t("agents.test")}
-            </Button>
-            {isDirty && (
-              <Button size="sm" onClick={onSave} disabled={saving}>
-                <SaveIcon className="size-3.5" />
-                {saving ? t("actions.saving") : t("actions.save")}
-              </Button>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -235,7 +329,7 @@ export default function SettingsPage() {
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
-  const [dirtyPresets, setDirtyPresets] = useState<Set<number>>(new Set());
+  const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
   const [dataAction, setDataAction] = useState<DataAction | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -255,7 +349,7 @@ export default function SettingsPage() {
     try {
       await save(draft);
       setDraft(null);
-      setDirtyPresets(new Set());
+      setDirtyPresetFields(new Map());
       toast.success(t("feedback.saved"));
     } catch (saveError) {
       toast.error(getErrorMessage(saveError, t("feedback.saveFailed")));
@@ -381,11 +475,43 @@ export default function SettingsPage() {
       const agents = base.agents.map((preset, index) => (index === idx ? { ...preset, ...patch } : preset));
       return { ...base, agents };
     });
-    setDirtyPresets((prev) => new Set(prev).add(idx));
+    setDirtyPresetFields((prev) => {
+      const next = new Map(prev);
+      const fields = new Set(next.get(idx));
+      for (const k of Object.keys(patch) as (keyof AgentPreset)[]) fields.add(k);
+      next.set(idx, fields);
+      return next;
+    });
+  };
+
+  const duplicatePreset = (idx: number) => {
+    const source = current.agents[idx];
+    const newId = `custom-${Date.now()}`;
+    const copy: AgentPreset = { ...source, id: newId, name: `${source.name} (copy)` };
+    const agents = [...current.agents];
+    agents.splice(idx + 1, 0, copy);
+    update({ agents });
+    const existing = loadTestResult(source.id);
+    if (existing) persistTestResult(newId, existing.status, existing.reason);
+    setDirtyPresetFields((prev) => {
+      const next = new Map<number, Set<keyof AgentPreset>>();
+      for (const [k, v] of prev) {
+        next.set(k <= idx ? k : k + 1, v);
+      }
+      return next;
+    });
   };
 
   const removePreset = (idx: number) => {
     update({ agents: current.agents.filter((_, index) => index !== idx) });
+    setDirtyPresetFields((prev) => {
+      const next = new Map<number, Set<keyof AgentPreset>>();
+      for (const [k, v] of prev) {
+        if (k < idx) next.set(k, v);
+        else if (k > idx) next.set(k - 1, v);
+      }
+      return next;
+    });
   };
 
   if (loading) {
@@ -542,7 +668,9 @@ export default function SettingsPage() {
                   t={t}
                   onUpdate={updatePreset}
                   onRemove={removePreset}
-                  isDirty={dirtyPresets.has(idx)}
+                  onDuplicate={duplicatePreset}
+                  isDirty={(dirtyPresetFields.get(idx)?.size ?? 0) > 0}
+                  needsTest={[...(dirtyPresetFields.get(idx) ?? [])].some((f) => EXEC_FIELDS.has(f))}
                   saving={saving}
                   onSave={handleSave}
                 />

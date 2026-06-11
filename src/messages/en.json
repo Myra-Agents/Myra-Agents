@@ -631,7 +631,17 @@
       "testing": "Testing…",
       "testPassed": "Agent responded",
       "testFailed": "Agent did not respond",
-      "testTooltip": "Send a \"hello\" prompt to verify the agent is reachable"
+      "testTooltip": "Send a \"hello\" prompt to verify the agent is reachable",
+      "duplicate": "Duplicate preset",
+      "removeConfirmTitle": "Remove preset?",
+      "removeConfirmDescription": "This will permanently remove the preset. This action cannot be undone.",
+      "removeConfirm": "Remove",
+      "removeCancel": "Cancel",
+      "testCommand": "Test command",
+      "testAndSave": "Test & Save",
+      "testAndSaveTooltip": "Test the agent, then save if it responds",
+      "testedBadge": "Tested",
+      "testFailedBadge": "Test failed"
     },
     "preferences": {
       "title": "Preferences",
@@ -722,7 +732,7 @@
       "catalog": "Recommended models",
       "customPull": "Pull any model",
       "customPlaceholder": "e.g. devstral:24b",
-      "browseModels": "Browse models on ollama.com",
+      "browseModels": "Browse models",
       "customNote": "Any tag from ollama.com/library",
       "minRam": "{ram} RAM",
       "pull": "Pull",

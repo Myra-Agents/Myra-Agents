@@ -631,7 +631,17 @@
       "testing": "Test en cours…",
       "testPassed": "Agent a répondu",
       "testFailed": "L'agent n'a pas répondu",
-      "testTooltip": "Envoie un prompt « hello » pour vérifier que l'agent est accessible"
+      "testTooltip": "Envoie un prompt « hello » pour vérifier que l'agent est accessible",
+      "duplicate": "Dupliquer le preset",
+      "removeConfirmTitle": "Supprimer le preset ?",
+      "removeConfirmDescription": "Cette action supprimera définitivement le preset et ne peut pas être annulée.",
+      "removeConfirm": "Supprimer",
+      "removeCancel": "Annuler",
+      "testCommand": "Commande de test",
+      "testAndSave": "Tester & Sauvegarder",
+      "testAndSaveTooltip": "Teste l'agent, puis sauvegarde s'il répond",
+      "testedBadge": "Testé",
+      "testFailedBadge": "Test échoué"
     },
     "preferences": {
       "title": "Préférences",
@@ -722,7 +732,7 @@
       "catalog": "Modèles recommandés",
       "customPull": "Télécharger n'importe quel modèle",
       "customPlaceholder": "ex. devstral:24b",
-      "browseModels": "Parcourir les modèles sur ollama.com",
+      "browseModels": "Parcourir les modèles",
       "customNote": "N'importe quel tag de ollama.com/library",
       "minRam": "{ram} de RAM",
       "pull": "Télécharger",

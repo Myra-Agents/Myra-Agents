@@ -175,12 +175,13 @@ export function LocalModelManager({ ollama }: { ollama: UseOllama }) {
           />
           <Button
             type="button"
-            variant="outline"
-            size="icon-sm"
-            title={t("local.browseModels")}
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-muted-foreground"
             onClick={() => openExternal("https://ollama.com/search")}
           >
             <ExternalLinkIcon className="size-3.5" />
+            {t("local.browseModels")}
           </Button>
           <Button
             type="button"
