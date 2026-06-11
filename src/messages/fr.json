@@ -610,6 +610,8 @@
       "defaultAgent": "Agent par défaut",
       "binary": "Binaire",
       "argsTemplate": "Modèle d'arguments",
+      "advancedArgs": "Arguments avancés",
+      "advancedArgsHint": "Doit contenir '{prompt}'. Permet de personnaliser comment le prompt est passé au binaire.",
       "workingDir": "Répertoire de travail par défaut",
       "presets": {
         "opencode": "OpenCode",
@@ -624,7 +626,12 @@
       "maxConcurrent": "Agents simultanés max",
       "maxConcurrentHint": "Nombre d’agents pouvant s’exécuter en même temps. 0 = illimité ; les lancements en trop sont mis en file.",
       "options": "Options",
-      "checkingInstall": "Vérification de l'installation de l'agent…"
+      "checkingInstall": "Vérification de l'installation de l'agent…",
+      "test": "Tester",
+      "testing": "Test en cours…",
+      "testPassed": "Agent a répondu",
+      "testFailed": "L'agent n'a pas répondu",
+      "testTooltip": "Envoie un prompt « hello » pour vérifier que l'agent est accessible"
     },
     "preferences": {
       "title": "Préférences",
@@ -715,6 +722,7 @@
       "catalog": "Modèles recommandés",
       "customPull": "Télécharger n'importe quel modèle",
       "customPlaceholder": "ex. devstral:24b",
+      "browseModels": "Parcourir les modèles sur ollama.com",
       "customNote": "N'importe quel tag de ollama.com/library",
       "minRam": "{ram} de RAM",
       "pull": "Télécharger",

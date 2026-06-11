@@ -4,7 +4,9 @@ import { type ChangeEvent, useCallback, useRef, useState } from "react";
 
 import { isTauri } from "@tauri-apps/api/core";
 import {
+  CheckCircle2Icon,
   DownloadIcon,
+  FlaskConicalIcon,
   Loader2Icon,
   PaletteIcon,
   PlusIcon,
@@ -13,6 +15,7 @@ import {
   Trash2Icon,
   TrashIcon,
   UploadIcon,
+  XCircleIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -36,6 +39,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // import { useEntitlement } from "@/hooks/use-entitlement"; // user connection disabled
 import { useSettings } from "@/hooks/use-settings";
@@ -60,6 +64,9 @@ interface AgentPresetCardProps {
   t: ReturnType<typeof useTranslations>;
   onUpdate: (idx: number, patch: Partial<AgentPreset>) => void;
   onRemove: (idx: number) => void;
+  isDirty: boolean;
+  saving: boolean;
+  onSave: () => void;
 }
 
 /**
@@ -68,9 +75,28 @@ interface AgentPresetCardProps {
  * installable CLI that isn't present, the config fields are replaced by an
  * install gate (auto / manual) — unless the user opts to configure anyway.
  */
-function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: AgentPresetCardProps) {
+type TestState = "idle" | "testing" | "passed" | "failed";
+
+function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove, isDirty, saving, onSave }: AgentPresetCardProps) {
   const bin = useBinaryStatus(preset.binary);
   const [configureAnyway, setConfigureAnyway] = useState(false);
+  const [showAdvancedArgs, setShowAdvancedArgs] = useState(false);
+  const [testState, setTestState] = useState<TestState>("idle");
+
+  const runTest = useCallback(async () => {
+    setTestState("testing");
+    try {
+      await invoke("test_agent", {
+        binary: preset.binary,
+        argsTemplate: preset.argsTemplate,
+        workingDir: preset.workingDir ?? null,
+      });
+      setTestState("passed");
+    } catch {
+      setTestState("failed");
+    }
+    setTimeout(() => setTestState("idle"), 3000);
+  }, [preset.binary, preset.argsTemplate, preset.workingDir]);
   // Gate only when we *can* install it (known binary) and a check confirmed it's missing.
   const gated = !configureAnyway && bin.missing && Boolean(bin.installInfo);
   // Until the first check resolves we don't know fields-or-gate — show a loading
@@ -118,13 +144,26 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: Agen
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">{t("agents.argsTemplate")}</Label>
-            <Input
-              value={preset.argsTemplate}
-              onChange={(event) => onUpdate(idx, { argsTemplate: event.target.value })}
-              placeholder="{prompt}"
-              className="h-7 font-mono text-xs"
-            />
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">{t("agents.advancedArgs")}</Label>
+              <Switch
+                checked={showAdvancedArgs}
+                onCheckedChange={setShowAdvancedArgs}
+                className="scale-75"
+              />
+            </div>
+            {showAdvancedArgs && (
+              <div className="space-y-1 pt-1">
+                <Label className="text-xs">{t("agents.argsTemplate")}</Label>
+                <Input
+                  value={preset.argsTemplate}
+                  onChange={(event) => onUpdate(idx, { argsTemplate: event.target.value })}
+                  placeholder="{prompt}"
+                  className="h-7 font-mono text-xs"
+                />
+                <p className="text-muted-foreground text-xs">{t("agents.advancedArgsHint")}</p>
+              </div>
+            )}
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t("agents.workingDir")}</Label>
@@ -150,6 +189,38 @@ function AgentPresetCard({ preset, idx, isDefault, t, onUpdate, onRemove }: Agen
               onOllamaModelChange={(ollamaModel) => onUpdate(idx, { ollamaModel })}
             />
           </div>
+          <div className="flex items-center justify-between pt-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void runTest()}
+              disabled={testState === "testing"}
+              title={t("agents.testTooltip")}
+            >
+              {testState === "testing" ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : testState === "passed" ? (
+                <CheckCircle2Icon className="size-3.5 text-green-600" />
+              ) : testState === "failed" ? (
+                <XCircleIcon className="size-3.5 text-destructive" />
+              ) : (
+                <FlaskConicalIcon className="size-3.5" />
+              )}
+              {testState === "testing"
+                ? t("agents.testing")
+                : testState === "passed"
+                  ? t("agents.testPassed")
+                  : testState === "failed"
+                    ? t("agents.testFailed")
+                    : t("agents.test")}
+            </Button>
+            {isDirty && (
+              <Button size="sm" onClick={onSave} disabled={saving}>
+                <SaveIcon className="size-3.5" />
+                {saving ? t("actions.saving") : t("actions.save")}
+              </Button>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -164,6 +235,7 @@ export default function SettingsPage() {
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
+  const [dirtyPresets, setDirtyPresets] = useState<Set<number>>(new Set());
   const [dataAction, setDataAction] = useState<DataAction | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -183,6 +255,7 @@ export default function SettingsPage() {
     try {
       await save(draft);
       setDraft(null);
+      setDirtyPresets(new Set());
       toast.success(t("feedback.saved"));
     } catch (saveError) {
       toast.error(getErrorMessage(saveError, t("feedback.saveFailed")));
@@ -308,6 +381,7 @@ export default function SettingsPage() {
       const agents = base.agents.map((preset, index) => (index === idx ? { ...preset, ...patch } : preset));
       return { ...base, agents };
     });
+    setDirtyPresets((prev) => new Set(prev).add(idx));
   };
 
   const removePreset = (idx: number) => {
@@ -324,24 +398,18 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <SettingsIcon className="size-5 text-muted-foreground" />
-          <h1 className="font-semibold text-xl tracking-tight">{t("title")}</h1>
-        </div>
-        {draft && (
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            <SaveIcon className="size-3.5" />
-            {saving ? t("actions.saving") : t("actions.save")}
-          </Button>
-        )}
+      <div className="flex items-center gap-3">
+        <SettingsIcon className="size-5 text-muted-foreground" />
+        <h1 className="font-semibold text-xl tracking-tight">{t("title")}</h1>
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Tabs defaultValue="hub" className="w-full">
+      <Tabs defaultValue="preferences" className="w-full">
         <TabsList variant="line">
+          {/* Hub tab hidden — no remote enabled for now.
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
+          */}
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
           <TabsTrigger value="localModels">{t("tabs.localModels")}</TabsTrigger>
@@ -353,14 +421,11 @@ export default function SettingsPage() {
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
 
+        {/* Hub tab hidden — no remote enabled for now.
         <TabsContent value="hub" className="space-y-6">
-          {/* User connection disabled — hub status + remote access removed. */}
-          {/* {isPro && <HubStatusCard />} */}
           <ConnectionsPanel />
-          {/* Local server setup disabled — temporary session server still runs in the background. */}
-          {/* {isTauri() && <LocalServerPanel />} */}
-          {/* {isTauri() && isPro && <RemoteAccessPanel />} */}
         </TabsContent>
+        */}
 
         <TabsContent value="preferences" className="space-y-6">
           <Card>
@@ -477,6 +542,9 @@ export default function SettingsPage() {
                   t={t}
                   onUpdate={updatePreset}
                   onRemove={removePreset}
+                  isDirty={dirtyPresets.has(idx)}
+                  saving={saving}
+                  onSave={handleSave}
                 />
               ))}
             </CardContent>
