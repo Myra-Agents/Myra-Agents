@@ -839,13 +839,13 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
 
               {/* Structured field(s) for the kind, inline to the right. */}
               {kindType !== "cron" && (
-                <div className="flex flex-1 flex-wrap items-end gap-2">
+                <div className="flex flex-wrap items-end gap-2">
                   <ScheduleKindFields schedule={schedule} onChange={handleScheduleChange} inline />
                 </div>
               )}
 
-              {/* Cron equivalent — two-way with the structured fields. */}
-              <div className="flex flex-col gap-1">
+              {/* Cron equivalent — sits right after the time, with a margin. */}
+              <div className="ml-2 flex flex-col gap-1">
                 <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
                   {t("form.cronEquivalent")}
                 </Label>

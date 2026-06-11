@@ -255,7 +255,7 @@
       "cardDescription": "Task description",
       "agentPrompt": "Agent prompt",
       "tags": "Tags",
-      "scheduleKind": "Schedule type",
+      "scheduleKind": "Schedule",
       "time": "Time",
       "days": "Days",
       "minutes": "Minutes",

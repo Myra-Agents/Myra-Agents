@@ -255,7 +255,7 @@
       "cardDescription": "Description de la tâche",
       "agentPrompt": "Prompt de l'agent",
       "tags": "Étiquettes",
-      "scheduleKind": "Type de planification",
+      "scheduleKind": "Planification",
       "time": "Heure",
       "days": "Jours",
       "minutes": "Minutes",
