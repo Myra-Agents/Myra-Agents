@@ -610,6 +610,8 @@
       "defaultAgent": "Default agent",
       "binary": "Binary",
       "argsTemplate": "Args Template",
+      "advancedArgs": "Advanced Args",
+      "advancedArgsHint": "Must contain '{prompt}'. Use to customize how the prompt is passed to the binary.",
       "workingDir": "Default working directory",
       "presets": {
         "opencode": "OpenCode",
@@ -624,7 +626,12 @@
       "maxConcurrent": "Max concurrent agents",
       "maxConcurrentHint": "How many agents may run at once. 0 = unlimited; extra launches are queued.",
       "options": "Options",
-      "checkingInstall": "Checking whether the agent is installed…"
+      "checkingInstall": "Checking whether the agent is installed…",
+      "test": "Test",
+      "testing": "Testing…",
+      "testPassed": "Agent responded",
+      "testFailed": "Agent did not respond",
+      "testTooltip": "Send a \"hello\" prompt to verify the agent is reachable"
     },
     "preferences": {
       "title": "Preferences",
@@ -715,6 +722,7 @@
       "catalog": "Recommended models",
       "customPull": "Pull any model",
       "customPlaceholder": "e.g. devstral:24b",
+      "browseModels": "Browse models on ollama.com",
       "customNote": "Any tag from ollama.com/library",
       "minRam": "{ram} RAM",
       "pull": "Pull",
