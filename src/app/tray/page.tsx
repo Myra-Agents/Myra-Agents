@@ -11,7 +11,6 @@ import {
   LoaderIcon,
   PlusIcon,
   PowerIcon,
-  RefreshCwIcon,
   SettingsIcon,
 } from "lucide-react";
 
@@ -201,7 +200,6 @@ export default function TrayPopover() {
       {/* Footer */}
       <div className="border-border flex gap-1.5 border-t p-2">
         <FooterButton icon={SettingsIcon} label="Settings" onClick={() => openMain("/settings")} />
-        <FooterButton icon={RefreshCwIcon} label="Restart" onClick={() => void cmd("refresh_local_backend")} />
         <FooterButton icon={PowerIcon} label="Quit" onClick={() => void cmd("quit_app")} />
       </div>
     </div>
