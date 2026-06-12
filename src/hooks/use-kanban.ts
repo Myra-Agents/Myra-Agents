@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { parseGlobalId, toGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
-import { track } from "@/lib/posthog/events";
+import { captureError, track } from "@/lib/posthog/events";
 import { isDevModeError } from "@/lib/tauri";
 import type { CreateCardInput, KanbanCard, KanbanStatus, LaunchResult, UpdateCardInput } from "@/types/kanban";
 
@@ -44,6 +44,7 @@ export function useKanban() {
     } catch (e) {
       if (!isDevModeError(e)) {
         console.error("Failed to load cards:", e);
+        captureError(e, { where: "useKanban.loadCards" });
         setError(String(e));
       }
     } finally {

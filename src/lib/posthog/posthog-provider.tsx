@@ -22,7 +22,8 @@ function ensureInit() {
     persistence: "localStorage", // Tauri webview: avoid cross-origin cookie quirks
     person_profiles: "identified_only",
     autocapture: true,
-    capture_exceptions: true, // surface client errors in PostHog
+    capture_exceptions: true, // Error Tracking: autocapture unhandled errors + rejections
+    enable_recording_console_log: true, // record console.*/logs into the replay timeline
     // Session replay. This app shows user prompts, code, and agent logs — all
     // potentially sensitive — so mask aggressively by default. Add
     // `data-ph-no-capture` (block) or `ph-mask` class to redact specific nodes.
