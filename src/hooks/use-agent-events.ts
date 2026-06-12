@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 import { toGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
-import { track } from "@/lib/posthog/events";
+import { captureError, track } from "@/lib/posthog/events";
 import type { UnlistenFn } from "@/lib/tauri";
 import type { KanbanCard } from "@/types/kanban";
 
@@ -51,6 +51,7 @@ export function useAgentEvents(onCardUpdated: (card: KanbanCard) => void) {
         else unlisten = fn;
       } catch (e) {
         console.error("Failed to subscribe to agent-result-changed:", e);
+        captureError(e, { where: "useAgentEvents.subscribe" });
       }
     };
 

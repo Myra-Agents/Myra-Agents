@@ -23,3 +23,14 @@ export function track(event: AppEvent, properties?: Record<string, unknown>): vo
   if (typeof window === "undefined" || !posthog.__loaded) return;
   posthog.capture(event, { environment: PH_ENV, ...properties });
 }
+
+/**
+ * Report a caught error to PostHog Error Tracking. Use in catch blocks where the
+ * error would otherwise be swallowed. Unhandled errors are auto-captured by
+ * `capture_exceptions`, so reserve this for handled-but-notable failures.
+ */
+export function captureError(error: unknown, context?: Record<string, unknown>): void {
+  if (typeof window === "undefined" || !posthog.__loaded) return;
+  const err = error instanceof Error ? error : new Error(String(error));
+  posthog.captureException(err, { environment: PH_ENV, ...context });
+}
