@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { connectionManager } from "@/lib/connections/manager";
+import { track } from "@/lib/posthog/events";
 import { isDevModeError } from "@/lib/tauri";
 import type { AppSettings } from "@/types/settings";
 import { DEFAULT_SETTINGS } from "@/types/settings";
@@ -50,6 +51,7 @@ export function useSettings(connId?: string) {
         setError(null);
         await connectionManager.invokeOne(id, "save_settings", { settings: updated });
         setSettings(updated);
+        track("settings_saved", { agent_count: updated.agents?.length ?? 0 });
       } catch (e) {
         console.error("Failed to save settings:", e);
         setError(String(e));

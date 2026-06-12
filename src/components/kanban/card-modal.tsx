@@ -5,6 +5,7 @@ import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, us
 import { isTauri } from "@tauri-apps/api/core";
 import {
   CheckCircle2Icon,
+  ChevronRightIcon,
   FlaskConicalIcon,
   FolderIcon,
   HelpCircleIcon,
@@ -549,7 +550,7 @@ export function CardModal({
             </div>
 
             {agentPresets.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-lg border bg-foreground/5 p-3">
                 <Label>{t("agentPreset")}</Label>
                 <Select value={agentPresetId} onValueChange={handlePresetChange}>
                   <SelectTrigger>
@@ -621,13 +622,21 @@ export function CardModal({
                 )}
 
                 {selectedPreset && (
-                  <AgentOptions
-                    binary={selectedPreset.binary}
-                    flags={agentFlags ?? selectedPreset.flags ?? []}
-                    useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
-                    onFlagsChange={setAgentFlags}
-                    onWorktreeChange={setUseWorktree}
-                  />
+                  <details className="group rounded-md border bg-background/40 px-2.5 py-2">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground text-xs hover:text-foreground">
+                      <ChevronRightIcon className="size-3 transition-transform group-open:rotate-90" />
+                      {t("override")}
+                    </summary>
+                    <div className="pt-2">
+                      <AgentOptions
+                        binary={selectedPreset.binary}
+                        flags={agentFlags ?? selectedPreset.flags ?? []}
+                        useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
+                        onFlagsChange={setAgentFlags}
+                        onWorktreeChange={setUseWorktree}
+                      />
+                    </div>
+                  </details>
                 )}
               </div>
             )}
@@ -691,6 +700,7 @@ export function CardModal({
               </div>
               <Textarea
                 id="card-prompt"
+                data-ph-no-capture
                 value={agentPrompt}
                 onChange={(event) => setAgentPrompt(event.target.value)}
                 placeholder={t("promptPlaceholder")}
@@ -698,7 +708,7 @@ export function CardModal({
                 className="font-mono text-xs"
               />
               {promptDraft !== null && (
-                <div className="space-y-1.5 rounded-md border bg-foreground/5 p-2.5">
+                <div data-ph-no-capture className="space-y-1.5 rounded-md border bg-foreground/5 p-2.5">
                   <div className="flex items-center gap-1.5 font-medium text-xs">
                     {promptDraftIsQuestion ? (
                       <HelpCircleIcon className="size-3.5 text-amber-500" />
