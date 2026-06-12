@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { parseGlobalId, toGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
+import { track } from "@/lib/posthog/events";
 import { isDevModeError } from "@/lib/tauri";
 import type { CreateCardInput, KanbanCard, KanbanStatus, LaunchResult, UpdateCardInput } from "@/types/kanban";
 
@@ -70,6 +71,13 @@ export function useKanban() {
     const connId = targetConnId ?? connectionManager.primaryId();
     const card = globalize(await connectionManager.invokeOne<KanbanCard>(connId, "add_card", { input }), connId);
     setCards((prev) => [...prev, card]);
+    track("card_created", {
+      card_id: card.id,
+      agent_preset_id: input.agentPresetId,
+      has_prompt: !!input.agentPrompt,
+      tags_count: input.tags?.length ?? 0,
+      use_worktree: input.useWorktree ?? false,
+    });
     return card;
   }, []);
 
@@ -95,6 +103,7 @@ export function useKanban() {
           status,
         });
         if (card) upsertCard(globalize(card, connId));
+        track("card_moved", { card_id: id, to_status: status });
         return card;
       } catch (e) {
         await loadCards();
@@ -207,6 +216,12 @@ export function useKanban() {
               : card,
           ),
         );
+        track("agent_launch", {
+          card_id: cardId,
+          run_id: result.runId,
+          queued: result.queued,
+          has_working_dir: !!workingDir,
+        });
         return result;
       } catch (e) {
         await loadCards();

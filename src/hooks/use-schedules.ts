@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { parseGlobalId, toGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
+import { track } from "@/lib/posthog/events";
 import { isDevModeError, type UnlistenFn } from "@/lib/tauri";
 import type { CreateScheduleInput, ScheduledTask, UpdateScheduleInput } from "@/types/schedule";
 import { isToday } from "@/types/schedule";
@@ -89,6 +90,13 @@ export function useSchedules() {
       connId,
     );
     setSchedules((prev) => [...prev, task]);
+    track("schedule_created", {
+      schedule_id: task.id,
+      schedule_type: input.schedule?.type,
+      enabled: input.enabled,
+      agent_preset_id: input.agentPresetId,
+      has_prompt: !!input.agentPrompt,
+    });
     return task;
   }, []);
 

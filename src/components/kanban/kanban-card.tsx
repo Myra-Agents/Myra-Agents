@@ -167,7 +167,9 @@ export function KanbanCardComponent({
                 {t("question")}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground italic line-clamp-2">&ldquo;{card.agentQuestion}&rdquo;</p>
+            <p data-ph-no-capture className="text-xs text-muted-foreground italic line-clamp-2">
+              &ldquo;{card.agentQuestion}&rdquo;
+            </p>
             <Button
               size="xs"
               variant="default"
@@ -183,7 +185,11 @@ export function KanbanCardComponent({
         {/* Awaiting review */}
         {!isOverlay && card.status === "awaiting_review" && (
           <div className="pl-4 pt-2 border-t space-y-2">
-            {card.agentResult && <p className="text-xs text-muted-foreground line-clamp-2">{card.agentResult}</p>}
+            {card.agentResult && (
+              <p data-ph-no-capture className="text-xs text-muted-foreground line-clamp-2">
+                {card.agentResult}
+              </p>
+            )}
             <Button
               size="xs"
               variant="secondary"
@@ -283,7 +289,10 @@ function InProgressBlock({ card, logLines, onViewLogs, stop }: InProgressBlockPr
       </div>
 
       {tail.length > 0 ? (
-        <div className="bg-foreground/95 text-background/85 font-mono text-[10px] leading-snug p-2 rounded max-h-20 overflow-hidden">
+        <div
+          data-ph-no-capture
+          className="bg-foreground/95 text-background/85 font-mono text-[10px] leading-snug p-2 rounded max-h-20 overflow-hidden"
+        >
           {tail.map((line, i) => (
             <div key={i} className={cn("truncate", line.startsWith("[err]") && "text-red-400")}>
               {line || "\u00a0"}

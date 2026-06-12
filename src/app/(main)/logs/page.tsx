@@ -167,7 +167,10 @@ export default function LogsPage() {
         )}
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="bg-foreground/95 text-background font-mono text-xs leading-relaxed p-4 rounded-md min-h-[200px]">
+          <div
+            data-ph-no-capture
+            className="bg-foreground/95 text-background font-mono text-xs leading-relaxed p-4 rounded-md min-h-[200px]"
+          >
             {loadingLog ? t("details.loadingLog") : logContent || t("details.noOutput")}
           </div>
         </ScrollArea>

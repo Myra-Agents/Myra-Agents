@@ -1,18 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { KanbanCard } from "@/types/kanban";
+
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import type { KanbanCard } from "@/types/kanban";
 
 interface FeedbackModalProps {
   open: boolean;
@@ -43,13 +44,11 @@ export function FeedbackModal({ open, card, onSubmit, onClose }: FeedbackModalPr
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Answer Agent Question</DialogTitle>
-          <DialogDescription>
-            The agent is waiting for your input on &ldquo;{card?.title}&rdquo;.
-          </DialogDescription>
+          <DialogDescription>The agent is waiting for your input on &ldquo;{card?.title}&rdquo;.</DialogDescription>
         </DialogHeader>
 
         {card?.agentQuestion && (
-          <div className="bg-muted rounded-md p-3">
+          <div data-ph-no-capture className="bg-muted rounded-md p-3">
             <p className="text-sm italic text-foreground">&ldquo;{card.agentQuestion}&rdquo;</p>
           </div>
         )}
@@ -59,6 +58,7 @@ export function FeedbackModal({ open, card, onSubmit, onClose }: FeedbackModalPr
             <Label htmlFor="feedback-answer">Your answer</Label>
             <Textarea
               id="feedback-answer"
+              data-ph-no-capture
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               placeholder="Type your answer here..."
@@ -122,13 +122,11 @@ export function ReviewModal({ open, card, onApprove, onRevise, onClose }: Review
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Review Result</DialogTitle>
-          <DialogDescription>
-            Review the agent&apos;s work on &ldquo;{card?.title}&rdquo;.
-          </DialogDescription>
+          <DialogDescription>Review the agent&apos;s work on &ldquo;{card?.title}&rdquo;.</DialogDescription>
         </DialogHeader>
 
         {card?.agentResult && (
-          <div className="bg-muted rounded-md p-3 max-h-40 overflow-y-auto">
+          <div data-ph-no-capture className="bg-muted rounded-md p-3 max-h-40 overflow-y-auto">
             <p className="text-sm text-foreground whitespace-pre-wrap">{card.agentResult}</p>
           </div>
         )}
@@ -138,6 +136,7 @@ export function ReviewModal({ open, card, onApprove, onRevise, onClose }: Review
             <Label htmlFor="revision-note">Revision note (to send back for rework)</Label>
             <Textarea
               id="revision-note"
+              data-ph-no-capture
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Describe what needs to change..."
