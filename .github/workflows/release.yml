@@ -82,6 +82,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PostHog analytics baked into the static export at build time. The
+          # project token is public/write-only, so a plain repo Variable (not a
+          # Secret) is fine — set it once in Settings → Secrets and variables →
+          # Actions → Variables. Absent → the app ships with analytics disabled.
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}
           # build-sidecar.mjs reads server-version.json; override here if needed.
           # Pin the bundled sidecar to the BUILD target, not the runner host —
           # required when cross-compiling x86_64 on the Apple Silicon self-hosted
