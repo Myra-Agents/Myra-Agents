@@ -305,6 +305,17 @@
     "newSchedule": "Nouvelle planification",
     "emptyState": "Aucune planification pour le moment. Créez-en une pour commencer.",
     "next": "Prochaine : {time}",
+    "columns": {
+      "automation": "Automatisation",
+      "source": "Source",
+      "tools": "Outils",
+      "created": "Créée"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "noAgent": "Agent par défaut",
     "actions": {
       "runNow": "Exécuter maintenant",
       "edit": "Modifier",

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { isTauri } from "@tauri-apps/api/core";
 import {
+  BotIcon,
   CheckCircle2Icon,
   ChevronRightIcon,
   ClockIcon,
@@ -11,11 +12,13 @@ import {
   CopyIcon,
   FlaskConicalIcon,
   FolderIcon,
+  GitBranchIcon,
   HelpCircleIcon,
   ListChecksIcon,
   ListPlusIcon,
   Loader2Icon,
   type LucideIcon,
+  MoreHorizontalIcon,
   PackageIcon,
   PencilIcon,
   PlayIcon,
@@ -35,14 +38,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
+import { parseGlobalId } from "@/lib/aggregate/global-id";
+import { connectionManager } from "@/lib/connections/manager";
 import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
 import { cronToSchedule, scheduleToCron } from "@/lib/schedule-cron";
 import { invoke } from "@/lib/tauri";
@@ -84,10 +97,33 @@ const SCHEDULE_PRESETS: SchedulePreset[] = [
   { id: "testSweep", icon: FlaskConicalIcon, schedule: { type: "daily", time: "08:00" }, tags: ["tests"] },
 ];
 
+/** Friendly label of the connection that owns a (globalized) schedule id —
+ *  "This device", a server name, etc. Mirrors Cursor's "Author" column. */
+function scheduleSource(id: string): string {
+  try {
+    const { connId } = parseGlobalId(id);
+    return connectionManager.get(connId)?.label ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Compact "Mar 7"-style date for the "Created" column. */
+function formatCreated(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export default function SchedulesPage() {
   const t = useTranslations("schedules");
   const { schedules, loading, error, createSchedule, updateSchedule, deleteSchedule, toggleEnabled, triggerNow } =
     useSchedules();
+  const { settings } = useSettings();
+
+  // Resolve an agent-preset id → its display name for the "Tools" column.
+  const agentNameById = useMemo(() => new Map(settings.agents.map((p) => [p.id, p.name])), [settings.agents]);
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
@@ -190,47 +226,107 @@ export default function SchedulesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {sorted.map((task) => (
-            <Card key={task.id} className={`py-0 ${!task.enabled ? "opacity-60" : ""}`}>
-              <CardContent className="flex items-center gap-4 px-4 py-2.5">
-                <Switch checked={task.enabled} onCheckedChange={(v) => toggleEnabled(task.id, v)} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{task.name}</p>
-                  <p className="text-xs text-muted-foreground">{describeSchedule(task.schedule)}</p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-                  {task.nextRunAt && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {t("next", { time: formatHm(task.nextRunAt) })}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => handleTrigger(task.id)}
-                    disabled={triggering === task.id}
-                    title={t("actions.runNow")}
-                  >
-                    <PlayIcon />
-                  </Button>
-                  <Button variant="ghost" size="icon-xs" onClick={() => handleEdit(task)} title={t("actions.edit")}>
-                    <PencilIcon />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => deleteSchedule(task.id)}
-                    title={t("actions.delete")}
-                  >
-                    <TrashIcon />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>{t("columns.automation")}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t("columns.source")}</TableHead>
+                <TableHead className="hidden md:table-cell">{t("columns.tools")}</TableHead>
+                <TableHead className="hidden sm:table-cell">{t("columns.created")}</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sorted.map((task) => {
+                const agentName = task.agentPresetId ? agentNameById.get(task.agentPresetId) : undefined;
+                const source = scheduleSource(task.id);
+                return (
+                  <TableRow key={task.id} className={cn("group", !task.enabled && "opacity-60")}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Switch checked={task.enabled} onCheckedChange={(v) => toggleEnabled(task.id, v)} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium">{task.name}</span>
+                            {!task.enabled && (
+                              <Badge
+                                variant="secondary"
+                                className="h-4 px-1.5 text-[10px] font-normal text-muted-foreground"
+                              >
+                                {t("status.inactive")}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {describeSchedule(task.schedule)}
+                            {task.enabled && task.nextRunAt
+                              ? ` · ${t("next", { time: formatHm(task.nextRunAt) })}`
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="hidden whitespace-nowrap text-sm text-muted-foreground sm:table-cell">
+                      {source || "—"}
+                    </TableCell>
+
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground">
+                          <BotIcon className="size-3" />
+                          {agentName ?? t("noAgent")}
+                        </span>
+                        {task.useWorktree && (
+                          <span className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-muted-foreground">
+                            <GitBranchIcon className="size-3" />
+                          </span>
+                        )}
+                        {task.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className={tagClassName(tag, "h-5 text-[10px]")}>
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="hidden whitespace-nowrap text-sm text-muted-foreground sm:table-cell">
+                      {formatCreated(task.createdAt)}
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon-xs" title={t("actions.edit")}>
+                            <MoreHorizontalIcon />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleTrigger(task.id)} disabled={triggering === task.id}>
+                            <PlayIcon className="size-3.5" />
+                            {t("actions.runNow")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(task)}>
+                            <PencilIcon className="size-3.5" />
+                            {t("actions.edit")}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => deleteSchedule(task.id)}
+                          >
+                            <TrashIcon className="size-3.5" />
+                            {t("actions.delete")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
@@ -554,324 +650,330 @@ function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, on
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="no-scrollbar sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <DialogHeader className="shrink-0 border-b p-4 pr-12">
           <DialogTitle className="flex items-center gap-2">
             <ListPlusIcon className="size-4 text-muted-foreground" />
             {task ? t("editSchedule") : t("newSchedule")}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>{t("form.scheduleName")} *</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("form.scheduleNamePlaceholder")}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>{t("form.cardTitle")} *</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                className="h-6 gap-1 text-muted-foreground"
-                onClick={() => setCardTitle(name)}
-                disabled={!name.trim()}
-                title={t("form.copyName")}
-              >
-                <CopyIcon className="size-3" />
-                {t("form.copyName")}
-              </Button>
-            </div>
-            <Input
-              value={cardTitle}
-              onChange={(e) => setCardTitle(e.target.value)}
-              placeholder={t("form.cardTitlePlaceholder")}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>{t("form.description")}</Label>
-            <Textarea
-              value={cardDescription}
-              onChange={(e) => setCardDescription(e.target.value)}
-              rows={2}
-              placeholder={t("form.descriptionPlaceholder")}
-            />
-          </div>
-
-          {agentPresets.length > 0 && (
-            <div className="space-y-2 rounded-lg border bg-foreground/5 p-3">
-              <Label>{t("form.agentPreset")}</Label>
-              <Select value={agentPresetId} onValueChange={handlePresetChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t("agent.needPreset")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {agentPresets.map((preset) => {
-                    const r = testResults[preset.id];
-                    return (
-                      <SelectItem key={preset.id} value={preset.id}>
-                        <span className="flex items-center gap-2">
-                          {preset.name}
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
-                              r?.status === "passed"
-                                ? "bg-green-500/15 text-green-600"
-                                : r?.status === "failed"
-                                  ? "bg-red-500/15 text-red-600"
-                                  : "bg-muted text-muted-foreground",
-                            )}
-                          >
-                            {r?.status === "passed" ? (
-                              <CheckCircle2Icon className="size-2.5" />
-                            ) : r?.status === "failed" ? (
-                              <XCircleIcon className="size-2.5" />
-                            ) : null}
-                            {r?.status === "passed"
-                              ? t("agent.tested")
-                              : r?.status === "failed"
-                                ? t("agent.testFailed")
-                                : t("agent.untested")}
-                          </span>
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-
-              {selectedPreset && testingId === agentPresetId && (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2Icon className="size-3 animate-spin" />
-                  {t("agent.testing", { name: selectedPreset.name })}
-                </p>
-              )}
-              {selectedPreset && presetBlocked && selectedTest?.status === "failed" && (
-                <div className="space-y-1.5">
-                  <p className="flex items-center gap-1.5 text-xs text-destructive">
-                    <XCircleIcon className="size-3" />
-                    {t("agent.blocked")}
-                  </p>
-                  {selectedTest.reason && (
-                    <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
-                      {selectedTest.reason}
-                    </p>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
-                    disabled={testingId !== null}
-                  >
-                    <FlaskConicalIcon className="size-3" />
-                    {t("agent.retry")}
-                  </Button>
-                </div>
-              )}
-
-              {selectedPreset && (
-                <details className="group rounded-md border bg-background/40 px-2.5 py-2">
-                  <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground text-xs hover:text-foreground">
-                    <ChevronRightIcon className="size-3 transition-transform group-open:rotate-90" />
-                    {t("form.override")}
-                  </summary>
-                  <div className="pt-2">
-                    <AgentOptions
-                      binary={selectedPreset.binary}
-                      flags={agentFlags ?? selectedPreset.flags ?? []}
-                      useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
-                      launchVia={launchVia ?? selectedPreset.launchVia ?? "direct"}
-                      ollamaModel={ollamaModel ?? selectedPreset.ollamaModel ?? ""}
-                      onFlagsChange={setAgentFlags}
-                      onWorktreeChange={setUseWorktree}
-                      onLaunchViaChange={setLaunchVia}
-                      onOllamaModelChange={setOllamaModel}
-                    />
-                  </div>
-                </details>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <FolderIcon className="size-3.5 text-muted-foreground" />
-              {t("form.workingDir")}
-              <span className="font-normal text-muted-foreground">({t("form.optional")})</span>
-            </Label>
-            <WorkingDirField value={workingDir} onChange={setWorkingDir} placeholder={selectedPreset?.workingDir ?? ""} />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>{t("form.agentPrompt")}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => void handleGeneratePrompt()}
-                disabled={!canGenerate}
-                title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
-              >
-                {generating === "prompt" ? (
-                  <Loader2Icon className="size-3 animate-spin" />
-                ) : (
-                  <SparklesIcon className="size-3" />
-                )}
-                {t("actions.generate")}
-              </Button>
-            </div>
-            <Textarea
-              value={agentPrompt}
-              onChange={(e) => setAgentPrompt(e.target.value)}
-              rows={3}
-              className="font-mono text-xs"
-            />
-            {promptDraft !== null && (
-              <div className="space-y-1.5 rounded-md border bg-foreground/5 p-2.5">
-                <div className="flex items-center gap-1.5 font-medium text-xs">
-                  {promptDraftIsQuestion ? (
-                    <HelpCircleIcon className="size-3.5 text-amber-500" />
-                  ) : (
-                    <SparklesIcon className="size-3.5 text-muted-foreground" />
-                  )}
-                  {promptDraftIsQuestion ? t("agent.previewQuestion") : t("agent.previewTitle")}
-                </div>
-                <p className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-background px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
-                  {promptDraft}
-                </p>
-                <div className="flex gap-1.5">
-                  <Button
-                    type="button"
-                    size="xs"
-                    onClick={() => {
-                      setAgentPrompt(promptDraft);
-                      setPromptDraft(null);
-                    }}
-                  >
-                    {t("agent.useDraft")}
-                  </Button>
-                  <Button type="button" size="xs" variant="ghost" onClick={() => setPromptDraft(null)}>
-                    {t("agent.dismissDraft")}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>{t("form.tags")}</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => void handleSuggestTags()}
-                disabled={!canGenerate}
-                title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
-              >
-                {generating === "tags" ? (
-                  <Loader2Icon className="size-3 animate-spin" />
-                ) : (
-                  <SparklesIcon className="size-3" />
-                )}
-                {t("actions.suggestTags")}
-              </Button>
-            </div>
-            <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5">
-              {tagList.map((tag) => (
-                <Badge key={tag} variant="outline" className={tagClassName(tag, "h-6 gap-1 pr-1")}>
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag)}
-                    className="rounded-full p-0.5 hover:bg-background/60"
-                  >
-                    <XIcon className="size-3" />
-                  </button>
-                </Badge>
-              ))}
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+            <div className="space-y-2">
+              <Label>{t("form.scheduleName")} *</Label>
               <Input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-                onBlur={() => addTag(tagInput)}
-                placeholder={tagList.length === 0 ? t("form.tagsPlaceholder") : ""}
-                className="h-7 min-w-32 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t("form.scheduleNamePlaceholder")}
+                required
               />
             </div>
-            {tagSuggestions.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {tagSuggestions.map((tag) => (
-                  <Button key={tag} type="button" variant="outline" size="xs" onClick={() => addTag(tag)}>
-                    {tag}
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
 
-          <div className="space-y-2">
-            <Label>{t("form.scheduleKind")}</Label>
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="flex flex-col gap-1">
-                <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  {t("form.typeLabel")}
-                </Label>
-                <Select value={kindType} onValueChange={(v) => handleKindChange(v as ScheduleKindType)}>
-                  <SelectTrigger className="w-32 shrink-0">
-                    <SelectValue />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t("form.cardTitle")} *</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  className="h-6 gap-1 text-muted-foreground"
+                  onClick={() => setCardTitle(name)}
+                  disabled={!name.trim()}
+                  title={t("form.copyName")}
+                >
+                  <CopyIcon className="size-3" />
+                  {t("form.copyName")}
+                </Button>
+              </div>
+              <Input
+                value={cardTitle}
+                onChange={(e) => setCardTitle(e.target.value)}
+                placeholder={t("form.cardTitlePlaceholder")}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("form.description")}</Label>
+              <Textarea
+                value={cardDescription}
+                onChange={(e) => setCardDescription(e.target.value)}
+                rows={2}
+                placeholder={t("form.descriptionPlaceholder")}
+              />
+            </div>
+
+            {agentPresets.length > 0 && (
+              <div className="space-y-2 rounded-lg border bg-foreground/5 p-3">
+                <Label>{t("form.agentPreset")}</Label>
+                <Select value={agentPresetId} onValueChange={handlePresetChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("agent.needPreset")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="once">{t("kind.once")}</SelectItem>
-                    <SelectItem value="daily">{t("kind.daily")}</SelectItem>
-                    <SelectItem value="weekly">{t("kind.weekly")}</SelectItem>
-                    <SelectItem value="interval">{t("kind.interval")}</SelectItem>
-                    <SelectItem value="cron">{t("kind.custom")}</SelectItem>
+                    {agentPresets.map((preset) => {
+                      const r = testResults[preset.id];
+                      return (
+                        <SelectItem key={preset.id} value={preset.id}>
+                          <span className="flex items-center gap-2">
+                            {preset.name}
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+                                r?.status === "passed"
+                                  ? "bg-green-500/15 text-green-600"
+                                  : r?.status === "failed"
+                                    ? "bg-red-500/15 text-red-600"
+                                    : "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {r?.status === "passed" ? (
+                                <CheckCircle2Icon className="size-2.5" />
+                              ) : r?.status === "failed" ? (
+                                <XCircleIcon className="size-2.5" />
+                              ) : null}
+                              {r?.status === "passed"
+                                ? t("agent.tested")
+                                : r?.status === "failed"
+                                  ? t("agent.testFailed")
+                                  : t("agent.untested")}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
-              </div>
 
-              {/* Structured field(s) for the kind, inline to the right. */}
-              {kindType !== "cron" && (
-                <div className="flex flex-wrap items-end gap-2">
-                  <ScheduleKindFields schedule={schedule} onChange={handleScheduleChange} inline />
+                {selectedPreset && testingId === agentPresetId && (
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2Icon className="size-3 animate-spin" />
+                    {t("agent.testing", { name: selectedPreset.name })}
+                  </p>
+                )}
+                {selectedPreset && presetBlocked && selectedTest?.status === "failed" && (
+                  <div className="space-y-1.5">
+                    <p className="flex items-center gap-1.5 text-xs text-destructive">
+                      <XCircleIcon className="size-3" />
+                      {t("agent.blocked")}
+                    </p>
+                    {selectedTest.reason && (
+                      <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
+                        {selectedTest.reason}
+                      </p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
+                      disabled={testingId !== null}
+                    >
+                      <FlaskConicalIcon className="size-3" />
+                      {t("agent.retry")}
+                    </Button>
+                  </div>
+                )}
+
+                {selectedPreset && (
+                  <details className="group rounded-md border bg-background/40 px-2.5 py-2">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground text-xs hover:text-foreground">
+                      <ChevronRightIcon className="size-3 transition-transform group-open:rotate-90" />
+                      {t("form.override")}
+                    </summary>
+                    <div className="pt-2">
+                      <AgentOptions
+                        binary={selectedPreset.binary}
+                        flags={agentFlags ?? selectedPreset.flags ?? []}
+                        useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
+                        launchVia={launchVia ?? selectedPreset.launchVia ?? "direct"}
+                        ollamaModel={ollamaModel ?? selectedPreset.ollamaModel ?? ""}
+                        onFlagsChange={setAgentFlags}
+                        onWorktreeChange={setUseWorktree}
+                        onLaunchViaChange={setLaunchVia}
+                        onOllamaModelChange={setOllamaModel}
+                      />
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <FolderIcon className="size-3.5 text-muted-foreground" />
+                {t("form.workingDir")}
+                <span className="font-normal text-muted-foreground">({t("form.optional")})</span>
+              </Label>
+              <WorkingDirField
+                value={workingDir}
+                onChange={setWorkingDir}
+                placeholder={selectedPreset?.workingDir ?? ""}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t("form.agentPrompt")}</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => void handleGeneratePrompt()}
+                  disabled={!canGenerate}
+                  title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
+                >
+                  {generating === "prompt" ? (
+                    <Loader2Icon className="size-3 animate-spin" />
+                  ) : (
+                    <SparklesIcon className="size-3" />
+                  )}
+                  {t("actions.generate")}
+                </Button>
+              </div>
+              <Textarea
+                value={agentPrompt}
+                onChange={(e) => setAgentPrompt(e.target.value)}
+                rows={3}
+                className="font-mono text-xs"
+              />
+              {promptDraft !== null && (
+                <div className="space-y-1.5 rounded-md border bg-foreground/5 p-2.5">
+                  <div className="flex items-center gap-1.5 font-medium text-xs">
+                    {promptDraftIsQuestion ? (
+                      <HelpCircleIcon className="size-3.5 text-amber-500" />
+                    ) : (
+                      <SparklesIcon className="size-3.5 text-muted-foreground" />
+                    )}
+                    {promptDraftIsQuestion ? t("agent.previewQuestion") : t("agent.previewTitle")}
+                  </div>
+                  <p className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-background px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
+                    {promptDraft}
+                  </p>
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="button"
+                      size="xs"
+                      onClick={() => {
+                        setAgentPrompt(promptDraft);
+                        setPromptDraft(null);
+                      }}
+                    >
+                      {t("agent.useDraft")}
+                    </Button>
+                    <Button type="button" size="xs" variant="ghost" onClick={() => setPromptDraft(null)}>
+                      {t("agent.dismissDraft")}
+                    </Button>
+                  </div>
                 </div>
               )}
+            </div>
 
-              {/* Cron equivalent — sits right after the time, with a margin. */}
-              <div className="ml-2 flex flex-col gap-1">
-                <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  {t("form.cronEquivalent")}
-                </Label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t("form.tags")}</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => void handleSuggestTags()}
+                  disabled={!canGenerate}
+                  title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
+                >
+                  {generating === "tags" ? (
+                    <Loader2Icon className="size-3 animate-spin" />
+                  ) : (
+                    <SparklesIcon className="size-3" />
+                  )}
+                  {t("actions.suggestTags")}
+                </Button>
+              </div>
+              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5">
+                {tagList.map((tag) => (
+                  <Badge key={tag} variant="outline" className={tagClassName(tag, "h-6 gap-1 pr-1")}>
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="rounded-full p-0.5 hover:bg-background/60"
+                    >
+                      <XIcon className="size-3" />
+                    </button>
+                  </Badge>
+                ))}
                 <Input
-                  value={cronValue}
-                  onChange={(e) => handleCronChange(e.target.value)}
-                  placeholder={cronExpressible ? "0 9 * * *" : t("form.cronNotExpressible")}
-                  disabled={!cronExpressible && kindType !== "cron"}
-                  className="h-8 w-36 font-mono text-xs"
-                  title={t("form.cronEquivalent")}
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  onBlur={() => addTag(tagInput)}
+                  placeholder={tagList.length === 0 ? t("form.tagsPlaceholder") : ""}
+                  className="h-7 min-w-32 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
                 />
               </div>
+              {tagSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {tagSuggestions.map((tag) => (
+                    <Button key={tag} type="button" variant="outline" size="xs" onClick={() => addTag(tag)}>
+                      {tag}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("form.scheduleKind")}</Label>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="flex flex-col gap-1">
+                  <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    {t("form.typeLabel")}
+                  </Label>
+                  <Select value={kindType} onValueChange={(v) => handleKindChange(v as ScheduleKindType)}>
+                    <SelectTrigger className="w-32 shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="once">{t("kind.once")}</SelectItem>
+                      <SelectItem value="daily">{t("kind.daily")}</SelectItem>
+                      <SelectItem value="weekly">{t("kind.weekly")}</SelectItem>
+                      <SelectItem value="interval">{t("kind.interval")}</SelectItem>
+                      <SelectItem value="cron">{t("kind.custom")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Structured field(s) for the kind, inline to the right. */}
+                {kindType !== "cron" && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <ScheduleKindFields schedule={schedule} onChange={handleScheduleChange} inline />
+                  </div>
+                )}
+
+                {/* Cron equivalent — sits right after the time, with a margin. */}
+                <div className="ml-2 flex flex-col gap-1">
+                  <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                    {t("form.cronEquivalent")}
+                  </Label>
+                  <Input
+                    value={cronValue}
+                    onChange={(e) => handleCronChange(e.target.value)}
+                    placeholder={cronExpressible ? "0 9 * * *" : t("form.cronNotExpressible")}
+                    disabled={!cronExpressible && kindType !== "cron"}
+                    className="h-8 w-36 font-mono text-xs"
+                    title={t("form.cronEquivalent")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch checked={enabled} onCheckedChange={setEnabled} />
+              <Label>{t("enabled")}</Label>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
-            <Label>{t("enabled")}</Label>
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="mx-0 mb-0 shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>
               {t("actions.cancel")}
             </Button>

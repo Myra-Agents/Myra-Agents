@@ -305,6 +305,17 @@
     "newSchedule": "New Schedule",
     "emptyState": "No schedules yet. Create one to get started.",
     "next": "Next: {time}",
+    "columns": {
+      "automation": "Automation",
+      "source": "Source",
+      "tools": "Tools",
+      "created": "Created"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "noAgent": "Default agent",
     "actions": {
       "runNow": "Run now",
       "edit": "Edit",
