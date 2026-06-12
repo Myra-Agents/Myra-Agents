@@ -414,6 +414,7 @@ export function UnifiedModelPicker({
   return (
     <>
       <Popover
+        modal
         open={open}
         onOpenChange={(next) => {
           setOpen(next);

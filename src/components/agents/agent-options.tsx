@@ -121,6 +121,7 @@ function ModelPicker({
 
   return (
     <Popover
+      modal
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -419,6 +420,7 @@ export function AgentOptions({
 
         {catalog.length > 0 && (
           <Popover
+            modal
             open={pickerOpen}
             onOpenChange={(next) => {
               setPickerOpen(next);

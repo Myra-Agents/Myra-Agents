@@ -36,8 +36,9 @@
       "empty": "Aucune planification prévue aujourd'hui."
     },
     "recent": {
-      "title": "Activité récente",
-      "empty": "Aucune exécution pour l'instant."
+      "title": "Historique des exécutions",
+      "empty": "Aucune exécution pour l'instant.",
+      "barTooltip": "{date} — {completed} réussies, {failed} échouées"
     },
     "stats": {
       "title": "Statistiques",
@@ -175,6 +176,7 @@
       "tagInputPlaceholder": "Ajouter une étiquette",
       "agentPreset": "Préréglage d'agent",
       "agentPresetPlaceholder": "Sélectionner un agent",
+      "override": "Surcharger",
       "targetServer": "Serveur",
       "agent": "Agent",
       "prompt": "Prompt",

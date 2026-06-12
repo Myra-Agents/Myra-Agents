@@ -36,8 +36,9 @@
       "empty": "No schedule due today."
     },
     "recent": {
-      "title": "Recent activity",
-      "empty": "No runs yet."
+      "title": "Run history",
+      "empty": "No runs yet.",
+      "barTooltip": "{date} — {completed} completed, {failed} failed"
     },
     "stats": {
       "title": "Statistics",
@@ -175,6 +176,7 @@
       "tagInputPlaceholder": "Add tag",
       "agentPreset": "Agent preset",
       "agentPresetPlaceholder": "Select agent",
+      "override": "Override",
       "targetServer": "Server",
       "agent": "Agent",
       "prompt": "Prompt",

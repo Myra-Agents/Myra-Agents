@@ -123,6 +123,8 @@ export default function KanbanPage() {
             workingDir: data.workingDir,
             agentFlags: data.agentFlags,
             useWorktree: data.useWorktree,
+            launchVia: data.launchVia,
+            ollamaModel: data.ollamaModel,
             tags: parsedTags,
             status,
           },
@@ -138,6 +140,8 @@ export default function KanbanPage() {
           workingDir: data.workingDir,
           agentFlags: data.agentFlags,
           useWorktree: data.useWorktree,
+          launchVia: data.launchVia,
+          ollamaModel: data.ollamaModel,
           tags: parsedTags,
         });
       }

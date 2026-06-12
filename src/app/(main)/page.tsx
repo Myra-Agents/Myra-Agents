@@ -25,9 +25,9 @@ import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } f
 import { useHubStatus } from "@/hooks/use-hub-status";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
-import { buildStats, CHART_DAYS, formatMs, KPI_DAYS } from "@/lib/home/overview-stats";
+import { buildStats, CHART_DAYS, type DayStat, formatMs, KPI_DAYS } from "@/lib/home/overview-stats";
 import { useShortcutStore } from "@/stores/shortcut-store";
-import type { AgentRun, KanbanCard } from "@/types/kanban";
+import type { KanbanCard } from "@/types/kanban";
 
 /** Re-render cadence for the live "elapsed" counters on running cards. */
 const TICK_MS = 30_000;
@@ -50,15 +50,8 @@ export default function HomePage() {
     [cards],
   );
   const running = useMemo(() => cards.filter((c) => c.status === "in_progress" || c.agentQueued), [cards]);
-  const recentRuns = useMemo(
-    () =>
-      cards
-        .flatMap((c) => (c.runHistory ?? []).map((run) => ({ card: c, run })))
-        .filter(({ run }) => run.status !== "running")
-        .sort((a, b) => b.run.startedAt.localeCompare(a.run.startedAt))
-        .slice(0, 5),
-    [cards],
-  );
+  const runDays = useMemo(() => buildStats(cards).daily, [cards]);
+  const runCount = useMemo(() => runDays.reduce((a, d) => a + d.completed + d.failed, 0), [runDays]);
   const upcoming = todayTriggers().slice(0, 5);
 
   const handleNewCard = () => {
@@ -159,32 +152,10 @@ export default function HomePage() {
         <Section
           icon={ActivityIcon}
           title={t("recent.title")}
-          count={recentRuns.length}
+          count={runCount}
           viewAll={{ label: t("viewAll"), href: "/logs" }}
         >
-          {recentRuns.length === 0 ? (
-            <SectionEmpty label={t("recent.empty")} />
-          ) : (
-            recentRuns.map(({ card, run }) => (
-              <Card
-                key={`${card.id}-${run.id}`}
-                className="cursor-pointer rounded-lg py-0 hover:bg-muted/50 transition-colors"
-                onClick={() => router.push("/logs")}
-              >
-                <CardContent className="flex min-h-13 items-center gap-3 px-3 py-3">
-                  <RunStatusBadge status={run.status} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{card.title}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(run.startedAt).toLocaleString()}
-                      {run.endedAt && ` — ${formatDuration(run.startedAt, run.endedAt)}`}
-                      {typeof run.cost === "number" && ` — $${run.cost.toFixed(2)}`}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+          {runCount === 0 ? <SectionEmpty label={t("recent.empty")} /> : <RunHistoryStrip days={runDays} />}
         </Section>
       </div>
 
@@ -340,23 +311,42 @@ function CardRow({ card, onClick, children }: { card: KanbanCard; onClick: () =>
   );
 }
 
-function RunStatusBadge({ status }: { status: AgentRun["status"] }) {
-  const t = useTranslations("logs.status");
-  const variants: Record<
-    AgentRun["status"],
-    { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
-  > = {
-    running: { label: t("running"), variant: "default" },
-    needs_feedback: { label: t("needsFeedback"), variant: "secondary" },
-    awaiting_review: { label: t("awaitingReview"), variant: "outline" },
-    completed: { label: t("completed"), variant: "default" },
-    failed: { label: t("failed"), variant: "destructive" },
-  };
-  const v = variants[status] ?? { label: status, variant: "outline" as const };
+/**
+ * Cursor-style run-history strip: one vertical bar per day over the chart
+ * window, bar height ∝ runs that day, split green (completed) over red (failed).
+ * Empty days render a faint baseline tick.
+ */
+function RunHistoryStrip({ days }: { days: DayStat[] }) {
+  const t = useTranslations("home.recent");
+  const max = Math.max(1, ...days.map((d) => d.completed + d.failed));
   return (
-    <Badge variant={v.variant} className="text-[10px]">
-      {v.label}
-    </Badge>
+    <Card className="rounded-lg py-0">
+      <CardContent className="px-3 py-4">
+        <div className="flex h-16 items-end gap-1">
+          {days.map((d) => {
+            const total = d.completed + d.failed;
+            const tooltip = t("barTooltip", { date: d.label, completed: d.completed, failed: d.failed });
+            return (
+              <div key={d.label} className="flex h-full flex-1 flex-col justify-end" title={tooltip}>
+                {total === 0 ? (
+                  <div className="h-px w-full rounded-full bg-border" />
+                ) : (
+                  <div
+                    className="flex w-full flex-col overflow-hidden rounded-sm"
+                    style={{ height: `${(total / max) * 100}%` }}
+                  >
+                    {d.failed > 0 && <div className="w-full bg-destructive" style={{ flex: d.failed }} />}
+                    {d.completed > 0 && (
+                      <div className="w-full" style={{ flex: d.completed, backgroundColor: "var(--chart-1)" }} />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -392,17 +382,6 @@ function formatElapsed(startedAt: string, now: number): string {
   const m = Math.floor(ms / 60_000);
   if (m < 1) return "<1m";
   if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
-}
-
-function formatDuration(start: string, end: string): string {
-  const ms = Date.parse(end) - Date.parse(start);
-  if (Number.isNaN(ms) || ms < 0) return "";
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
   const h = Math.floor(m / 60);
   return `${h}h ${m % 60}m`;
 }

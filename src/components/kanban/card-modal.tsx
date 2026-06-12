@@ -14,7 +14,6 @@ import {
   SparklesIcon,
   XCircleIcon,
   XIcon,
-  ZapIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -42,7 +41,6 @@ import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
 import { invoke } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { CardFormData, CardTemplate, KanbanCard, KanbanStatus } from "@/types/kanban";
-import { COLUMN_CONFIG, CREATABLE_STATUSES } from "@/types/kanban";
 import type { AgentPreset } from "@/types/settings";
 
 const NO_TEMPLATE = "__none";
@@ -85,7 +83,7 @@ export function CardModal({
   agentPresets = [],
   defaultAgentId,
   onSave,
-  onSaveTemplate,
+  // onSaveTemplate, // "Save as template" hidden for now
   onLaunch,
   onOpenWorkingDir,
   onClose,
@@ -104,8 +102,10 @@ export function CardModal({
   );
   const [agentFlags, setAgentFlags] = useState<string[] | undefined>(card?.agentFlags);
   const [useWorktree, setUseWorktree] = useState<boolean | undefined>(card?.useWorktree);
+  const [launchVia, setLaunchVia] = useState<"direct" | "ollama" | undefined>(card?.launchVia);
+  const [ollamaModel, setOllamaModel] = useState<string | undefined>(card?.ollamaModel);
   const [selectedTemplateId, setSelectedTemplateId] = useState(NO_TEMPLATE);
-  const [templateName, setTemplateName] = useState("");
+  // const [templateName, setTemplateName] = useState(""); // "Save as template" hidden for now
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -134,8 +134,10 @@ export function CardModal({
       setAgentPresetId(card?.agentPresetId ?? defaultAgentId ?? agentPresets[0]?.id ?? "");
       setAgentFlags(card?.agentFlags);
       setUseWorktree(card?.useWorktree);
+      setLaunchVia(card?.launchVia);
+      setOllamaModel(card?.ollamaModel);
       setSelectedTemplateId(NO_TEMPLATE);
-      setTemplateName("");
+      // setTemplateName(""); // "Save as template" hidden for now
       setTargetConnId(primaryId);
       setPromptDraft(null);
       setGenerating(null);
@@ -237,6 +239,8 @@ export function CardModal({
     // options editor falls back to the newly selected preset's defaults.
     setAgentFlags(undefined);
     setUseWorktree(undefined);
+    setLaunchVia(undefined);
+    setOllamaModel(undefined);
     const preset = agentPresets.find((p) => p.id === value);
     // Auto-test on select unless a passing result is already cached.
     if (preset && testResults[value]?.status !== "passed") void runPresetTest(preset);
@@ -259,12 +263,12 @@ export function CardModal({
         prompt: metaPrompt,
         flags: agentFlags ?? selectedPreset.flags ?? [],
         workingDir: workingDir.trim() ? workingDir.trim() : (selectedPreset.workingDir ?? null),
-        launchVia: selectedPreset.launchVia ?? "direct",
-        ollamaModel: selectedPreset.ollamaModel ?? null,
+        launchVia: launchVia ?? selectedPreset.launchVia ?? "direct",
+        ollamaModel: ollamaModel ?? selectedPreset.ollamaModel ?? null,
       });
       return res?.output ?? null;
     },
-    [selectedPreset, agentFlags, workingDir, t],
+    [selectedPreset, agentFlags, workingDir, launchVia, ollamaModel, t],
   );
 
   // Both drafters need a title + description to give the agent any context.
@@ -328,18 +332,19 @@ export function CardModal({
     setAgentPresetId(template.agentPresetId ?? defaultAgentId ?? agentPresets[0]?.id ?? "");
   };
 
-  const handleSaveTemplate = () => {
-    const name = templateName.trim();
-    if (!name || !onSaveTemplate) return;
-    onSaveTemplate({
-      name,
-      description,
-      agentPrompt,
-      tags: tagList,
-      agentPresetId: agentPresetId || undefined,
-    });
-    setTemplateName("");
-  };
+  // "Save as template" hidden for now — re-enable with the JSX block below.
+  // const handleSaveTemplate = () => {
+  //   const name = templateName.trim();
+  //   if (!name || !onSaveTemplate) return;
+  //   onSaveTemplate({
+  //     name,
+  //     description,
+  //     agentPrompt,
+  //     tags: tagList,
+  //     agentPresetId: agentPresetId || undefined,
+  //   });
+  //   setTemplateName("");
+  // };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -356,6 +361,8 @@ export function CardModal({
           workingDir: workingDir.trim() || undefined,
           agentFlags,
           useWorktree,
+          launchVia,
+          ollamaModel,
         },
         status,
         mode === "add" ? targetConnId : undefined,
@@ -381,6 +388,8 @@ export function CardModal({
           workingDir: workingDir.trim() || undefined,
           agentFlags,
           useWorktree,
+          launchVia,
+          ollamaModel,
         },
         status,
       );
@@ -417,34 +426,6 @@ export function CardModal({
                 required
               />
             </div>
-
-            {mode === "add" && (
-              <div className="space-y-2">
-                <Label>{t("column")}</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {CREATABLE_STATUSES.map((item) => {
-                    const cfg = COLUMN_CONFIG[item];
-                    const isSelected = status === item;
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setStatus(item)}
-                        className={cn(
-                          "flex items-center gap-2 rounded-md border px-3 py-2 font-medium text-xs transition-colors",
-                          isSelected
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border text-muted-foreground hover:border-primary/50",
-                        )}
-                      >
-                        <div className={`h-2 w-2 rounded-full ${cfg.accentBar}`} />
-                        {cfg.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {mode === "add" && connections.length > 1 && (
               <div className="space-y-2">
@@ -632,8 +613,12 @@ export function CardModal({
                         binary={selectedPreset.binary}
                         flags={agentFlags ?? selectedPreset.flags ?? []}
                         useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
+                        launchVia={launchVia ?? selectedPreset.launchVia ?? "direct"}
+                        ollamaModel={ollamaModel ?? selectedPreset.ollamaModel ?? ""}
                         onFlagsChange={setAgentFlags}
                         onWorktreeChange={setUseWorktree}
+                        onLaunchViaChange={setLaunchVia}
+                        onOllamaModelChange={setOllamaModel}
                       />
                     </div>
                   </details>
@@ -673,10 +658,6 @@ export function CardModal({
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="card-prompt" className="flex items-center gap-2">
-                  <Badge className="border-orange-500/20 bg-orange-500/10 text-[10px] text-orange-600">
-                    <ZapIcon className="size-2.5" />
-                    {t("agent")}
-                  </Badge>
                   {t("prompt")}
                   <span className="font-normal text-muted-foreground">({t("optional")})</span>
                 </Label>
@@ -739,6 +720,7 @@ export function CardModal({
               )}
             </div>
 
+            {/* "Save as template" hidden for now — re-enable with handleSaveTemplate / templateName above.
             {onSaveTemplate && (
               <div className="rounded-lg border bg-foreground/5 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -747,17 +729,13 @@ export function CardModal({
                     onChange={(event) => setTemplateName(event.target.value)}
                     placeholder={t("templateNamePlaceholder")}
                   />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleSaveTemplate}
-                    disabled={!templateName.trim()}
-                  >
+                  <Button type="button" variant="secondary" onClick={handleSaveTemplate} disabled={!templateName.trim()}>
                     {t("saveTemplate")}
                   </Button>
                 </div>
               </div>
             )}
+            */}
 
             {mode === "edit" && card?.revisionNotes && card.revisionNotes.length > 0 && (
               <div className="space-y-2">
