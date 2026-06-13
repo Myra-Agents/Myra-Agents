@@ -29,6 +29,7 @@ import type { ToolResultEntry, ToolUseEntry, Transcript, TranscriptEntry } from 
 import { cn } from "@/lib/utils";
 
 import { CopyButton } from "./copy-button";
+import { DiffView, looksLikeDiff } from "./diff-view";
 import { Markdown } from "./markdown";
 
 const TOOL_ICONS: Record<string, LucideIcon> = {
@@ -151,11 +152,18 @@ function ThinkingBlock({ text }: { text: string }) {
   );
 }
 
+// Input keys already surfaced in the collapsed header row — redundant to repeat.
+const SUMMARY_KEYS = new Set(["file_path", "path", "command", "pattern", "query", "url", "description"]);
+
 function ToolCall({ tool, result }: { tool: ToolUseEntry; result?: ToolResultEntry }) {
   const Icon = toolIcon(tool.name);
   const arg = toolArgSummary(tool);
   const inputJson = JSON.stringify(tool.input, null, 2);
   const hasOutput = !!result?.content?.trim();
+  const outputIsDiff = hasOutput && !!result && looksLikeDiff(result.content);
+  // Show the input block only when it carries more than the header already does.
+  const richInput = Object.keys(tool.input).some((k) => !SUMMARY_KEYS.has(k));
+  const showInput = richInput || !hasOutput;
 
   return (
     <div>
@@ -173,8 +181,14 @@ function ToolCall({ tool, result }: { tool: ToolUseEntry; result?: ToolResultEnt
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-1 space-y-2 rounded-md border border-border/60 bg-muted/30 p-2.5">
-            <ToolIO label="input" body={inputJson} mono />
-            {hasOutput && result && <ToolIO label="output" body={result.content} mono isError={result.isError} />}
+            {showInput && <ToolIO label="input" body={inputJson} mono />}
+            {hasOutput &&
+              result &&
+              (outputIsDiff ? (
+                <DiffView diff={result.content} />
+              ) : (
+                <ToolIO label="output" body={result.content} mono isError={result.isError} />
+              ))}
           </div>
         </CollapsibleContent>
       </Collapsible>

@@ -454,6 +454,7 @@
       "thinking": "Raisonnement",
       "input": "Entrée",
       "output": "Sortie",
+      "changes": "Modifications",
       "showMore": "Afficher {count} caractères de plus",
       "tokens": "jetons",
       "turns": "{count} tours"

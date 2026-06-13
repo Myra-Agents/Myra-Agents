@@ -454,6 +454,7 @@
       "thinking": "Thought process",
       "input": "Input",
       "output": "Output",
+      "changes": "Changes",
       "showMore": "Show {count} more characters",
       "tokens": "tokens",
       "turns": "{count} turns"
