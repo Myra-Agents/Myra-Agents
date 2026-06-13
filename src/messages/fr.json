@@ -457,7 +457,17 @@
       "changes": "Modifications",
       "showMore": "Afficher {count} caractères de plus",
       "tokens": "jetons",
-      "turns": "{count} tours"
+      "turns": "{count} tours",
+      "review": {
+        "awaitingTitle": "Cette exécution attend votre vérification",
+        "questionTitle": "L'agent attend votre réponse",
+        "approve": "Approuver",
+        "requestChanges": "Demander des changements",
+        "revisePlaceholder": "Décrivez ce qui doit changer, puis Demander des changements — ou approuvez directement…",
+        "answerPlaceholder": "Tapez votre réponse ici…",
+        "send": "Envoyer",
+        "sending": "Envoi…"
+      }
     }
   },
   "settings": {

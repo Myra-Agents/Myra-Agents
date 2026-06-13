@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { ConversationView } from "@/components/conversation/conversation-view";
+import { ReviewComposer } from "@/components/conversation/review-composer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +29,7 @@ interface RunArtifact {
 
 export default function LogsPage() {
   const t = useTranslations("logs");
-  const { cards, loading } = useKanban();
+  const { cards, loading, moveCard, addRevisionNote, answerFeedback } = useKanban();
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
   const [logContent, setLogContent] = useState<string | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
@@ -99,6 +100,8 @@ export default function LogsPage() {
   }
 
   if (selectedRun) {
+    // The run's status is a snapshot; the card may still be waiting on the user.
+    const liveCard = cards.find((c) => c.id === selectedRun.card.id) ?? selectedRun.card;
     return (
       <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
@@ -200,6 +203,20 @@ export default function LogsPage() {
             </ScrollArea>
           </TabsContent>
         </Tabs>
+
+        <ReviewComposer
+          status={liveCard.status}
+          question={liveCard.agentQuestion}
+          onApprove={async () => {
+            await moveCard(liveCard.id, "done");
+          }}
+          onRevise={async (note) => {
+            await addRevisionNote(liveCard.id, note);
+          }}
+          onAnswer={async (answer) => {
+            await answerFeedback(liveCard.id, answer);
+          }}
+        />
       </div>
     );
   }
