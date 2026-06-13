@@ -423,6 +423,31 @@
     "title": "Logs & History",
     "description": "View agent run history and output logs",
     "noLogs": "No agent runs yet.",
+    "noMatches": "No runs match your filters.",
+    "searchPlaceholder": "Search automations…",
+    "stats": {
+      "successful24h": "Successful · 24h",
+      "failed24h": "Failed · 24h",
+      "successful7d": "Successful · 7d",
+      "failed7d": "Failed · 7d"
+    },
+    "columns": {
+      "automation": "Automation",
+      "jobName": "Job name",
+      "triggered": "Triggered",
+      "status": "Status",
+      "duration": "Duration",
+      "usage": "Usage"
+    },
+    "filter": {
+      "button": "Filter",
+      "filterBy": "Filter by",
+      "automation": "Automation",
+      "status": "Status",
+      "allAutomations": "All automations",
+      "allStatuses": "All statuses",
+      "clear": "Clear filters"
+    },
     "status": {
       "running": "Running",
       "completed": "Completed",
@@ -444,7 +469,7 @@
       "tokens": "Tokens",
       "cost": "Cost",
       "openWorkingDir": "Open working dir",
-      "artifacts": "Artifacts"
+      "logs": "Logs"
     },
     "loading": "Loading…",
     "back": "Back",
