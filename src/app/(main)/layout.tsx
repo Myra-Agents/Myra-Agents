@@ -10,12 +10,12 @@ import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
 
 import { GlobalShortcuts } from "./_components/global-shortcuts";
-import { TrayActionListener } from "./_components/tray-action-listener";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
+import { TrayActionListener } from "./_components/tray-action-listener";
 import {
-  HeaderSidebarTrigger,
+  HeaderLeftControls,
   MacHeaderControlsSpacer,
   WindowControls,
   WindowDragRegion,
@@ -44,6 +44,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
     >
       <GlobalShortcuts />
       <TrayActionListener />
+      {/* Single dialog instance; triggered from either the sidebar or top-bar SearchButton. */}
+      <SearchDialog />
       <AppSidebar variant={variant} collapsible={collapsible} />
       <SidebarInset
         className={cn(
@@ -65,8 +67,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
           <div className="flex h-full w-full items-center gap-2 px-3">
             <div className="flex items-center gap-2">
               <MacHeaderControlsSpacer />
-              <HeaderSidebarTrigger />
-              <SearchDialog />
+              <HeaderLeftControls />
             </div>
             <WindowDragRegion />
             <div className="flex items-center gap-2">

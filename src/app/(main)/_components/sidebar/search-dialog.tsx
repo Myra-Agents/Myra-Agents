@@ -18,6 +18,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import type { NavMainItem } from "@/navigation/sidebar/sidebar-items";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 
@@ -75,6 +76,27 @@ function groupBy(items: SearchItem[]) {
   }));
 }
 
+// Single shared dialog, two possible triggers (sidebar header when open, top
+// bar when collapsed). The button only emits this event; the lone SearchDialog
+// instance owns the open state, so we never stack two dialogs / two ⌘J handlers.
+const OPEN_SEARCH_EVENT = "myra:open-search";
+
+/** Icon-only trigger. Rendered in both the sidebar header and the top bar. */
+export function SearchButton({ className }: { className?: string }) {
+  return (
+    <Button
+      onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))}
+      variant="ghost"
+      size="icon"
+      aria-label="Search"
+      title="Search (⌘J)"
+      className={cn("size-7 text-muted-foreground hover:text-foreground", className)}
+    >
+      <Search className="size-4" />
+    </Button>
+  );
+}
+
 export function SearchDialog() {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -87,8 +109,13 @@ export function SearchDialog() {
         setOpen((prev) => !prev);
       }
     };
+    const openFromButton = () => setOpen(true);
     document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+    window.addEventListener(OPEN_SEARCH_EVENT, openFromButton);
+    return () => {
+      document.removeEventListener("keydown", down);
+      window.removeEventListener(OPEN_SEARCH_EVENT, openFromButton);
+    };
   }, []);
 
   const handleOpenChange = (value: boolean) => {
@@ -133,27 +160,14 @@ export function SearchDialog() {
     ));
 
   return (
-    <>
-      <Button
-        onClick={() => handleOpenChange(true)}
-        variant="outline"
-        className="h-7 w-52 justify-start gap-2 rounded-md border-input/60 bg-foreground/5 px-2.5 font-normal text-[13px] text-muted-foreground shadow-none hover:bg-foreground/10 hover:text-muted-foreground"
-      >
-        <Search data-icon="inline-start" className="size-3.5!" />
-        Search
-        <kbd className="ml-auto inline-flex h-4.5 select-none items-center gap-0.5 rounded border bg-muted px-1 font-medium text-[10px]">
-          <span>⌘</span>J
-        </kbd>
-      </Button>
-      <CommandDialog open={open} onOpenChange={handleOpenChange}>
-        <Command>
-          <CommandInput placeholder="Search dashboards, users, and more…" value={query} onValueChange={setQuery} />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            {query ? renderGroups(searchItems) : renderGroups(recommendations)}
-          </CommandList>
-        </Command>
-      </CommandDialog>
-    </>
+    <CommandDialog open={open} onOpenChange={handleOpenChange}>
+      <Command>
+        <CommandInput placeholder="Search dashboards, users, and more…" value={query} onValueChange={setQuery} />
+        <CommandList>
+          <CommandEmpty>No results found.</CommandEmpty>
+          {query ? renderGroups(searchItems) : renderGroups(recommendations)}
+        </CommandList>
+      </Command>
+    </CommandDialog>
   );
 }
