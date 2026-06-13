@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { ToolResultEntry, ToolUseEntry, Transcript, TranscriptEntry } from "@/lib/conversation/types";
 import { cn } from "@/lib/utils";
@@ -129,22 +128,13 @@ function UserBubble({ text }: { text: string }) {
 }
 
 function AssistantBlock({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex gap-3">
-      <Avatar className="mt-0.5 size-7 shrink-0">
-        <AvatarFallback className="bg-primary/15 text-primary">
-          <SparklesIcon className="size-3.5" />
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1 pt-0.5">{children}</div>
-    </div>
-  );
+  return <div className="min-w-0">{children}</div>;
 }
 
 function ThinkingBlock({ text }: { text: string }) {
   const t = useTranslations("logs.conversation");
   return (
-    <div className="ml-10">
+    <div>
       <Collapsible>
         <CollapsibleTrigger className="group flex items-center gap-1.5 text-muted-foreground text-xs hover:text-foreground">
           <BrainIcon className="size-3.5" />
@@ -168,7 +158,7 @@ function ToolCall({ tool, result }: { tool: ToolUseEntry; result?: ToolResultEnt
   const hasOutput = !!result?.content?.trim();
 
   return (
-    <div className="ml-10">
+    <div>
       <Collapsible>
         <CollapsibleTrigger
           className={cn(
@@ -194,7 +184,7 @@ function ToolCall({ tool, result }: { tool: ToolUseEntry; result?: ToolResultEnt
 
 function ToolResultBlock({ result }: { result: ToolResultEntry }) {
   return (
-    <div className="ml-10">
+    <div>
       <ToolIO label="output" body={result.content} mono isError={result.isError} />
     </div>
   );
@@ -259,7 +249,7 @@ function ResultFooter({ entry }: { entry: Extract<TranscriptEntry, { kind: "resu
           <Markdown text={entry.summary} />
         </div>
       )}
-      <div className="ml-10 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
         {typeof entry.tokens === "number" && (
           <span className="inline-flex items-center gap-1">
             <CoinsIcon className="size-3" />
