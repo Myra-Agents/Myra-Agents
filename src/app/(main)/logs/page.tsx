@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { ChevronLeftIcon, ExternalLinkIcon, FileIcon, FolderIcon, ScrollTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -30,6 +32,9 @@ interface RunArtifact {
 export default function LogsPage() {
   const t = useTranslations("logs");
   const { cards, loading, moveCard, addRevisionNote, answerFeedback } = useKanban();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const deepLinkCardId = searchParams.get("card");
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
   const [logContent, setLogContent] = useState<string | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
@@ -69,6 +74,18 @@ export default function LogsPage() {
     [t],
   );
 
+  // Deep-link from the Kanban board (?card=<id>): auto-open that card's most
+  // recent run as a conversation. Runs once per distinct card id.
+  const openedDeepLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || !deepLinkCardId || openedDeepLink.current === deepLinkCardId) return;
+    const card = cards.find((c) => c.id === deepLinkCardId);
+    const run = (card?.runHistory ?? []).slice().sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+    if (!card || !run) return;
+    openedDeepLink.current = deepLinkCardId;
+    void handleViewLog(card, run);
+  }, [loading, deepLinkCardId, cards, handleViewLog]);
+
   const openPath = useCallback(
     async (path: string) => {
       // Artifact paths live on the run's owning server — route open there.
@@ -105,7 +122,16 @@ export default function LogsPage() {
     return (
       <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedRun(null)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              // Arrived via a card deep-link (?card=…): return to the previous
+              // page (the board). Otherwise just clear back to the runs list.
+              if (deepLinkCardId) router.back();
+              else setSelectedRun(null);
+            }}
+          >
             <ChevronLeftIcon className="size-4" />
             {t("back")}
           </Button>
@@ -208,7 +234,16 @@ export default function LogsPage() {
           status={liveCard.status}
           question={liveCard.agentQuestion}
           onApprove={async () => {
+            const prevStatus = liveCard.status;
             await moveCard(liveCard.id, "done");
+            toast.success(t("conversation.review.approved"), {
+              action: {
+                label: t("conversation.review.undo"),
+                onClick: () => {
+                  void moveCard(liveCard.id, prevStatus);
+                },
+              },
+            });
           }}
           onRevise={async (note) => {
             await addRevisionNote(liveCard.id, note);
