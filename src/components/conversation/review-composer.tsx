@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 
-import { CheckIcon, SendIcon } from "lucide-react";
+import { CheckCircle2Icon, CheckIcon, RotateCcwIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -21,15 +21,13 @@ interface Props {
   onApprove: () => Promise<void>;
   onRevise: (note: string) => Promise<void>;
   onAnswer: (answer: string) => Promise<void>;
+  onReopen: () => Promise<void>;
 }
 
-export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer }: Props) {
+export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer, onReopen }: Props) {
   const t = useTranslations("logs.conversation.review");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-
-  if (status !== "awaiting_review" && status !== "waiting_feedback") return null;
-  const isReview = status === "awaiting_review";
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -40,6 +38,30 @@ export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer
       setBusy(false);
     }
   };
+
+  // Approved/done run: keep a permanent way to reverse the decision.
+  if (status === "done") {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-2 border-t pt-3">
+        <CheckCircle2Icon className="size-4 text-green-600 dark:text-green-400" />
+        <span className="text-muted-foreground text-sm">{t("approvedState")}</span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          disabled={busy}
+          onClick={() => run(onReopen)}
+        >
+          <RotateCcwIcon className="size-4" />
+          {t("reopen")}
+        </Button>
+      </div>
+    );
+  }
+
+  if (status !== "awaiting_review" && status !== "waiting_feedback") return null;
+  const isReview = status === "awaiting_review";
 
   return (
     <div className="mx-auto w-full max-w-3xl border-t pt-3">

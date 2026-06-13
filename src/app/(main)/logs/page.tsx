@@ -234,22 +234,17 @@ export default function LogsPage() {
           status={liveCard.status}
           question={liveCard.agentQuestion}
           onApprove={async () => {
-            const prevStatus = liveCard.status;
             await moveCard(liveCard.id, "done");
-            toast.success(t("conversation.review.approved"), {
-              action: {
-                label: t("conversation.review.undo"),
-                onClick: () => {
-                  void moveCard(liveCard.id, prevStatus);
-                },
-              },
-            });
+            toast.success(t("conversation.review.approved"));
           }}
           onRevise={async (note) => {
             await addRevisionNote(liveCard.id, note);
           }}
           onAnswer={async (answer) => {
             await answerFeedback(liveCard.id, answer);
+          }}
+          onReopen={async () => {
+            await moveCard(liveCard.id, "awaiting_review");
           }}
         />
       </div>
