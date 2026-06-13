@@ -25,6 +25,7 @@ import type { CardFormData, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 export default function KanbanPage() {
   const t = useTranslations("kanban");
+  const { settings } = useSettings();
   const {
     cards,
     loading,
@@ -40,11 +41,10 @@ export default function KanbanPage() {
     answerFeedback,
     launchAgent,
     upsertCard,
-  } = useKanban();
+  } = useKanban(settings.agents);
 
   const { logs } = useAgentLogs();
   const { byId } = useSchedules();
-  const { settings } = useSettings();
   const { isVisible } = useConnections();
   const { templates, saveTemplate } = useCardTemplates();
   const {
@@ -304,6 +304,8 @@ export default function KanbanPage() {
         templates={templates}
         agentPresets={settings.agents}
         defaultAgentId={settings.defaultAgentId}
+        logLines={editingCard ? logs.get(editingCard.id) : undefined}
+        isRunning={editingCard ? cards.find((c) => c.id === editingCard.id)?.status === "in_progress" : false}
         onSave={handleSaveCard}
         onSaveTemplate={saveTemplate}
         onLaunch={handleLaunchFromModal}

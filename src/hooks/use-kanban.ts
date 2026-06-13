@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import { parseGlobalId, toGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
+import { agentProps } from "@/lib/posthog/agent-props";
 import { captureError, track } from "@/lib/posthog/events";
 import { isDevModeError } from "@/lib/tauri";
 import type { CreateCardInput, KanbanCard, KanbanStatus, LaunchResult, UpdateCardInput } from "@/types/kanban";
+import type { AgentPreset } from "@/types/settings";
 
 /** Rewrite a server-local card's id into a GlobalId tagged by its connection. */
 function globalize(card: KanbanCard, connId: string): KanbanCard {
@@ -18,7 +20,7 @@ function globalize(card: KanbanCard, connId: string): KanbanCard {
  * entity id. Adds target the primary connection (or an explicit one). A failing
  * connection drops its cards without taking down the board.
  */
-export function useKanban() {
+export function useKanban(presets: AgentPreset[] = []) {
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,19 +70,23 @@ export function useKanban() {
     });
   }, []);
 
-  const addCard = useCallback(async (input: CreateCardInput, targetConnId?: string) => {
-    const connId = targetConnId ?? connectionManager.primaryId();
-    const card = globalize(await connectionManager.invokeOne<KanbanCard>(connId, "add_card", { input }), connId);
-    setCards((prev) => [...prev, card]);
-    track("card_created", {
-      card_id: card.id,
-      agent_preset_id: input.agentPresetId,
-      has_prompt: !!input.agentPrompt,
-      tags_count: input.tags?.length ?? 0,
-      use_worktree: input.useWorktree ?? false,
-    });
-    return card;
-  }, []);
+  const addCard = useCallback(
+    async (input: CreateCardInput, targetConnId?: string) => {
+      const connId = targetConnId ?? connectionManager.primaryId();
+      const card = globalize(await connectionManager.invokeOne<KanbanCard>(connId, "add_card", { input }), connId);
+      setCards((prev) => [...prev, card]);
+      track("card_created", {
+        card_id: card.id,
+        agent_preset_id: input.agentPresetId,
+        has_prompt: !!input.agentPrompt,
+        tags_count: input.tags?.length ?? 0,
+        use_worktree: input.useWorktree ?? false,
+        ...agentProps(input, presets),
+      });
+      return card;
+    },
+    [presets],
+  );
 
   const updateCard = useCallback(
     async (input: UpdateCardInput) => {
@@ -217,11 +223,13 @@ export function useKanban() {
               : card,
           ),
         );
+        const launched = cards.find((c) => c.id === cardId);
         track("agent_launch", {
           card_id: cardId,
           run_id: result.runId,
           queued: result.queued,
           has_working_dir: !!workingDir,
+          ...(launched ? agentProps(launched, presets) : {}),
         });
         return result;
       } catch (e) {
@@ -229,7 +237,7 @@ export function useKanban() {
         throw e;
       }
     },
-    [loadCards],
+    [loadCards, cards, presets],
   );
 
   return {
