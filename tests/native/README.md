@@ -1,12 +1,12 @@
 # AX test home (vendored)
 
-This folder was **vendored into your app repo by the [`tauri-ax-test`](https://github.com/Myra-Agents/skills/tree/main/skills/tauri-ax-test)
+This folder was **vendored into your app repo by the [`native-macos-test`](https://github.com/Myra-Agents/skills/tree/main/skills/native-macos-test)
 skill**. It is a self-contained, generic harness for driving a native macOS app
 (Tauri / Electron / WKWebView) through the **accessibility (AX) tree** — no pixel
 clicks — plus this app's own test suites.
 
 ```
-.tauri-ax.json            # discovery marker (don't delete)
+.native-macos.json            # discovery marker (don't delete)
 scripts/
   ax-driver.js            # JXA core — runs a flow in one osascript pass
   ax.ts                   # typed Flow builder (imported as @ax)
@@ -21,7 +21,7 @@ apps/
 apps.index.json           # generated: app -> window title -> components + tests
 ```
 
-You normally don't run anything by hand — the `tauri-ax-test` skill drives this
+You normally don't run anything by hand — the `native-macos-test` skill drives this
 for you. For reference, the commands it runs:
 
 ```bash

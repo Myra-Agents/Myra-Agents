@@ -17,7 +17,7 @@ Stack: **Next.js 16 (App Router, React 19, TypeScript) frontend + Tauri v2
 (Rust) desktop shell**. Package manager is **bun**; lint/format is **biome**.
 There is no unit-test project — verification is type-check + cargo check + a
 manual run. **Native UI regression tests** live in `tests/native/` (a vendored,
-self-contained Bun + osascript harness driven by the `tauri-ax-test` skill): it
+self-contained Bun + osascript harness driven by the `native-macos-test` skill): it
 exercises the running app through the macOS accessibility (AX) tree — `cd
 tests/native && bun test`. It is excluded from the app tsconfig/biome; the skill
 authors and runs it. (Web e2e stays in `tests/e2e/`, Playwright.)

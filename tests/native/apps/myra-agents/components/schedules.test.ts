@@ -21,7 +21,7 @@ describe("Schedules", () => {
   test("New Schedule modal opens, accepts input, and reflects it back", async () => {
     const name = "AX Test Schedule";
     const task = "AX test task";
-    const desc = "Filled by tauri-ax-test (non-destructive)";
+    const desc = "Filled by native-macos-test (non-destructive)";
 
     const r = await app(APP.windowTitle)
       .click("AXLink", "Schedules")
