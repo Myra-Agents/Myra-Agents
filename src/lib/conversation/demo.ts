@@ -140,10 +140,54 @@ Adding a "downloads" badge.
 
 Done. README.md updated with 4 badges, version corrected to v0.6.1.`;
 
+// ── 4. Real opencode/qwen terminal log (ANSI + `[err]` tags + markers) ───────
+// Verbatim shape of a captured opencode run: stdout prose is untagged, the
+// action trail is `[err] `-tagged with ANSI colors. The parser strips the
+// noise and rebuilds it as a clean transcript. `[…m` are ANSI escapes.
+const E = ""; // ESC, so the demo carries genuine ANSI to strip
+const OPENCODE_LOG = [
+  `[err] ${E}[0m`,
+  `[err] > build · qwen3-coder:latest`,
+  `[err] ${E}[0m`,
+  "I need to gather information about changes in the repositories since yesterday: new commits, open PRs, failing checks. Let me check the repo status first.",
+  `[err] ${E}[0m$ ${E}[0mcd /Users/val/Workspace/Myra-Agents-Dev/app && git status`,
+  "[err] On branch feature/sidebar-header-controls",
+  "[err] Your branch is up to date with 'origin/feature/sidebar-header-controls'.",
+  "[err] ",
+  "[err] Changes not staged for commit:",
+  "[err] \tmodified:   packages/shared (new commits)",
+  "[err] ",
+  "[err] Untracked files:",
+  "[err] \tbuild-in-public/",
+  "Let me check the recent commits:",
+  `[err] ${E}[0m$ ${E}[0mgit log --oneline -5`,
+  "[err] de46211 Move collapse + search into sidebar header",
+  "[err] 7704785 refactor(tray): remove unused RefreshCwIcon",
+  "[err] d697772 Merge pull request #170 from posthog-error-tracking-logs",
+  "I'll look up the open PRs on the shared repo:",
+  `[err] ${E}[90m% ${E}[0mWebFetch https://api.github.com/repos/Myra-Agents/Myra-Agents-Shared/pulls?state=open`,
+  `[err] ${E}[91m${E}[1m✗ ${E}[0mRead app/packages/shared/src/types/plugins.ts failed`,
+  "[err] Error: File not found: app/packages/shared/src/types/plugins.ts",
+  `[err] ${E}[90m✱ ${E}[0mGlob "**/plugins.ts" 0 matches`,
+  "[err] → Read app/packages/shared/src/types/settings.ts",
+  "I've found the PluginInfo interface. Let me add the three protocol-compatibility fields.",
+  "[err] ← Edit app/packages/shared/src/types/settings.ts",
+  "[err] @@ -491,8 +491,17 @@",
+  "[err]    config: PluginConfigField[];",
+  "[err]    enabled: boolean;",
+  "[err] +  compatible: boolean;",
+  "[err] +  incompatibleReason?: string;",
+  "[err] +  minProtocol?: string;",
+  "[err]  }",
+  "I've updated the PluginInfo interface with `compatible`, `incompatibleReason`, and `minProtocol`. TypeScript compiles clean.",
+  `[err] ${E}[0m[myra-agents] OpenCode Local (opencode) exited with code 0`,
+].join("\n");
+
 export const DEMO_RUN_LOGS: Record<string, string> = {
   "run-darkmode": DARKMODE_LOG,
   "run-flaky": FLAKY_LOG,
   "run-readme": PLAIN_LOG,
+  "run-opencode": OPENCODE_LOG,
 };
 
 const run = (id: string, status: AgentRun["status"], prompt: string, extra: Partial<AgentRun>): AgentRun => ({
@@ -211,6 +255,21 @@ export function demoCards(): KanbanCard[] {
           endedAt: "2026-06-13T09:12:09.000Z",
           exitCode: 0,
           result: "README badges updated; version corrected to v0.6.1.",
+        }),
+      ],
+    },
+    {
+      ...base,
+      id: "demo-standup",
+      title: "Summarize repo changes since yesterday",
+      status: "done",
+      position: 3000,
+      runHistory: [
+        run("run-opencode", "completed", "Summarize what changed across the repos since yesterday.", {
+          startedAt: "2026-06-13T09:18:00.000Z",
+          endedAt: "2026-06-13T09:18:52.000Z",
+          exitCode: 0,
+          result: "Added PluginInfo protocol-compatibility fields to @myra/shared.",
         }),
       ],
     },

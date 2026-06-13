@@ -8,6 +8,7 @@
 
 import type { AgentRun } from "@/types/kanban";
 
+import { cleanLog, parseOpencodeLog } from "./opencode";
 import type { ToolResultEntry, Transcript, TranscriptEntry } from "./types";
 
 /** Drop the result-protocol footer we append to every prompt (see
@@ -154,9 +155,16 @@ export function parseTranscript(log: string | null, run: AgentRun): Transcript {
     return { entries, structured: true };
   }
 
-  // Plain-text fallback: one assistant block with the raw output, then a
-  // result summary so usage/status still surface.
-  const body = (log ?? "").trim();
+  // opencode / codex terminal log: tagged action stream + markers.
+  const oc = log ? parseOpencodeLog(log) : null;
+  if (oc && oc.length) {
+    entries.push(...oc);
+    return { entries, structured: true };
+  }
+
+  // Plain-text fallback: one assistant block with the (de-noised) raw output,
+  // then a result summary so usage/status still surface.
+  const body = log ? cleanLog(log) : "";
   if (body) entries.push({ kind: "text", text: body });
   if (run.result?.trim() || typeof run.tokens === "number" || typeof run.cost === "number") {
     entries.push({
