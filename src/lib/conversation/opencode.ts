@@ -91,6 +91,9 @@ export function parseOpencodeLog(log: string): TranscriptEntry[] | null {
     const text = line.text;
     const trimmed = text.trim();
 
+    // Drop the sidecar's own banners ("[myra-agents] … exited with code N").
+    if (trimmed.startsWith("[myra-agents]")) continue;
+
     // Model prose (stdout): narration between actions.
     if (line.stream === "out") {
       if (!trimmed && prose.length === 0) continue; // skip leading blanks
@@ -181,11 +184,11 @@ export function parseOpencodeLog(log: string): TranscriptEntry[] | null {
   flushPending();
   flushProse();
 
-  // Terminal banner → result footer.
+  // Surface a failure footer only for a non-zero exit — a clean exit is noise.
   const exit = /\[myra-agents\][^\n]*exited with code (\d+)/.exec(log);
   if (exit) {
     const code = Number(exit[1]);
-    entries.push({ kind: "result", summary: `Process exited with code ${code}.`, isError: code !== 0 });
+    if (code !== 0) entries.push({ kind: "result", summary: `Process exited with code ${code}.`, isError: true });
   }
 
   return entries.length ? entries : null;
