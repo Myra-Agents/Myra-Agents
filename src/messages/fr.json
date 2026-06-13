@@ -221,7 +221,10 @@
         "runs": "Exéc.",
         "totalTime": "Temps total",
         "totalCost": "Coût total"
-      }
+      },
+      "liveLogs": "Sortie en direct",
+      "logs": "Sortie",
+      "waitingForOutput": "En attente de sortie…"
     },
     "bulk": {
       "selected": "{count} sélectionnée(s)",
@@ -444,7 +447,17 @@
       "artifacts": "Fichiers"
     },
     "loading": "Chargement…",
-    "back": "Retour"
+    "back": "Retour",
+    "conversation": {
+      "tab": "Conversation",
+      "rawTab": "Log brut",
+      "thinking": "Raisonnement",
+      "input": "Entrée",
+      "output": "Sortie",
+      "showMore": "Afficher {count} caractères de plus",
+      "tokens": "jetons",
+      "turns": "{count} tours"
+    }
   },
   "settings": {
     "title": "Paramètres",

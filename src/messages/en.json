@@ -221,7 +221,10 @@
         "runs": "Runs",
         "totalTime": "Total time",
         "totalCost": "Total cost"
-      }
+      },
+      "liveLogs": "Live output",
+      "logs": "Output",
+      "waitingForOutput": "Waiting for output…"
     },
     "bulk": {
       "selected": "{count} selected",
@@ -444,7 +447,17 @@
       "artifacts": "Artifacts"
     },
     "loading": "Loading…",
-    "back": "Back"
+    "back": "Back",
+    "conversation": {
+      "tab": "Conversation",
+      "rawTab": "Raw log",
+      "thinking": "Thought process",
+      "input": "Input",
+      "output": "Output",
+      "showMore": "Show {count} more characters",
+      "tokens": "tokens",
+      "turns": "{count} turns"
+    }
   },
   "settings": {
     "title": "Settings",

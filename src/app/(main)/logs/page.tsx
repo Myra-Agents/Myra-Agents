@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { ChevronLeftIcon, ExternalLinkIcon, FileIcon, FolderIcon, ScrollTextIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { ConversationView } from "@/components/conversation/conversation-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useKanban } from "@/hooks/use-kanban";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
+import { parseTranscript } from "@/lib/conversation/parse";
 import { invokeOn } from "@/lib/tauri";
 import type { AgentRun, KanbanCard } from "@/types/kanban";
 
@@ -30,6 +33,11 @@ export default function LogsPage() {
   const [logContent, setLogContent] = useState<string | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
   const [artifacts, setArtifacts] = useState<RunArtifact[]>([]);
+
+  const transcript = useMemo(
+    () => (selectedRun ? parseTranscript(logContent, selectedRun.run) : { entries: [], structured: false }),
+    [logContent, selectedRun],
+  );
 
   const allRuns = cards
     .filter((c) => c.runHistory && c.runHistory.length > 0)
@@ -84,7 +92,7 @@ export default function LogsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center">
         <p className="text-muted-foreground">{t("loading")}</p>
       </div>
     );
@@ -92,17 +100,17 @@ export default function LogsPage() {
 
   if (selectedRun) {
     return (
-      <div className="flex flex-col gap-4 p-4 h-full max-w-4xl mx-auto">
+      <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setSelectedRun(null)}>
             <ChevronLeftIcon className="size-4" />
             {t("back")}
           </Button>
-          <h2 className="text-sm font-semibold truncate">{selectedRun.card.title}</h2>
+          <h2 className="truncate font-semibold text-sm">{selectedRun.card.title}</h2>
           <RunStatusBadge status={selectedRun.run.status} />
         </div>
 
-        <div className="text-xs text-muted-foreground space-x-3">
+        <div className="space-x-3 text-muted-foreground text-xs">
           <span>
             {t("details.startedAt")}: {new Date(selectedRun.run.startedAt).toLocaleString()}
           </span>
@@ -155,34 +163,52 @@ export default function LogsPage() {
           ))}
         </div>
 
-        {selectedRun.run.prompt && (
-          <Card>
-            <CardContent className="p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                {t("details.prompt")}
-              </p>
-              <pre className="text-xs whitespace-pre-wrap text-foreground">{selectedRun.run.prompt}</pre>
-            </CardContent>
-          </Card>
-        )}
+        <Tabs defaultValue="conversation" className="flex min-h-0 flex-1 flex-col gap-3">
+          <TabsList>
+            <TabsTrigger value="conversation">{t("conversation.tab")}</TabsTrigger>
+            <TabsTrigger value="raw">{t("conversation.rawTab")}</TabsTrigger>
+          </TabsList>
 
-        <ScrollArea className="flex-1 min-h-0">
-          <div
-            data-ph-no-capture
-            className="bg-foreground/95 text-background font-mono text-xs leading-relaxed p-4 rounded-md min-h-[200px]"
-          >
-            {loadingLog ? t("details.loadingLog") : logContent || t("details.noOutput")}
-          </div>
-        </ScrollArea>
+          <TabsContent value="conversation" className="min-h-0 flex-1">
+            <ScrollArea className="h-full">
+              {loadingLog ? (
+                <p className="text-muted-foreground text-sm">{t("details.loadingLog")}</p>
+              ) : (
+                <ConversationView transcript={transcript} />
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="raw" className="min-h-0 flex-1">
+            <ScrollArea className="h-full">
+              {selectedRun.run.prompt && (
+                <Card className="mb-3">
+                  <CardContent className="p-3">
+                    <p className="mb-1 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
+                      {t("details.prompt")}
+                    </p>
+                    <pre className="whitespace-pre-wrap text-foreground text-xs">{selectedRun.run.prompt}</pre>
+                  </CardContent>
+                </Card>
+              )}
+              <div
+                data-ph-no-capture
+                className="min-h-[200px] whitespace-pre-wrap rounded-md bg-foreground/95 p-4 font-mono text-background text-xs leading-relaxed"
+              >
+                {loadingLog ? t("details.loadingLog") : logContent || t("details.noOutput")}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto">
+    <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
       <div className="flex items-center gap-3">
         <ScrollTextIcon className="size-5 text-muted-foreground" />
-        <h1 className="text-xl font-semibold tracking-tight">{t("title")}</h1>
+        <h1 className="font-semibold text-xl tracking-tight">{t("title")}</h1>
       </div>
 
       {allRuns.length === 0 ? (
@@ -196,13 +222,13 @@ export default function LogsPage() {
           {allRuns.map(({ card, run }) => (
             <Card
               key={`${card.id}-${run.id}`}
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
+              className="cursor-pointer transition-colors hover:bg-muted/50"
               onClick={() => handleViewLog(card, run)}
             >
               <CardContent className="flex items-center gap-3 p-3">
                 <RunStatusBadge status={run.status} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{card.title}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-sm">{card.title}</p>
                   <p className="text-[11px] text-muted-foreground">
                     {new Date(run.startedAt).toLocaleString()}
                     {run.endedAt && ` — ${formatDuration(run.startedAt, run.endedAt)}`}
