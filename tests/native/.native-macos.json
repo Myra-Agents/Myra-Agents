@@ -1,0 +1,5 @@
+{
+  "skill": "native-macos-test",
+  "harnessVersion": "0.1.0",
+  "note": "Marker for the AX test home. Vendored by the native-macos-test skill into the app repo — discovery anchor; do not delete."
+}
