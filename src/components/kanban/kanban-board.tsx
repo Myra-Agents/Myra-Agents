@@ -45,6 +45,7 @@ interface KanbanBoardProps {
   onMoveCard: (id: string, status: KanbanStatus) => void | Promise<unknown>;
   onReorderCard: (id: string, newPosition: number, status?: KanbanStatus) => void;
   onReviewCard: (card: KanbanCard) => void;
+  onOpenConversation: (card: KanbanCard) => void;
   onBulkAddTag: (card: KanbanCard, tag: string) => Promise<void>;
   onBulkLaunch: (card: KanbanCard) => Promise<void>;
   onViewLogs?: (card: KanbanCard) => void;
@@ -81,6 +82,7 @@ export function KanbanBoard({
   onMoveCard,
   onReorderCard,
   onReviewCard,
+  onOpenConversation,
   onBulkAddTag,
   onBulkLaunch,
   onViewLogs,
@@ -693,6 +695,7 @@ export function KanbanBoard({
               onEditCard={onEditCard}
               onTrashCard={onTrashCard}
               onReviewCard={onReviewCard}
+              onOpenConversation={onOpenConversation}
               onLaunchCard={onBulkLaunch}
               onMoveCard={onMoveCard}
               columnLabel={getColumnLabel}

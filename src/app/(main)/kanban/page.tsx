@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -25,6 +27,7 @@ import type { CardFormData, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 export default function KanbanPage() {
   const t = useTranslations("kanban");
+  const router = useRouter();
   const { settings } = useSettings();
   const {
     cards,
@@ -189,6 +192,15 @@ export default function KanbanPage() {
     [launchAgent],
   );
 
+  // Clicking a card in an active/done column opens its agent conversation
+  // (the Logs view, deep-linked to that card's latest run).
+  const handleOpenConversation = useCallback(
+    (card: KanbanCard) => {
+      router.push(`/logs?card=${encodeURIComponent(card.id)}`);
+    },
+    [router],
+  );
+
   const handleReviewCard = useCallback((card: KanbanCard) => {
     if (card.status === "waiting_feedback") {
       setFeedbackCard(card);
@@ -283,6 +295,7 @@ export default function KanbanPage() {
         onMoveCard={moveCard}
         onReorderCard={reorderCard}
         onReviewCard={handleReviewCard}
+        onOpenConversation={handleOpenConversation}
         onBulkAddTag={handleBulkAddTag}
         onBulkLaunch={handleBulkLaunch}
         logsByCard={logs}

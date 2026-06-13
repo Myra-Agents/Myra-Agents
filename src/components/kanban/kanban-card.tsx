@@ -18,11 +18,17 @@ import type { KanbanCard } from "@/types/kanban";
 import { COLUMN_CONFIG } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
 
+// Statuses whose cards carry an agent run — body click opens the conversation
+// rather than the edit modal (the pencil button still edits).
+const CONVERSATION_STATUSES = new Set(["in_progress", "waiting_feedback", "awaiting_review", "done"]);
+
 interface KanbanCardProps {
   card: KanbanCard;
   onEdit: () => void;
   onTrash: () => void;
   onReview: () => void;
+  /** Open the agent conversation for this card (active/done columns). */
+  onOpenConversation?: () => void;
   onViewLogs?: () => void;
   logLines?: string[];
   schedule?: ScheduledTask;
@@ -38,6 +44,7 @@ export function KanbanCardComponent({
   onEdit,
   onTrash,
   onReview,
+  onOpenConversation,
   onViewLogs,
   logLines,
   schedule,
@@ -79,6 +86,9 @@ export function KanbanCardComponent({
     fn();
   };
 
+  // Active/done cards open the agent conversation on body click; others edit.
+  const handleBodyClick = onOpenConversation && CONVERSATION_STATUSES.has(card.status) ? onOpenConversation : onEdit;
+
   return (
     <Card
       ref={setNodeRef}
@@ -87,7 +97,7 @@ export function KanbanCardComponent({
       {...attributes}
       data-kanban-card
       size="sm"
-      onClick={isOverlay ? undefined : stop(onEdit)}
+      onClick={isOverlay ? undefined : stop(handleBodyClick)}
       className={cn(
         "group cursor-grab active:cursor-grabbing select-none transition-all duration-200",
         isDragging && !isOverlay && "opacity-30",

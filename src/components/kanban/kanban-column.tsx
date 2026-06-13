@@ -22,6 +22,7 @@ interface KanbanColumnProps {
   onEditCard: (card: KanbanCard) => void;
   onTrashCard: (id: string) => void;
   onReviewCard: (card: KanbanCard) => void;
+  onOpenConversation: (card: KanbanCard) => void;
   onLaunchCard: (card: KanbanCard) => void;
   onMoveCard: (id: string, status: KanbanStatus) => void;
   columnLabel: (status: KanbanStatus) => string;
@@ -41,6 +42,7 @@ export function KanbanColumn({
   onEditCard,
   onTrashCard,
   onReviewCard,
+  onOpenConversation,
   onLaunchCard,
   onMoveCard,
   columnLabel,
@@ -113,6 +115,7 @@ export function KanbanColumn({
                 onEdit={() => onEditCard(card)}
                 onTrash={() => onTrashCard(card.id)}
                 onReview={() => onReviewCard(card)}
+                onOpenConversation={() => onOpenConversation(card)}
                 selected={selectedIds?.has(card.id)}
                 onSelectedChange={onSelectedChange ? (selected) => onSelectedChange(card.id, selected) : undefined}
                 onViewLogs={onViewLogs ? () => onViewLogs(card) : undefined}
