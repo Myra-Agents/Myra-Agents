@@ -21,6 +21,7 @@ import "../styles/presets/tangerine.css";
 import "../styles/presets/caffeine.css";
 import "../styles/presets/claude.css";
 import "../styles/presets/supabase.css";
+import "../styles/presets/cursor.css";
 
 export const metadata: Metadata = {
   title: APP_CONFIG.meta.title,

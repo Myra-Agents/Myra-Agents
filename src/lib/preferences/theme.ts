@@ -36,6 +36,14 @@ export const THEME_PRESET_OPTIONS = [
     },
   },
   {
+    label: "Cursor",
+    value: "cursor",
+    primary: {
+      light: "oklch(0.5651 0.0982 243)",
+      dark: "oklch(0.6812 0.131 252.63)",
+    },
+  },
+  {
     label: "Myra",
     value: "myra",
     primary: {

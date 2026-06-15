@@ -1,0 +1,105 @@
+/*
+label: Cursor
+value: cursor
+*/
+
+/*
+ * Cursor-inspired theme.
+ * Palette extracted from cursor.com design tokens:
+ *   brand        #f54e00  (signature orange — primary / CTA)
+ *   base text    #141414  light · #e4e4e4 dark
+ *   surfaces     #ffffff / #f7f7f7 / #f3f3f3  light · #181818 / #1f1f1f / #141414 dark
+ *   accent blue  #3c7cab  light · #599ce7 dark
+ *   danger       #cf2d56   success #1f8a65   warn #c08532   purple #7754d9
+ * Fonts: Geist (sans + mono), matching Cursor's marketing surface.
+ */
+
+:root[data-theme-preset="cursor"] {
+  --radius: 0.5rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.1913 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.1913 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.1913 0 0);
+  --primary: oklch(0.5651 0.0982 243);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9761 0 0);
+  --secondary-foreground: oklch(0.1913 0 0);
+  --muted: oklch(0.9642 0 0);
+  --muted-foreground: oklch(0.5103 0 0);
+  --accent: oklch(0.9642 0 0);
+  --accent-foreground: oklch(0.1913 0 0);
+  --destructive: oklch(0.5659 0.1967 12.26);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.9276 0.0058 264.53);
+  --input: oklch(0.9276 0.0058 264.53);
+  --ring: oklch(0.5651 0.0982 243);
+  --chart-1: oklch(0.5651 0.0982 243);
+  --chart-2: oklch(0.5654 0.1101 164.5);
+  --chart-3: oklch(0.5539 0.1941 290.8);
+  --chart-4: oklch(0.6614 0.1207 71.71);
+  --chart-5: oklch(0.6522 0.2135 37.99);
+  --sidebar: oklch(0.9761 0 0);
+  --sidebar-foreground: oklch(0.1913 0 0);
+  --sidebar-primary: oklch(0.5651 0.0982 243);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.9642 0 0);
+  --sidebar-accent-foreground: oklch(0.1913 0 0);
+  --sidebar-border: oklch(0.9276 0.0058 264.53);
+  --sidebar-ring: oklch(0.5651 0.0982 243);
+  --font-sans: var(--font-geist);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-geist);
+  --shadow-2xs: 0 0 2px 0 hsl(0 0% 0% / 0.04);
+  --shadow-xs: 0 0 2px 0 hsl(0 0% 0% / 0.06);
+  --shadow-sm: 0 0 2px 0 hsl(0 0% 0% / 0.06), 0 1px 2px 0 hsl(0 0% 0% / 0.06);
+  --shadow: 0 0 2px 0 hsl(0 0% 0% / 0.06), 0 2px 6px 0 hsl(0 0% 0% / 0.06);
+  --shadow-md: 0 0 2px 0 hsl(0 0% 0% / 0.06), 0 6px 16px 0 hsl(0 0% 0% / 0.06);
+  --shadow-lg: 0 0 2px 0 hsl(0 0% 0% / 0.06), 0 10px 24px -4px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0 0 2px 0 hsl(0 0% 0% / 0.06), 0 16px 32px -8px hsl(0 0% 0% / 0.12);
+  --shadow-2xl: 0 25px 50px -12px hsl(0 0% 0% / 0.25);
+}
+
+.dark:root[data-theme-preset="cursor"] {
+  --background: oklch(0.209 0 0);
+  --foreground: oklch(0.9189 0 0);
+  --card: oklch(0.2393 0 0);
+  --card-foreground: oklch(0.9189 0 0);
+  --popover: oklch(0.2393 0 0);
+  --popover-foreground: oklch(0.9189 0 0);
+  --primary: oklch(0.6812 0.131 252.63);
+  --primary-foreground: oklch(0.1913 0 0);
+  --secondary: oklch(0.2686 0 0);
+  --secondary-foreground: oklch(0.9189 0 0);
+  --muted: oklch(0.2686 0 0);
+  --muted-foreground: oklch(0.7155 0 0);
+  --accent: oklch(0.3012 0 0);
+  --accent-foreground: oklch(0.9189 0 0);
+  --destructive: oklch(0.5659 0.1967 12.26);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.3012 0 0);
+  --input: oklch(0.3012 0 0);
+  --ring: oklch(0.6812 0.131 252.63);
+  --chart-1: oklch(0.6812 0.131 252.63);
+  --chart-2: oklch(0.5654 0.1101 164.5);
+  --chart-3: oklch(0.5539 0.1941 290.8);
+  --chart-4: oklch(0.6614 0.1207 71.71);
+  --chart-5: oklch(0.6522 0.2135 37.99);
+  --sidebar: oklch(0.1913 0 0);
+  --sidebar-foreground: oklch(0.9189 0 0);
+  --sidebar-primary: oklch(0.6812 0.131 252.63);
+  --sidebar-primary-foreground: oklch(0.1913 0 0);
+  --sidebar-accent: oklch(0.3012 0 0);
+  --sidebar-accent-foreground: oklch(0.9189 0 0);
+  --sidebar-border: oklch(0.3012 0 0);
+  --sidebar-ring: oklch(0.6812 0.131 252.63);
+  --shadow-2xs: 0 0 2px 0 hsl(0 0% 0% / 0.2);
+  --shadow-xs: 0 0 2px 0 hsl(0 0% 0% / 0.3);
+  --shadow-sm: 0 0 2px 0 hsl(0 0% 0% / 0.3), 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+  --shadow: 0 0 2px 0 hsl(0 0% 0% / 0.3), 0 2px 6px 0 hsl(0 0% 0% / 0.3);
+  --shadow-md: 0 0 2px 0 hsl(0 0% 0% / 0.3), 0 6px 16px 0 hsl(0 0% 0% / 0.4);
+  --shadow-lg: 0 0 3px 0 hsl(0 0% 0% / 0.4), 0 10px 24px -4px hsl(0 0% 0% / 0.5);
+  --shadow-xl: 0 0 6px 0 hsl(0 0% 0% / 0.4), 0 16px 32px -8px hsl(0 0% 0% / 0.55);
+  --shadow-2xl: 0 25px 50px -12px hsl(0 0% 0% / 0.6);
+}
