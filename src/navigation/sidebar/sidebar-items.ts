@@ -1,4 +1,4 @@
-import { Calendar, House, Kanban, type LucideIcon, ScrollText } from "lucide-react";
+import { Bot, Calendar, House, Kanban, type LucideIcon, ScrollText } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -62,6 +62,12 @@ export const sidebarItems: NavGroup[] = [
         url: "/kanban",
         icon: Kanban,
         description: "Track your agents' tasks across columns — drag cards to move work along.",
+      },
+      {
+        title: "Agents",
+        url: "/agents",
+        icon: Bot,
+        description: "See which agents are running right now — live status, elapsed time, and usage.",
       },
       {
         title: "Schedules",

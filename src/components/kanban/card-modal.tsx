@@ -10,6 +10,7 @@ import {
   FolderIcon,
   HelpCircleIcon,
   Loader2Icon,
+  LockIcon,
   RotateCcwIcon,
   ScrollTextIcon,
   SparklesIcon,
@@ -409,6 +410,9 @@ export function CardModal({
 
   const runStats = useMemo(() => summarizeRuns(card?.runHistory ?? []), [card?.runHistory]);
   const canRelaunch = mode === "edit" && card && onLaunch && card.status !== "in_progress" && !card.agentQueued;
+  // A running (or queued) task is locked: editing its fields mid-run would race
+  // the agent. Fields are disabled and Save is blocked until it settles.
+  const locked = mode === "edit" && Boolean(card) && (card?.status === "in_progress" || Boolean(card?.agentQueued));
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
@@ -419,7 +423,16 @@ export function CardModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <fieldset
+            disabled={locked}
+            className="m-0 min-h-0 flex-1 space-y-4 overflow-y-auto border-0 p-4 disabled:opacity-60"
+          >
+            {locked && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 text-xs dark:text-amber-400">
+                <LockIcon className="mt-0.5 size-3.5 shrink-0" />
+                <span>{t("locked")}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="card-title">
                 {t("title")} <span className="text-destructive">*</span>
@@ -781,7 +794,7 @@ export function CardModal({
                 />
               </div>
             )}
-          </div>
+          </fieldset>
 
           <DialogFooter className="mx-0 mb-0 shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>
@@ -798,7 +811,7 @@ export function CardModal({
                 {launching ? t("relaunching") : t("relaunch")}
               </Button>
             )}
-            <Button type="submit" disabled={!title.trim() || presetBlocked || saving}>
+            <Button type="submit" disabled={!title.trim() || presetBlocked || saving || locked}>
               {saving ? t("saving") : mode === "add" ? t("create") : t("save")}
             </Button>
           </DialogFooter>

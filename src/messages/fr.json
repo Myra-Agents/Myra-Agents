@@ -68,6 +68,7 @@
     "workspace": "Espace de travail",
     "configuration": "Configuration",
     "kanban": "Kanban",
+    "agents": "Agents",
     "schedules": "Planifications",
     "planner": "Planifier la journée",
     "logs": "Journaux",
@@ -185,6 +186,7 @@
       "templateNamePlaceholder": "Nom du modèle",
       "saveTemplate": "Enregistrer comme modèle",
       "revisionNotes": "Notes de révision ({count})",
+      "locked": "Cette tâche est en cours d'exécution. Arrêtez-la avant de la modifier.",
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "create": "Créer",
@@ -824,6 +826,39 @@
     "body": "Myra Pro vous permet d'accéder à vos agents où que vous soyez. L'application gratuite est réservée au bureau — passez à Pro pour utiliser l'application web et superviser vos machines à distance.",
     "signInTitle": "Déjà Pro ? Connectez-vous à votre hub",
     "signIn": "Se connecter"
+  },
+  "runningAgents": {
+    "title": "Agents",
+    "description": "Liste tous les agents en cours",
+    "loading": "Chargement des agents…",
+    "empty": "Aucun agent ne tourne pour le moment.",
+    "tiles": {
+      "backlog": { "label": "À faire", "sub": "Prochaines tâches" },
+      "running": { "label": "En cours", "sub": "En exécution" },
+      "needsYou": { "label": "Action requise", "sub": "Retour · Revue" },
+      "done": { "label": "Terminé", "sub": "Tâches finies" }
+    },
+    "caption": "« Action requise » liste les tâches où vous devez guider l'agent. L'objectif est de réduire ces tâches pour que les agents tournent sans vous.",
+    "columns": {
+      "task": "Nom de l'agent",
+      "triggered": "Déclenché",
+      "status": "Statut",
+      "duration": "Durée",
+      "agent": "Agent"
+    },
+    "showing": "{shown} sur {total}",
+    "hidden": "{count} agents masqués",
+    "search": "Rechercher dans la liste",
+    "sort": "Trier",
+    "filter": "Filtrer",
+    "filterAll": "Tous les statuts",
+    "clearFilter": "Effacer le filtre",
+    "noAgent": "—",
+    "viewOutput": "Voir la sortie",
+    "stop": "Arrêter",
+    "toast": {
+      "stopped": "{name} arrêté"
+    }
   },
   "agents": {
     "local": {

@@ -2,11 +2,9 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
 import { COLUMN_CONFIG } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
@@ -18,7 +16,6 @@ interface KanbanColumnProps {
   status: KanbanStatus;
   label?: string;
   cards: KanbanCard[];
-  onAddCard: () => void;
   onEditCard: (card: KanbanCard) => void;
   onTrashCard: (id: string) => void;
   onReviewCard: (card: KanbanCard) => void;
@@ -38,7 +35,6 @@ export function KanbanColumn({
   status,
   label,
   cards,
-  onAddCard,
   onEditCard,
   onTrashCard,
   onReviewCard,
@@ -127,17 +123,6 @@ export function KanbanColumn({
           ))}
         </SortableContext>
       </div>
-
-      {/* Add card button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onAddCard}
-        className="mt-2 w-full text-muted-foreground hover:text-foreground"
-      >
-        <PlusIcon className="size-3.5" />
-        <span className="text-xs">{t("card.addCard")}</span>
-      </Button>
     </div>
   );
 }

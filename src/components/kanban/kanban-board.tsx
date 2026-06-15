@@ -12,6 +12,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -502,6 +503,13 @@ export function KanbanBoard({
       <div className="flex h-full min-h-0 min-w-0 flex-col">
         <div className="space-y-3 px-4 pt-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button
+              onClick={() => onAddCard("draft")}
+              className="w-full bg-blue-500 text-white hover:bg-blue-600 sm:w-auto"
+            >
+              <PlusIcon className="size-4" />
+              {t("card.addCard")}
+            </Button>
             <Input
               id="card-search"
               value={query}
@@ -691,7 +699,6 @@ export function KanbanBoard({
               status={status}
               label={getColumnLabel(status)}
               cards={filteredCards.filter((c) => c.status === status)}
-              onAddCard={() => onAddCard(status)}
               onEditCard={onEditCard}
               onTrashCard={onTrashCard}
               onReviewCard={onReviewCard}

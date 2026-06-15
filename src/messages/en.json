@@ -68,6 +68,7 @@
     "workspace": "Workspace",
     "configuration": "Configuration",
     "kanban": "Kanban",
+    "agents": "Agents",
     "schedules": "Schedules",
     "planner": "Day Planner",
     "logs": "Logs",
@@ -185,6 +186,7 @@
       "templateNamePlaceholder": "Template name",
       "saveTemplate": "Save as template",
       "revisionNotes": "Revision Notes ({count})",
+      "locked": "This task is running. Stop it before editing.",
       "cancel": "Cancel",
       "saving": "Saving…",
       "create": "Create",
@@ -824,6 +826,39 @@
     "body": "Myra Pro lets you reach your agents from anywhere. The free app is desktop-only — upgrade to use the web app and observe your machines remotely.",
     "signInTitle": "Already Pro? Sign in to your hub",
     "signIn": "Sign in"
+  },
+  "runningAgents": {
+    "title": "Agents",
+    "description": "Lists all the running agents",
+    "loading": "Loading agents…",
+    "empty": "No agent is running right now.",
+    "tiles": {
+      "backlog": { "label": "Backlog", "sub": "Next tasks" },
+      "running": { "label": "Running", "sub": "In progress" },
+      "needsYou": { "label": "Needs you", "sub": "Feedback · Review" },
+      "done": { "label": "Done", "sub": "Task done" }
+    },
+    "caption": "“Needs you” lists the tasks where you need to steer the Agent. The idea is to reduce the “Needs you” tasks so the Agents can run without you.",
+    "columns": {
+      "task": "Agent Name",
+      "triggered": "Triggered",
+      "status": "Status",
+      "duration": "Duration",
+      "agent": "Agent"
+    },
+    "showing": "Showing {shown} of {total}",
+    "hidden": "{count} agents hidden",
+    "search": "Search the list",
+    "sort": "Sort",
+    "filter": "Filter",
+    "filterAll": "All statuses",
+    "clearFilter": "Clear filter",
+    "noAgent": "—",
+    "viewOutput": "View output",
+    "stop": "Stop",
+    "toast": {
+      "stopped": "Stopped {name}"
+    }
   },
   "agents": {
     "local": {
