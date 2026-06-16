@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -41,7 +41,7 @@ interface RunArtifact {
   modified?: string;
 }
 
-export default function LogsPage() {
+function LogsPageContent() {
   const t = useTranslations("logs");
   const { cards, loading, moveCard, addRevisionNote, answerFeedback } = useKanban();
   const router = useRouter();
@@ -556,4 +556,14 @@ function formatDuration(start: string, end: string): string {
   if (m < 60) return `${m}m ${s % 60}s`;
   const h = Math.floor(m / 60);
   return `${h}h ${m % 60}m`;
+}
+
+// `useSearchParams()` requires a Suspense boundary during static export
+// (`output: "export"`), otherwise the page fails to prerender. Wrap the content.
+export default function LogsPage() {
+  return (
+    <Suspense fallback={null}>
+      <LogsPageContent />
+    </Suspense>
+  );
 }
