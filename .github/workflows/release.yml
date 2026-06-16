@@ -78,6 +78,43 @@ jobs:
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
 
+      # Import the Developer ID cert into a dedicated keychain ourselves (instead
+      # of letting tauri-action do it). On the self-hosted `myra-x64` Mac the
+      # runner is a headless launchd service: tauri-action's keychain import +
+      # codesign fail with `errSecInternalComponent` because the key isn't
+      # reachable without `set-key-partition-list`. Doing it explicitly — unlock
+      # + partition-list granting `codesign`/`apple-tool` access — makes codesign
+      # work headlessly. tauri-cli then signs with APPLE_SIGNING_IDENTITY using
+      # this keychain (no APPLE_CERTIFICATE passed, so it doesn't re-import).
+      - name: Import Apple signing certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APPLE_CERTIFICATE:-}" ]; then
+            echo "No APPLE_CERTIFICATE secret — building unsigned."
+            exit 0
+          fi
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PW="$(uuidgen)"
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          printf '%s' "$APPLE_CERTIFICATE" | openssl base64 -d -A > "$CERT_PATH"
+          # Fresh keychain so we never touch the login keychain on the self-hosted Mac.
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          # Grant codesign/apple-tool access to the imported key without a UI prompt
+          # — the fix for errSecInternalComponent in a headless session.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PW" "$KEYCHAIN_PATH" >/dev/null
+          # Put our keychain first in the user search list, keeping the existing ones.
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$CERT_PATH"
+          echo "Imported signing identity into $KEYCHAIN_PATH"
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -95,22 +132,16 @@ jobs:
           # native rows where the target already equals the host triple.
           MYRA_SERVER_TRIPLE: ${{ matrix.target }}
           #
-          # macOS code signing + notarization (no-ops on Linux/Windows and on
-          # forks where the secrets are absent — the build just stays unsigned).
-          # tauri-action imports APPLE_CERTIFICATE into a temp keychain, signs
-          # with APPLE_SIGNING_IDENTITY, then notarizes + staples via the Apple
-          # ID + app-specific password. See SIGNING.md for how to mint these.
-          # Sign + notarize ONLY on the hosted arm64 mac (macos-14). The
-          # x86_64 row runs on the self-hosted `myra-x64` Mac as a headless
-          # launchd service with no GUI keychain session, where `codesign`
-          # fails with `errSecInternalComponent`. Gate the Apple secrets to the
-          # arm64 target so the x86_64 build ships UNSIGNED instead of failing.
-          APPLE_CERTIFICATE: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_TEAM_ID || '' }}
+          # macOS code signing + notarization. The certificate is imported into a
+          # dedicated keychain by the "Import Apple signing certificate" step above
+          # (works headless on the self-hosted runner via set-key-partition-list);
+          # we deliberately do NOT pass APPLE_CERTIFICATE here so tauri-cli signs
+          # with the already-imported identity instead of re-importing. These are
+          # no-ops on Linux/Windows. Empty (forks without secrets) → unsigned.
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "Myra Agents __VERSION__"
