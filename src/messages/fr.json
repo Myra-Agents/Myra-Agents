@@ -185,6 +185,7 @@
       "templateNamePlaceholder": "Nom du modèle",
       "saveTemplate": "Enregistrer comme modèle",
       "revisionNotes": "Notes de révision ({count})",
+      "locked": "Seules les tâches en brouillon sont modifiables. Replacez la tâche dans Brouillon pour la modifier.",
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "create": "Créer",

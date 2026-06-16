@@ -130,15 +130,18 @@ export function KanbanCardComponent({
           {/* Hover actions */}
           {!isOverlay && (
             <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={stop(onEdit)}
-                title={t("editCard")}
-              >
-                <PencilIcon />
-              </Button>
+              {/* Only draft tasks are editable — hide the pencil elsewhere. */}
+              {card.status === "draft" && (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={stop(onEdit)}
+                  title={t("editCard")}
+                >
+                  <PencilIcon />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-xs"
@@ -184,7 +187,7 @@ export function KanbanCardComponent({
               size="xs"
               variant="default"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={stop(onReview)}
+              onClick={stop(onOpenConversation ?? onReview)}
               className="w-full"
             >
               {t("answerFeedback")}
@@ -204,7 +207,7 @@ export function KanbanCardComponent({
               size="xs"
               variant="secondary"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={stop(onReview)}
+              onClick={stop(onOpenConversation ?? onReview)}
               className="w-full"
             >
               <ClipboardCheckIcon className="size-3" />

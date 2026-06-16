@@ -185,6 +185,7 @@
       "templateNamePlaceholder": "Template name",
       "saveTemplate": "Save as template",
       "revisionNotes": "Revision Notes ({count})",
+      "locked": "Only draft tasks can be edited. Move this task back to Draft to change it.",
       "cancel": "Cancel",
       "saving": "Saving…",
       "create": "Create",
