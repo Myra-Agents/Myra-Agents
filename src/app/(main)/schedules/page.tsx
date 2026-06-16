@@ -183,11 +183,14 @@ export default function SchedulesPage() {
     [createSchedule, updateSchedule],
   );
 
+  // Stable order independent of enable/disable — toggling a schedule must not
+  // make its row jump. Sort by creation time (oldest first); fall back to id so
+  // rows without a timestamp stay deterministic.
   const sorted = [...schedules].sort((a, b) => {
-    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
-    const ta = a.nextRunAt ? Date.parse(a.nextRunAt) : Infinity;
-    const tb = b.nextRunAt ? Date.parse(b.nextRunAt) : Infinity;
-    return ta - tb;
+    const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+    const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+    if (ta !== tb) return ta - tb;
+    return a.id.localeCompare(b.id);
   });
 
   // Tag suggestions for the editor: every tag already used across schedules.

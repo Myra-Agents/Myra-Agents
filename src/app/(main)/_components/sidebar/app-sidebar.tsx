@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
@@ -21,6 +22,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { MacSidebarControls } from "../window-controls";
 import { NavMain } from "./nav-main";
+import { SearchButton } from "./search-dialog";
 // import { NavUser } from "./nav-user";
 import { SidebarSupportCard } from "./sidebar-support-card";
 
@@ -50,6 +52,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           closes on mouse-out (and ⌘B still works everywhere). */}
       <div className="flex h-10 shrink-0 items-center gap-2 pl-3">
         <MacSidebarControls />
+        {/* Collapse + search live here while the sidebar is open; when collapsed
+            (offcanvas) the rail is gone and the top bar shows them instead.
+            Hidden in the narrow icon rail to keep it clean. */}
+        <div className="flex items-center gap-1 group-data-[collapsible=icon]:hidden">
+          <SidebarTrigger />
+          <SearchButton />
+        </div>
       </div>
       <SidebarHeader>
         <SidebarMenu>

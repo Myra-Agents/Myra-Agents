@@ -10,7 +10,9 @@ import {
   FolderIcon,
   HelpCircleIcon,
   Loader2Icon,
+  LockIcon,
   RotateCcwIcon,
+  ScrollTextIcon,
   SparklesIcon,
   XCircleIcon,
   XIcon,
@@ -66,6 +68,10 @@ interface CardModalProps {
   templates?: CardTemplate[];
   agentPresets?: AgentPreset[];
   defaultAgentId?: string;
+  /** Live log lines for this card (streamed while the modal is open). */
+  logLines?: string[];
+  /** Live run state — kept separate from `card` so the form snapshot doesn't reset on board updates. */
+  isRunning?: boolean;
   onSave: (data: CardFormData, status: KanbanStatus, targetConnId?: string) => Promise<void>;
   onSaveTemplate?: (template: Omit<CardTemplate, "id" | "createdAt">) => void;
   onLaunch?: (cardId: string) => Promise<void>;
@@ -82,6 +88,8 @@ export function CardModal({
   templates = [],
   agentPresets = [],
   defaultAgentId,
+  logLines,
+  isRunning = false,
   onSave,
   // onSaveTemplate, // "Save as template" hidden for now
   onLaunch,
@@ -402,6 +410,10 @@ export function CardModal({
 
   const runStats = useMemo(() => summarizeRuns(card?.runHistory ?? []), [card?.runHistory]);
   const canRelaunch = mode === "edit" && card && onLaunch && card.status !== "in_progress" && !card.agentQueued;
+  // Only draft tasks are editable. Once a task leaves the Draft column it's
+  // locked: fields are disabled and Save is blocked (move it back to Draft to
+  // edit). This also covers running/queued cards mid-run.
+  const locked = mode === "edit" && Boolean(card) && card?.status !== "draft";
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
@@ -412,7 +424,16 @@ export function CardModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          <fieldset
+            disabled={locked}
+            className="m-0 min-h-0 flex-1 space-y-4 overflow-y-auto border-0 p-4 disabled:opacity-60"
+          >
+            {locked && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 text-xs dark:text-amber-400">
+                <LockIcon className="mt-0.5 size-3.5 shrink-0" />
+                <span>{t("locked")}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="card-title">
                 {t("title")} <span className="text-destructive">*</span>
@@ -426,6 +447,10 @@ export function CardModal({
                 required
               />
             </div>
+
+            {mode === "edit" && card && ((logLines?.length ?? 0) > 0 || isRunning) && (
+              <LiveLogPanel lines={logLines ?? []} running={isRunning} />
+            )}
 
             {mode === "add" && connections.length > 1 && (
               <div className="space-y-2">
@@ -770,7 +795,7 @@ export function CardModal({
                 />
               </div>
             )}
-          </div>
+          </fieldset>
 
           <DialogFooter className="mx-0 mb-0 shrink-0">
             <Button type="button" variant="outline" onClick={onClose}>
@@ -787,7 +812,7 @@ export function CardModal({
                 {launching ? t("relaunching") : t("relaunch")}
               </Button>
             )}
-            <Button type="submit" disabled={!title.trim() || presetBlocked || saving}>
+            <Button type="submit" disabled={!title.trim() || presetBlocked || saving || locked}>
               {saving ? t("saving") : mode === "add" ? t("create") : t("save")}
             </Button>
           </DialogFooter>
@@ -799,6 +824,50 @@ export function CardModal({
 
 function dedupeTags(tags: string[]): string[] {
   return [...new Set(tags.map(normalizeTag).filter(Boolean))];
+}
+
+/** Terminal-style live output for the card's running agent, auto-scrolled to the tail. */
+function LiveLogPanel({ lines, running }: { lines: string[]; running: boolean }) {
+  const t = useTranslations("kanban.cardModal");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Pin to the bottom on every new line so the latest output stays visible.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on each new line to follow the tail
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lines]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        {running ? (
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-orange-500 opacity-60" />
+            <span className="relative inline-flex size-2 rounded-full bg-orange-500" />
+          </span>
+        ) : (
+          <ScrollTextIcon className="size-3.5 text-muted-foreground" />
+        )}
+        <Label className="text-xs">{running ? t("liveLogs") : t("logs")}</Label>
+      </div>
+      {lines.length > 0 ? (
+        <div
+          ref={scrollRef}
+          data-ph-no-capture
+          className="max-h-64 overflow-y-auto rounded bg-foreground/95 p-2.5 font-mono text-[11px] leading-relaxed text-background/85"
+        >
+          {lines.map((line, i) => (
+            <div key={i} className={cn("whitespace-pre-wrap break-words", line.startsWith("[err]") && "text-red-400")}>
+              {line || " "}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground italic">{t("waitingForOutput")}</p>
+      )}
+    </div>
+  );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

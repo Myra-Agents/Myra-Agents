@@ -185,6 +185,7 @@
       "templateNamePlaceholder": "Nom du modèle",
       "saveTemplate": "Enregistrer comme modèle",
       "revisionNotes": "Notes de révision ({count})",
+      "locked": "Seules les tâches en brouillon sont modifiables. Replacez la tâche dans Brouillon pour la modifier.",
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "create": "Créer",
@@ -221,7 +222,10 @@
         "runs": "Exéc.",
         "totalTime": "Temps total",
         "totalCost": "Coût total"
-      }
+      },
+      "liveLogs": "Sortie en direct",
+      "logs": "Sortie",
+      "waitingForOutput": "En attente de sortie…"
     },
     "bulk": {
       "selected": "{count} sélectionnée(s)",
@@ -420,6 +424,31 @@
     "title": "Journaux et historique",
     "description": "Consultez l'historique des exécutions et les logs des agents",
     "noLogs": "Aucune exécution d'agent pour le moment.",
+    "noMatches": "Aucune exécution ne correspond aux filtres.",
+    "searchPlaceholder": "Rechercher une automatisation…",
+    "stats": {
+      "successful24h": "Réussies · 24h",
+      "failed24h": "Échouées · 24h",
+      "successful7d": "Réussies · 7j",
+      "failed7d": "Échouées · 7j"
+    },
+    "columns": {
+      "automation": "Automatisation",
+      "jobName": "Nom du job",
+      "triggered": "Déclenchée",
+      "status": "Statut",
+      "duration": "Durée",
+      "usage": "Utilisation"
+    },
+    "filter": {
+      "button": "Filtrer",
+      "filterBy": "Filtrer par",
+      "automation": "Automatisation",
+      "status": "Statut",
+      "allAutomations": "Toutes les automatisations",
+      "allStatuses": "Tous les statuts",
+      "clear": "Réinitialiser les filtres"
+    },
     "status": {
       "running": "En cours",
       "completed": "Terminé",
@@ -441,10 +470,34 @@
       "tokens": "Jetons",
       "cost": "Coût",
       "openWorkingDir": "Ouvrir le répertoire",
-      "artifacts": "Fichiers"
+      "logs": "Logs"
     },
     "loading": "Chargement…",
-    "back": "Retour"
+    "back": "Retour",
+    "conversation": {
+      "tab": "Conversation",
+      "rawTab": "Log brut",
+      "thinking": "Raisonnement",
+      "input": "Entrée",
+      "output": "Sortie",
+      "changes": "Modifications",
+      "showMore": "Afficher {count} caractères de plus",
+      "tokens": "jetons",
+      "turns": "{count} tours",
+      "review": {
+        "awaitingTitle": "Cette exécution attend votre vérification",
+        "questionTitle": "L'agent attend votre réponse",
+        "approve": "Approuver",
+        "approved": "Approuvé — déplacé vers Terminé",
+        "approvedState": "Vous avez approuvé cette exécution",
+        "reopen": "Rouvrir pour révision",
+        "requestChanges": "Demander des changements",
+        "revisePlaceholder": "Décrivez ce qui doit changer, puis Demander des changements — ou approuvez directement…",
+        "answerPlaceholder": "Tapez votre réponse ici…",
+        "send": "Envoyer",
+        "sending": "Envoi…"
+      }
+    }
   },
   "settings": {
     "title": "Paramètres",

@@ -1,20 +1,38 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ChevronLeftIcon, ExternalLinkIcon, FileIcon, FolderIcon, ScrollTextIcon } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { ChevronLeftIcon, ExternalLinkIcon, FileIcon, FolderIcon, ListFilterIcon, SearchIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { ConversationView } from "@/components/conversation/conversation-view";
+import { ReviewComposer } from "@/components/conversation/review-composer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useKanban } from "@/hooks/use-kanban";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
+import { parseTranscript } from "@/lib/conversation/parse";
 import { invokeOn } from "@/lib/tauri";
-import type { AgentRun, KanbanCard } from "@/types/kanban";
+import type { AgentRun, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 interface RunArtifact {
   name: string;
@@ -25,16 +43,88 @@ interface RunArtifact {
 
 export default function LogsPage() {
   const t = useTranslations("logs");
-  const { cards, loading } = useKanban();
+  const { cards, loading, moveCard, addRevisionNote, answerFeedback } = useKanban();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const deepLinkCardId = searchParams.get("card");
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
   const [logContent, setLogContent] = useState<string | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
   const [artifacts, setArtifacts] = useState<RunArtifact[]>([]);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<AgentRun["status"] | "all">("all");
+  const [automationFilter, setAutomationFilter] = useState<string>("all");
 
-  const allRuns = cards
-    .filter((c) => c.runHistory && c.runHistory.length > 0)
-    .flatMap((c) => (c.runHistory ?? []).map((run) => ({ card: c, run })))
-    .sort((a, b) => b.run.startedAt.localeCompare(a.run.startedAt));
+  const transcript = useMemo(
+    () => (selectedRun ? parseTranscript(logContent, selectedRun.run) : { entries: [], structured: false }),
+    [logContent, selectedRun],
+  );
+
+  const allRuns = useMemo(
+    () =>
+      cards
+        .filter((c) => c.runHistory && c.runHistory.length > 0)
+        .flatMap((c) => (c.runHistory ?? []).map((run) => ({ card: c, run })))
+        .sort((a, b) => b.run.startedAt.localeCompare(a.run.startedAt)),
+    [cards],
+  );
+
+  // The card's live status only applies to its most recent run; older runs in
+  // the history keep their own snapshot. allRuns is sorted desc, so the first
+  // entry per card is the latest run.
+  const latestRunIds = useMemo(() => {
+    const seenCards = new Set<string>();
+    const ids = new Set<string>();
+    for (const { card, run } of allRuns) {
+      if (!seenCards.has(card.id)) {
+        seenCards.add(card.id);
+        ids.add(run.id);
+      }
+    }
+    return ids;
+  }, [allRuns]);
+
+  // Success/failure counts over the last 24h and 7d, for the summary cards.
+  const stats = useMemo(() => {
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const acc = { ok24h: 0, fail24h: 0, ok7d: 0, fail7d: 0 };
+    for (const { card, run } of allRuns) {
+      const age = now - Date.parse(run.startedAt);
+      if (Number.isNaN(age)) continue;
+      const status = displayRunStatus(card, run, latestRunIds.has(run.id));
+      const ok = status === "completed";
+      const fail = status === "failed";
+      if (age <= day) {
+        if (ok) acc.ok24h++;
+        if (fail) acc.fail24h++;
+      }
+      if (age <= 7 * day) {
+        if (ok) acc.ok7d++;
+        if (fail) acc.fail7d++;
+      }
+    }
+    return acc;
+  }, [allRuns, latestRunIds]);
+
+  // Distinct job names present in the history — populates the Automation submenu.
+  const automations = useMemo(() => {
+    const names = new Set<string>();
+    for (const { card } of allRuns) names.add(card.title);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [allRuns]);
+
+  const filteredRuns = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allRuns.filter(
+      ({ card, run }) =>
+        (statusFilter === "all" || displayRunStatus(card, run, latestRunIds.has(run.id)) === statusFilter) &&
+        (automationFilter === "all" || card.title === automationFilter) &&
+        (q === "" || card.title.toLowerCase().includes(q)),
+    );
+  }, [allRuns, query, statusFilter, automationFilter, latestRunIds]);
+
+  const activeFilters = (statusFilter !== "all" ? 1 : 0) + (automationFilter !== "all" ? 1 : 0);
 
   const handleViewLog = useCallback(
     async (card: KanbanCard, run: AgentRun) => {
@@ -60,6 +150,18 @@ export default function LogsPage() {
     [t],
   );
 
+  // Deep-link from the Kanban board (?card=<id>): auto-open that card's most
+  // recent run as a conversation. Runs once per distinct card id.
+  const openedDeepLink = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading || !deepLinkCardId || openedDeepLink.current === deepLinkCardId) return;
+    const card = cards.find((c) => c.id === deepLinkCardId);
+    const run = (card?.runHistory ?? []).slice().sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+    if (!card || !run) return;
+    openedDeepLink.current = deepLinkCardId;
+    void handleViewLog(card, run);
+  }, [loading, deepLinkCardId, cards, handleViewLog]);
+
   const openPath = useCallback(
     async (path: string) => {
       // Artifact paths live on the run's owning server — route open there.
@@ -84,25 +186,40 @@ export default function LogsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex h-full items-center justify-center">
         <p className="text-muted-foreground">{t("loading")}</p>
       </div>
     );
   }
 
   if (selectedRun) {
+    // The run's status is a snapshot; the card may still be waiting on the user.
+    const liveCard = cards.find((c) => c.id === selectedRun.card.id) ?? selectedRun.card;
+    // The run status is a snapshot taken when the agent stopped; the card's live
+    // status is the source of truth for post-run transitions (e.g. approved → done).
+    const displayStatus = displayRunStatus(liveCard, selectedRun.run, latestRunIds.has(selectedRun.run.id));
+    const logArtifact = artifacts.find((a) => a.name.endsWith(".log")) ?? artifacts[0];
     return (
-      <div className="flex flex-col gap-4 p-4 h-full max-w-4xl mx-auto">
+      <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedRun(null)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              // Arrived via a card deep-link (?card=…): return to the previous
+              // page (the board). Otherwise just clear back to the runs list.
+              if (deepLinkCardId) router.back();
+              else setSelectedRun(null);
+            }}
+          >
             <ChevronLeftIcon className="size-4" />
             {t("back")}
           </Button>
-          <h2 className="text-sm font-semibold truncate">{selectedRun.card.title}</h2>
-          <RunStatusBadge status={selectedRun.run.status} />
+          <h2 className="truncate font-semibold text-sm">{selectedRun.card.title}</h2>
+          <RunStatusBadge status={displayStatus} />
         </div>
 
-        <div className="text-xs text-muted-foreground space-x-3">
+        <div className="space-x-3 text-muted-foreground text-xs">
           <span>
             {t("details.startedAt")}: {new Date(selectedRun.run.startedAt).toLocaleString()}
           </span>
@@ -138,83 +255,276 @@ export default function LogsPage() {
             <FolderIcon className="size-3.5" />
             {t("details.openWorkingDir")}
           </Button>
-          {artifacts.length > 0 && <span className="text-muted-foreground text-xs">{t("details.artifacts")}:</span>}
-          {artifacts.map((artifact) => (
+          {logArtifact && (
             <Button
-              key={artifact.path}
               variant="ghost"
               size="sm"
-              className="h-7 gap-1.5 font-mono text-xs"
-              onClick={() => openPath(artifact.path)}
-              title={artifact.path}
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => openPath(logArtifact.path)}
+              title={logArtifact.path}
             >
               <FileIcon className="size-3" />
-              {artifact.name}
+              {t("details.logs")}
               <ExternalLinkIcon className="size-3 opacity-60" />
             </Button>
-          ))}
+          )}
         </div>
 
-        {selectedRun.run.prompt && (
-          <Card>
-            <CardContent className="p-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                {t("details.prompt")}
-              </p>
-              <pre className="text-xs whitespace-pre-wrap text-foreground">{selectedRun.run.prompt}</pre>
-            </CardContent>
-          </Card>
-        )}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ScrollArea className="h-full">
+            {loadingLog ? (
+              <p className="text-muted-foreground text-sm">{t("details.loadingLog")}</p>
+            ) : (
+              <ConversationView transcript={transcript} />
+            )}
+          </ScrollArea>
+        </div>
 
-        <ScrollArea className="flex-1 min-h-0">
-          <div
-            data-ph-no-capture
-            className="bg-foreground/95 text-background font-mono text-xs leading-relaxed p-4 rounded-md min-h-[200px]"
-          >
-            {loadingLog ? t("details.loadingLog") : logContent || t("details.noOutput")}
-          </div>
-        </ScrollArea>
+        <ReviewComposer
+          status={liveCard.status}
+          question={liveCard.agentQuestion}
+          onApprove={async () => {
+            await moveCard(liveCard.id, "done");
+            toast.success(t("conversation.review.approved"));
+          }}
+          onRevise={async (note) => {
+            await addRevisionNote(liveCard.id, note);
+          }}
+          onAnswer={async (answer) => {
+            await answerFeedback(liveCard.id, answer);
+          }}
+          onReopen={async () => {
+            await moveCard(liveCard.id, "awaiting_review");
+          }}
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3">
-        <ScrollTextIcon className="size-5 text-muted-foreground" />
-        <h1 className="text-xl font-semibold tracking-tight">{t("title")}</h1>
+    <div className="mx-auto flex h-full max-w-5xl flex-col gap-5 p-6">
+      <div>
+        <h1 className="font-semibold text-xl tracking-tight">{t("title")}</h1>
+        <p className="mt-0.5 text-muted-foreground text-sm">{t("description")}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label={t("stats.successful24h")} value={stats.ok24h} tone="success" />
+        <StatCard label={t("stats.failed24h")} value={stats.fail24h} tone="danger" />
+        <StatCard label={t("stats.successful7d")} value={stats.ok7d} tone="success" />
+        <StatCard label={t("stats.failed7d")} value={stats.fail7d} tone="danger" />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <SearchIcon className="-translate-y-1/2 absolute top-1/2 left-2.5 size-3.5 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("searchPlaceholder")}
+            className="h-8 pl-8 text-sm"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="relative h-8 gap-1.5">
+              <ListFilterIcon className="size-3.5" />
+              {t("filter.button")}
+              {activeFilters > 0 && (
+                <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground tabular-nums">
+                  {activeFilters}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="text-muted-foreground text-xs">{t("filter.filterBy")}</DropdownMenuLabel>
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>{t("filter.automation")}</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-72 w-56 overflow-y-auto">
+                <DropdownMenuRadioGroup value={automationFilter} onValueChange={setAutomationFilter}>
+                  <DropdownMenuRadioItem value="all">{t("filter.allAutomations")}</DropdownMenuRadioItem>
+                  {automations.map((name) => (
+                    <DropdownMenuRadioItem key={name} value={name}>
+                      <span className="truncate">{name}</span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>{t("filter.status")}</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="w-48">
+                <DropdownMenuRadioGroup
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                >
+                  <DropdownMenuRadioItem value="all">{t("filter.allStatuses")}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="running">{t("status.running")}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="completed">{t("status.completed")}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="failed">{t("status.failed")}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="needs_feedback">{t("status.needsFeedback")}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="awaiting_review">{t("status.awaitingReview")}</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            {activeFilters > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <button
+                  type="button"
+                  className="w-full rounded-sm px-2 py-1.5 text-left text-muted-foreground text-sm hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setAutomationFilter("all");
+                  }}
+                >
+                  {t("filter.clear")}
+                </button>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {allRuns.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground text-sm">{t("noLogs")}</p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed">
+          <p className="text-muted-foreground text-sm">{t("noLogs")}</p>
+        </div>
       ) : (
-        <div className="space-y-1">
-          {allRuns.map(({ card, run }) => (
-            <Card
-              key={`${card.id}-${run.id}`}
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => handleViewLog(card, run)}
-            >
-              <CardContent className="flex items-center gap-3 p-3">
-                <RunStatusBadge status={run.status} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{card.title}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {new Date(run.startedAt).toLocaleString()}
-                    {run.endedAt && ` — ${formatDuration(run.startedAt, run.endedAt)}`}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="min-h-0 flex-1 overflow-hidden rounded-lg border">
+          <ScrollArea className="h-full">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="h-9 w-[280px]">{t("columns.jobName")}</TableHead>
+                  <TableHead className="h-9 w-[170px]">{t("columns.triggered")}</TableHead>
+                  <TableHead className="h-9">{t("columns.status")}</TableHead>
+                  <TableHead className="h-9 w-[100px] text-right">{t("columns.duration")}</TableHead>
+                  <TableHead className="h-9 w-[110px] text-right">{t("columns.usage")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRuns.map(({ card, run }) => (
+                  <TableRow
+                    key={`${card.id}-${run.id}`}
+                    className="h-11 cursor-pointer"
+                    onClick={() => handleViewLog(card, run)}
+                  >
+                    <TableCell className="max-w-[280px] truncate font-medium text-sm">{card.title}</TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground text-xs">
+                      {formatTriggered(run.startedAt)}
+                    </TableCell>
+                    <TableCell>
+                      <StatusDot status={displayRunStatus(card, run, latestRunIds.has(run.id))} />
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground text-xs tabular-nums">
+                      {run.endedAt ? formatDuration(run.startedAt, run.endedAt) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground text-xs tabular-nums">
+                      {typeof run.cost === "number"
+                        ? `$${run.cost.toFixed(2)}`
+                        : typeof run.tokens === "number"
+                          ? `${(run.tokens / 1000).toFixed(1)}k`
+                          : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredRuns.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-sm">
+                      {t("noMatches")}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </div>
       )}
     </div>
   );
+}
+
+function StatCard({ label, value, tone }: { label: string; value: number; tone: "success" | "danger" }) {
+  return (
+    <div className="rounded-lg border bg-card px-3.5 py-2.5">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p
+        className={`mt-0.5 font-semibold text-2xl tabular-nums ${
+          value === 0 ? "text-muted-foreground" : tone === "success" ? "text-emerald-500" : "text-destructive"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+const STATUS_DOT: Record<AgentRun["status"], string> = {
+  running: "bg-blue-500",
+  needs_feedback: "bg-amber-500",
+  awaiting_review: "bg-violet-500",
+  completed: "bg-emerald-500",
+  failed: "bg-destructive",
+};
+
+function StatusDot({ status }: { status: AgentRun["status"] }) {
+  const t = useTranslations("logs");
+  const labels: Record<AgentRun["status"], string> = {
+    running: t("status.running"),
+    needs_feedback: t("status.needsFeedback"),
+    awaiting_review: t("status.awaitingReview"),
+    completed: t("status.completed"),
+    failed: t("status.failed"),
+  };
+  return (
+    <span className="flex items-center gap-2 text-xs">
+      <span className={`size-1.5 rounded-full ${STATUS_DOT[status] ?? "bg-muted-foreground"}`} />
+      {labels[status] ?? status}
+    </span>
+  );
+}
+
+function formatTriggered(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+// Map a card's live Kanban status onto the equivalent run status so the run
+// badge/dot reflects post-run transitions. Returns null for statuses that don't
+// correspond to a run state (draft/todo/trashed) — caller falls back to the run snapshot.
+function runStatusFromCard(status: KanbanStatus): AgentRun["status"] | null {
+  switch (status) {
+    case "in_progress":
+      return "running";
+    case "waiting_feedback":
+      return "needs_feedback";
+    case "awaiting_review":
+      return "awaiting_review";
+    case "done":
+      return "completed";
+    default:
+      return null;
+  }
+}
+
+// A run's status is a snapshot from when the agent stopped. For the card's most
+// recent run, the card's live status is the source of truth (e.g. approved →
+// done); failures always stay visible. Older runs keep their snapshot.
+function displayRunStatus(card: KanbanCard, run: AgentRun, isLatest: boolean): AgentRun["status"] {
+  if (run.status === "failed") return "failed";
+  if (isLatest) return runStatusFromCard(card.status) ?? run.status;
+  return run.status;
 }
 
 function RunStatusBadge({ status }: { status: AgentRun["status"] }) {

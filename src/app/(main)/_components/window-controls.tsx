@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { isTauri } from "@/lib/tauri";
+
+import { SearchButton } from "./sidebar/search-dialog";
 
 async function getCurrentTauriWindow() {
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -230,25 +231,25 @@ export function MacHeaderControlsSpacer() {
 }
 
 /**
- * Header-side sidebar toggle — the only toggle in the UI (the sidebar itself
- * carries none), always visible in the top bar. On a narrow window simply
- * hovering the icon opens the peek overlay; leaving the panel closes it.
+ * Top-bar collapse + search cluster. Shown only while the sidebar is collapsed:
+ * when expanded the sidebar hosts its own copy of these controls (see
+ * AppSidebar), so the top bar stays empty there. On a narrow window hovering the
+ * trigger opens the peek overlay; leaving the panel closes it.
  */
-export function HeaderSidebarTrigger() {
+export function HeaderLeftControls() {
   const { state, isNarrow, peek, setPeek } = useSidebar();
 
+  if (state === "expanded") return null;
+
   return (
-    <>
+    <div className="flex items-center gap-1">
       <SidebarTrigger
         onMouseEnter={() => {
-          if (isNarrow && state === "collapsed" && !peek) setPeek(true);
+          if (isNarrow && !peek) setPeek(true);
         }}
       />
-      <Separator
-        orientation="vertical"
-        className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
-      />
-    </>
+      <SearchButton />
+    </div>
   );
 }
 
