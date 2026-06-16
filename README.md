@@ -67,6 +67,43 @@ Copy `.env.example` → `.env.local` and fill in the `NEXT_PUBLIC_*` values to
 enable sign-in (Clerk publishable key) and a managed hub. Everything is optional
 — leave them empty to run app-only.
 
+### macOS code signing & notarization
+
+`bun run tauri:build` produces an unsigned bundle by default. To sign it with a
+**Developer ID Application** certificate (and notarize it so Gatekeeper opens it
+without warnings), use the helper:
+
+```bash
+./scripts/macos-sign.sh          # interactive menu
+./scripts/macos-sign.sh build    # local signed (optionally notarized) build
+./scripts/macos-sign.sh ci       # one-time: export .p12 + push GitHub secrets
+./scripts/macos-sign.sh release  # push a v* tag → signed build in CI
+```
+
+**One-time prerequisites** (just a Developer ID Application cert — no App Store /
+App ID / provisioning profile for direct distribution):
+
+1. **App-specific password** for notarization — log in at
+   [appleid.apple.com](https://appleid.apple.com) → **Sign-In & Security →
+   App-Specific Passwords → +** → name it (e.g. "myra notarization") → copy the
+   16-char code (`xxxx-xxxx-xxxx-xxxx`). This is **not** your Apple ID login
+   password; the notary API requires it because the account has 2FA.
+2. **Accept agreements** once at
+   [App Store Connect](https://appstoreconnect.apple.com) (notarization 401s
+   until the latest Program License Agreement is accepted).
+3. **Export the cert** as a `.p12` (cert + private key): Keychain Access → login
+   → My Certificates → right-click *Developer ID Application: …* → Export → set
+   a password.
+
+Then `./scripts/macos-sign.sh ci` pushes six repo secrets
+(`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
+`APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`). To rotate just the notarization
+password later: `printf %s 'xxxx-xxxx-xxxx-xxxx' | gh secret set APPLE_PASSWORD`.
+
+CI (`.github/workflows/release.yml`) signs + notarizes automatically when the
+secrets are set; without them, builds stay unsigned. Full reference:
+[`src-tauri/SIGNING.md`](src-tauri/SIGNING.md).
+
 ---
 
 ## Architecture
@@ -88,6 +125,27 @@ enable sign-in (Clerk publishable key) and a managed hub. Everything is optional
   `scripts/build-sidecar.mjs` (pinned in `server-version.json`) and bundled by
   Tauri as `externalBin`. It backs the desktop "local" board over
   `http://127.0.0.1:<port>`. Its source is maintained separately.
+
+---
+
+## Logs
+
+The desktop shell logs through [`tauri-plugin-log`](https://github.com/tauri-apps/tauri-plugin-log).
+Output goes to stdout (visible when launched from a terminal), the webview
+devtools console, **and a persistent log file**. Sidecar output is captured
+under the `myra-server` target.
+
+| OS      | Log file                                                            |
+|---------|---------------------------------------------------------------------|
+| macOS   | `~/Library/Logs/com.myra-agents.app/Myra Agents.log`                |
+| Linux   | `~/.config/com.myra-agents.app/logs/Myra Agents.log`                |
+| Windows | `%LOCALAPPDATA%\com.myra-agents.app\logs\Myra Agents.log`           |
+
+Tail it live (macOS):
+
+```bash
+tail -f ~/Library/Logs/com.myra-agents.app/"Myra Agents.log"
+```
 
 ---
 

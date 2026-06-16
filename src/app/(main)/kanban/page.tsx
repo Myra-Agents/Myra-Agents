@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -25,6 +27,8 @@ import type { CardFormData, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 export default function KanbanPage() {
   const t = useTranslations("kanban");
+  const router = useRouter();
+  const { settings } = useSettings();
   const {
     cards,
     loading,
@@ -40,11 +44,10 @@ export default function KanbanPage() {
     answerFeedback,
     launchAgent,
     upsertCard,
-  } = useKanban();
+  } = useKanban(settings.agents);
 
   const { logs } = useAgentLogs();
   const { byId } = useSchedules();
-  const { settings } = useSettings();
   const { isVisible } = useConnections();
   const { templates, saveTemplate } = useCardTemplates();
   const {
@@ -121,6 +124,10 @@ export default function KanbanPage() {
             agentPrompt: data.agentPrompt || undefined,
             agentPresetId,
             workingDir: data.workingDir,
+            agentFlags: data.agentFlags,
+            useWorktree: data.useWorktree,
+            launchVia: data.launchVia,
+            ollamaModel: data.ollamaModel,
             tags: parsedTags,
             status,
           },
@@ -134,6 +141,10 @@ export default function KanbanPage() {
           agentPrompt: data.agentPrompt || undefined,
           agentPresetId,
           workingDir: data.workingDir,
+          agentFlags: data.agentFlags,
+          useWorktree: data.useWorktree,
+          launchVia: data.launchVia,
+          ollamaModel: data.ollamaModel,
           tags: parsedTags,
         });
       }
@@ -179,6 +190,15 @@ export default function KanbanPage() {
       await launchAgent(card.id);
     },
     [launchAgent],
+  );
+
+  // Clicking a card in an active/done column opens its agent conversation
+  // (the Logs view, deep-linked to that card's latest run).
+  const handleOpenConversation = useCallback(
+    (card: KanbanCard) => {
+      router.push(`/logs?card=${encodeURIComponent(card.id)}`);
+    },
+    [router],
   );
 
   const handleReviewCard = useCallback((card: KanbanCard) => {
@@ -275,6 +295,7 @@ export default function KanbanPage() {
         onMoveCard={moveCard}
         onReorderCard={reorderCard}
         onReviewCard={handleReviewCard}
+        onOpenConversation={handleOpenConversation}
         onBulkAddTag={handleBulkAddTag}
         onBulkLaunch={handleBulkLaunch}
         logsByCard={logs}
@@ -296,6 +317,8 @@ export default function KanbanPage() {
         templates={templates}
         agentPresets={settings.agents}
         defaultAgentId={settings.defaultAgentId}
+        logLines={editingCard ? logs.get(editingCard.id) : undefined}
+        isRunning={editingCard ? cards.find((c) => c.id === editingCard.id)?.status === "in_progress" : false}
         onSave={handleSaveCard}
         onSaveTemplate={saveTemplate}
         onLaunch={handleLaunchFromModal}

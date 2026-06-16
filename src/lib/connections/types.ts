@@ -19,6 +19,7 @@ export interface Connection {
   status: ConnectionStatus;
   hubId?: string; // hub-instance only: the owning hub registration
   instanceId?: string; // hub-instance only: the bare instance id within the hub
+  version?: string; // server build the backend reported, if known (hub-instance: from InstanceInfo)
 }
 
 /** A connection paired with the transport that reaches it. */

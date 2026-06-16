@@ -70,6 +70,7 @@ export function useConnections() {
     [],
   );
   const setPrimary = useCallback((id: string) => connectionManager.setPrimary(id), []);
+  const refresh = useCallback(() => connectionManager.refresh(), []);
 
   const toggleVisible = useCallback((id: string) => {
     setHidden((prev) => {
@@ -96,6 +97,7 @@ export function useConnections() {
     revokeHubInstance,
     update,
     setPrimary,
+    refresh,
     toggleVisible,
     isVisible,
   };

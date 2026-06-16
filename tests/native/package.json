@@ -1,0 +1,18 @@
+{
+  "name": "native-macos-test",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Author and run reusable component UI tests for native macOS Tauri apps by driving the accessibility (AX) tree.",
+  "scripts": {
+    "test": "bun test --timeout 60000",
+    "test:destructive": "DESTRUCTIVE=1 bun test --timeout 60000",
+    "inspect": "bun scripts/inspect.ts",
+    "scaffold": "bun scripts/scaffold.ts",
+    "index": "bun scripts/index.ts",
+    "index:check": "bun scripts/index.ts --check"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

@@ -10,6 +10,7 @@ import { APP_CONFIG } from "@/config/app-config";
 import { ThemeInitScript, ThemeProvider } from "@/hooks/use-theme";
 import { I18nProvider } from "@/i18n/provider";
 import { fontVars } from "@/lib/fonts/registry";
+import { PostHogProvider } from "@/lib/posthog/posthog-provider";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { ThemeBootScript } from "@/scripts/theme-boot";
 import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
@@ -49,20 +50,22 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body className={`${fontVars} min-h-screen antialiased`}>
         <DisableNativeContextMenu />
         <ThemeProvider>
-          <TooltipProvider>
-            <PreferencesStoreProvider
-              themeMode={theme_mode}
-              themePreset={theme_preset}
-              contentLayout={content_layout}
-              navbarStyle={navbar_style}
-              font={font}
-            >
-              <I18nProvider>
-                <DevContextMenu>{children}</DevContextMenu>
-              </I18nProvider>
-              <Toaster />
-            </PreferencesStoreProvider>
-          </TooltipProvider>
+          <PostHogProvider>
+            <TooltipProvider>
+              <PreferencesStoreProvider
+                themeMode={theme_mode}
+                themePreset={theme_preset}
+                contentLayout={content_layout}
+                navbarStyle={navbar_style}
+                font={font}
+              >
+                <I18nProvider>
+                  <DevContextMenu>{children}</DevContextMenu>
+                </I18nProvider>
+                <Toaster />
+              </PreferencesStoreProvider>
+            </TooltipProvider>
+          </PostHogProvider>
         </ThemeProvider>
       </body>
     </html>

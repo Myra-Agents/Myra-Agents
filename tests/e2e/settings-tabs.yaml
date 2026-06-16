@@ -1,0 +1,71 @@
+# Maestro web e2e — Settings tab shell + backend-independent panels.
+#
+# Walks the Settings tab rail and asserts the panels that render in pure web
+# mode (no Rust/Tauri backend): Hub (Connections), Preferences, Agents, and
+# Data. Each tab switch is verified by a unique string from its panel body, so
+# this catches a tab that renders its trigger but fails to mount its content.
+#
+# The Plugins / Integrations tabs need filesystem plugin enumeration (a real
+# backend) and are covered by plugins.yaml / integrations.yaml; Sync has its own
+# sync.yaml. This flow deliberately stays on the backend-independent tabs so it
+# is green against a bare `bun dev`.
+#
+# Non-mutating: only navigates and reads.
+#
+# Prereqs: dev server on http://localhost:1420 with NEXT_PUBLIC_MYRA_TIER=pro
+#   (cd app && NEXT_PUBLIC_MYRA_TIER=pro bun dev)
+#
+#   maestro test app/tests/e2e/settings-tabs.yaml
+url: http://localhost:1420
+tags:
+  - settings
+---
+- openLink: http://localhost:1420/settings
+# extendedWaitUntil so a cold /settings compile doesn't race the first paint.
+- extendedWaitUntil:
+    visible: "Settings"
+    timeout: 15000
+
+# The full tab rail is present.
+- assertVisible: "Hub"
+- assertVisible: "Preferences"
+- assertVisible: "Agents"
+- assertVisible: "Integrations"
+- assertVisible: "Sync"
+- assertVisible: "Plugins"
+- assertVisible: "Data"
+- takeScreenshot: settings-tabs
+
+# Hub (default tab) — the Connections aggregation panel.
+- tapOn: "Hub"
+- waitForAnimationToEnd
+- assertVisible: "Connections"
+- assertVisible: "Backends this board aggregates.*"
+- assertVisible: "Primary"
+
+# Preferences — language / default page / theme controls.
+- tapOn: "Preferences"
+- waitForAnimationToEnd
+- assertVisible: "Language"
+- assertVisible: "Default Page"
+- assertVisible: "Theme"
+- assertVisible: "Theme changes apply immediately and are stored for your next launch."
+- takeScreenshot: settings-preferences
+
+# Agents — the agent-preset registry (default agent + concurrency + presets).
+- tapOn: "Agents"
+- waitForAnimationToEnd
+- assertVisible: "Agent Presets"
+- assertVisible: "Default agent"
+- assertVisible: "Max concurrent agents"
+- assertVisible: "OpenCode"
+- takeScreenshot: settings-agents
+
+# Data — board export / import / clear-logs actions.
+- tapOn: "Data"
+- waitForAnimationToEnd
+- assertVisible: "Data Management"
+- assertVisible: "Export board"
+- assertVisible: "Import board"
+- assertVisible: "Clear logs"
+- takeScreenshot: settings-data

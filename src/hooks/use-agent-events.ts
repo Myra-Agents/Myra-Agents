@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 import { toGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
+import { captureError, track } from "@/lib/posthog/events";
 import type { UnlistenFn } from "@/lib/tauri";
 import type { KanbanCard } from "@/types/kanban";
 
@@ -30,13 +31,27 @@ export function useAgentEvents(onCardUpdated: (card: KanbanCard) => void) {
           "agent-result-changed",
           ({ connId, payload }) => {
             if (cancelled) return;
-            onCardUpdated({ ...payload.card, id: toGlobalId(connId, payload.card.id) });
+            const card = payload.card;
+            // `failed` runs are parked back in the Todo column by applyResult.
+            const failed = card.status === "todo";
+            const duration_ms =
+              card.agentRunEndedAt && card.agentRunStartedAt
+                ? Date.parse(card.agentRunEndedAt) - Date.parse(card.agentRunStartedAt)
+                : undefined;
+            track(failed ? "agent_run_failed" : "agent_run_completed", {
+              card_id: toGlobalId(connId, card.id),
+              final_status: card.status,
+              has_question: !!card.agentQuestion,
+              duration_ms,
+            });
+            onCardUpdated({ ...card, id: toGlobalId(connId, card.id) });
           },
         );
         if (cancelled) fn();
         else unlisten = fn;
       } catch (e) {
         console.error("Failed to subscribe to agent-result-changed:", e);
+        captureError(e, { where: "useAgentEvents.subscribe" });
       }
     };
 

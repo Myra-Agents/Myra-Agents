@@ -17,7 +17,7 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +26,13 @@ const outDir = join(root, "src-tauri", "binaries");
 const serverEntry = join(root, "packages", "server", "src", "index.ts");
 
 function hostTriple() {
+  // CI cross-compile override: when building for an arch other than the host
+  // (e.g. x86_64 on an Apple Silicon self-hosted runner), the bundled sidecar
+  // must match the BUILD target, not the host. The Release workflow sets
+  // MYRA_SERVER_TRIPLE to the cargo `--target` so Tauri's externalBin resolves
+  // the right `myra-server-<triple>` asset.
+  const override = process.env.MYRA_SERVER_TRIPLE;
+  if (override) return override.trim();
   const out = execFileSync("rustc", ["-Vv"], { encoding: "utf8" });
   const line = out.split("\n").find((l) => l.startsWith("host:"));
   if (!line) throw new Error("could not parse host triple from `rustc -Vv`");
@@ -69,6 +76,32 @@ const outfile = join(outDir, assetName);
 const stamp = join(outDir, `.${assetName}.version`);
 
 mkdirSync(outDir, { recursive: true });
+
+// --- compile path (local Rust server checkout present) ---------------------
+// In the dev workspace the Rust server lives next to this app (../server). When
+// it's there AND we're building for the host (not a CI cross-compile), build it
+// from source so the bundled sidecar always matches local server changes — no
+// pinned-release download, no manual binary copy. The public app repo has no
+// ../server, so it falls through to the download path below.
+const rustServerDir = join(root, "..", "server");
+if (!process.env.MYRA_SERVER_TRIPLE && existsSync(join(rustServerDir, "Cargo.toml"))) {
+  console.log(`[build-sidecar] local Rust server found, building\n            -> ${outfile}`);
+  const res = spawnSync("cargo", ["build", "--release"], { stdio: "inherit", cwd: rustServerDir });
+  if (res.status !== 0) {
+    console.error("[build-sidecar] cargo build --release failed");
+    process.exit(res.status ?? 1);
+  }
+  const built = join(rustServerDir, "target", "release", isWindows ? "myra-server.exe" : "myra-server");
+  if (!existsSync(built)) {
+    console.error(`[build-sidecar] built binary not found at ${built}`);
+    process.exit(1);
+  }
+  copyFileSync(built, outfile);
+  if (!isWindows) chmodSync(outfile, 0o755);
+  writeFileSync(stamp, "local\n");
+  console.log("[build-sidecar] done (compiled from local Rust source)");
+  process.exit(0);
+}
 
 // --- compile path (server source present) ---------------------------------
 if (existsSync(serverEntry)) {

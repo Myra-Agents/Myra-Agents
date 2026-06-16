@@ -38,6 +38,21 @@ const IsComingSoon = () => (
   <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">Soon</span>
 );
 
+// Rich hover tooltip: title + (when present) a longer description.
+// `hidden: false` makes it show in the expanded rail too, not just when collapsed.
+const itemTooltip = (item: NavMainItem) => {
+  if (!item.description) return item.title;
+  return {
+    hidden: false,
+    children: (
+      <div className="flex max-w-56 flex-col gap-0.5">
+        <span className="font-medium">{item.title}</span>
+        <span className="text-background/70">{item.description}</span>
+      </div>
+    ),
+  };
+};
+
 const NavItemExpanded = ({
   item,
   isActive,
@@ -55,7 +70,7 @@ const NavItemExpanded = ({
             <SidebarMenuButton
               disabled={item.comingSoon}
               isActive={isActive(item.url, item.subItems)}
-              tooltip={item.title}
+              tooltip={itemTooltip(item)}
             >
               {item.icon && <item.icon />}
               <span>{item.title}</span>
@@ -67,7 +82,7 @@ const NavItemExpanded = ({
               asChild
               aria-disabled={item.comingSoon}
               isActive={isActive(item.url)}
-              tooltip={item.title}
+              tooltip={itemTooltip(item)}
             >
               <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
                 {item.icon && <item.icon />}
@@ -112,7 +127,7 @@ const NavItemCollapsed = ({
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             disabled={item.comingSoon}
-            tooltip={item.title}
+            tooltip={itemTooltip(item)}
             isActive={isActive(item.url, item.subItems)}
             className={collapsedIconClass}
           >
@@ -180,7 +195,7 @@ export function NavMain({ items }: NavMainProps) {
                         <SidebarMenuButton
                           asChild
                           aria-disabled={item.comingSoon}
-                          tooltip={item.title}
+                          tooltip={itemTooltip(item)}
                           isActive={isItemActive(item.url)}
                           className={collapsedIconClass}
                         >

@@ -9,13 +9,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -27,9 +20,13 @@ import { PanelLeftIcon } from "lucide-react"
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
+// Hover-peek floats a narrower, denser panel than the docked sidebar.
+const SIDEBAR_WIDTH_PEEK = "14rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+// Below this window width the sidebar auto-collapses (Linear-style); the
+// trigger then toggles the floating peek overlay instead of the dock.
+const SIDEBAR_AUTO_COLLAPSE_QUERY = "(max-width: 1023px)"
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -38,6 +35,9 @@ type SidebarContextProps = {
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
+  isNarrow: boolean
+  peek: boolean
+  setPeek: (peek: boolean) => void
   toggleSidebar: () => void
 }
 
@@ -87,10 +87,26 @@ function SidebarProvider({
     [setOpenProp, open]
   )
 
-  // Helper to toggle the sidebar.
+  // Window too narrow to dock the sidebar next to the content?
+  const [isNarrow, setIsNarrow] = React.useState(false)
+  React.useEffect(() => {
+    const mql = window.matchMedia(SIDEBAR_AUTO_COLLAPSE_QUERY)
+    const update = () => setIsNarrow(mql.matches)
+    update()
+    mql.addEventListener("change", update)
+    return () => mql.removeEventListener("change", update)
+  }, [])
+
+  // Peek: the sidebar floats over the content while staying "collapsed".
+  // Opened by the trigger when the window is too narrow to dock.
+  const [peek, setPeek] = React.useState(false)
+
+  // Helper to toggle the sidebar. On a narrow window the dock is forced
+  // collapsed, so the trigger toggles the peek overlay instead.
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+    if (isNarrow) return setPeek((peek) => !peek)
+    return setOpen((open) => !open)
+  }, [isNarrow, setOpen])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -108,6 +124,26 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
 
+  // Narrow window forces the dock collapsed (peek takes over). Crossing back
+  // to wide — including maximizing — always brings the docked sidebar back,
+  // while still allowing a manual collapse on a wide window.
+  const prevNarrow = React.useRef(isNarrow)
+  React.useEffect(() => {
+    const wasNarrow = prevNarrow.current
+    prevNarrow.current = isNarrow
+    if (isNarrow) {
+      if (open) setOpen(false)
+    } else if (wasNarrow) {
+      setPeek(false)
+      setOpen(true)
+    }
+  }, [isNarrow, open, setOpen])
+
+  // The peek overlay only makes sense while the dock is collapsed.
+  React.useEffect(() => {
+    if (open) setPeek(false)
+  }, [open])
+
   // We add a state so that we can do data-state="expanded" or "collapsed".
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? "expanded" : "collapsed"
@@ -118,11 +154,14 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
+      isNarrow,
+      peek,
+      setPeek,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, isNarrow, peek, openMobile, setOpenMobile, toggleSidebar]
   )
 
   return (
@@ -133,6 +172,7 @@ function SidebarProvider({
           {
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+            "--sidebar-width-peek": SIDEBAR_WIDTH_PEEK,
             ...style,
           } as React.CSSProperties
         }
@@ -154,14 +194,42 @@ function Sidebar({
   collapsible = "offcanvas",
   className,
   children,
-  dir,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { state, peek, setPeek } = useSidebar()
+
+  // Peek (offcanvas only): the trigger floats the collapsed sidebar back in
+  // as an overlay without reflowing the content. Escape or a click outside
+  // (or on a nav item) closes it.
+  const isPeeking = collapsible === "offcanvas" && state === "collapsed" && peek
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!isPeeking) return
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      // Let the trigger's own click handler toggle the peek instead of
+      // closing here first (which would make the click reopen it).
+      if (target.closest('[data-slot="sidebar-trigger"]')) return
+      const container = containerRef.current
+      if (container && !container.contains(target)) {
+        setPeek(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPeek(false)
+    }
+    document.addEventListener("mousedown", onPointerDown)
+    document.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [isPeeking, setPeek])
 
   if (collapsible === "none") {
     return (
@@ -178,46 +246,30 @@ function Sidebar({
     )
   }
 
-  if (isMobile) {
-    return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          dir={dir}
-          data-sidebar="sidebar"
-          data-slot="sidebar"
-          data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-          style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
-          </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
-    )
-  }
-
+  // No mobile Sheet: every narrow width uses the same collapsed-dock + peek
+  // overlay, so the behaviour is identical across breakpoints.
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className="group peer block text-sidebar-foreground"
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
+      data-peek={isPeeking ? "true" : undefined}
       data-slot="sidebar"
     >
+      {isPeeking && (
+        <div
+          data-slot="sidebar-peek-backdrop"
+          className="fade-in-0 fixed inset-0 z-[55] animate-in bg-black/20 backdrop-blur-[2px] duration-150"
+          onClick={() => setPeek(false)}
+        />
+      )}
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "relative w-(--sidebar-width) bg-transparent",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -226,10 +278,25 @@ function Sidebar({
         )}
       />
       <div
+        ref={containerRef}
         data-slot="sidebar-container"
         data-side={side}
+        onMouseLeave={isPeeking ? () => setPeek(false) : undefined}
+        onClickCapture={
+          isPeeking
+            ? (event) => {
+                // The in-sidebar trigger toggles the peek itself.
+                if ((event.target as HTMLElement).closest('[data-slot="sidebar-trigger"]')) return
+                setPeek(false)
+              }
+            : undefined
+        }
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "fixed inset-y-0 z-10 flex h-svh w-(--sidebar-width) data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+          // Peek: slide a narrower, full-height panel back in over the
+          // content, flush with the window edge (Linear-style) — the native
+          // macOS traffic lights sit inside its top row.
+          "group-data-[peek=true]:z-[60] group-data-[peek=true]:w-(--sidebar-width-peek) data-[side=left]:group-data-[peek=true]:!left-0 data-[side=right]:group-data-[peek=true]:!right-0",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -241,7 +308,10 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border"
+          className={cn(
+            "flex size-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-sm group-data-[variant=floating]:ring-1 group-data-[variant=floating]:ring-sidebar-border",
+            "group-data-[peek=true]:shadow-xl"
+          )}
         >
           {children}
         </div>
@@ -333,7 +403,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-1.5 p-2", className)}
       {...props}
     />
   )
@@ -344,7 +414,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-1.5 p-2", className)}
       {...props}
     />
   )
@@ -383,7 +453,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-group"
       data-sidebar="group"
-      className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
+      className={cn("relative flex w-full min-w-0 flex-col px-2 py-1", className)}
       {...props}
     />
   )
@@ -401,7 +471,7 @@ function SidebarGroupLabel({
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
       className={cn(
-        "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:pointer-events-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "flex h-7 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:pointer-events-none focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         className
       )}
       {...props}
@@ -459,19 +529,14 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
     <li
       data-slot="sidebar-menu-item"
       data-sidebar="menu-item"
-      className={cn(
-        // Active indicator bar: lives on the <li> (no overflow clip), shown when
-        // the contained menu button is active. Sits in the left gutter.
-        "group/menu-item relative before:pointer-events-none before:absolute before:inset-y-1.5 before:-left-2 before:w-1 before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity before:content-[''] has-data-[active=true]:before:opacity-100",
-        className,
-      )}
+      className={cn("group/menu-item relative", className)}
       {...props}
     />
   )
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-[active=true]:bg-primary/10 data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/10 data-[active=true]:hover:text-primary [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-1.5 text-left text-[13px] ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground data-[active=true]:bg-primary/10 data-[active=true]:font-semibold data-[active=true]:text-primary data-[active=true]:hover:bg-primary/10 data-[active=true]:hover:text-primary [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {
@@ -480,9 +545,9 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]",
       },
       size: {
-        default: "h-8 text-sm",
-        sm: "h-7 text-xs",
-        lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
+        default: "h-7 text-[13px]",
+        sm: "h-6 text-xs",
+        lg: "h-10 text-sm group-data-[collapsible=icon]:p-0!",
       },
     },
     defaultVariants: {
@@ -530,7 +595,7 @@ function SidebarMenuButton({
   }
 
   return (
-    <Tooltip>
+    <Tooltip delayDuration={1000}>
       <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent
         side="right"

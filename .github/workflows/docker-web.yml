@@ -1,0 +1,72 @@
+name: Myra - Web Image
+
+# Build the web app container (multi-stage Dockerfile: bun static export ->
+# Caddy) and publish it to GHCR on every v* release tag. The NEXT_PUBLIC_* keys
+# are INLINED at build time, so they must be passed as --build-arg here; they
+# come from repo Variables (NEXT_PUBLIC_* are public-by-design — promote to
+# Secrets if you'd rather not surface them in the build log/settings UI).
+#
+# Pull the published image:
+#   docker pull ghcr.io/myra-agents/myra-web:<tag>
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag/ref to build (e.g. v0.1.0). Defaults to the current ref."
+        required: false
+
+env:
+  IMAGE: ghcr.io/myra-agents/myra-web
+
+permissions:
+  contents: read
+  packages: write # push to GHCR
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          submodules: recursive # packages/shared must be present for the build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            NEXT_PUBLIC_MYRA_HUB_URL=${{ vars.NEXT_PUBLIC_MYRA_HUB_URL }}
+            NEXT_PUBLIC_CLERK_JWT_TEMPLATE=${{ vars.NEXT_PUBLIC_CLERK_JWT_TEMPLATE }}
+            NEXT_PUBLIC_POSTHOG_KEY=${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}
+            NEXT_PUBLIC_POSTHOG_HOST=${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}

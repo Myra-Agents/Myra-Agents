@@ -1,0 +1,21 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "app": {
+    "windows": [
+      {
+        "title": "Myra Agents",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 640,
+        "minHeight": 500,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 18, "y": 22 },
+        "transparent": false,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  }
+}

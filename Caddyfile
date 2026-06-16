@@ -1,0 +1,12 @@
+# Domain comes from the SITE_ADDRESS env var at container start, e.g.
+#   -e SITE_ADDRESS=auth.cergy.example.com   (public -> auto Let's Encrypt)
+#   -e SITE_ADDRESS=:80                       (plain HTTP, behind a proxy)
+#   -e SITE_ADDRESS="auth.lan, tls internal"  (self-signed for LAN-only)
+{$SITE_ADDRESS::80} {
+	root * /srv
+	encode gzip
+	# Next static export uses trailingSlash: dirs resolve to index.html;
+	# fall back to the exported 404 page.
+	try_files {path} {path}/ {path}index.html /404.html
+	file_server
+}

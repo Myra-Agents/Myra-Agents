@@ -1,0 +1,16 @@
+// example.test.ts — starter component test. Replace with real flows.
+//
+// Author against the live AX tree: `bun scripts/inspect.ts "<window title>"`,
+// pick stable AXRole + name/label anchors, then build a flow. End inspect/fill
+// flows on Cancel/Close so nothing persists. See references/writing-tests.md.
+
+import { test, describe } from "bun:test";
+import { app, assertFlowOk } from "@ax";
+import { APP } from "../app.config";
+
+describe("__APP_NAME__ — example", () => {
+  test("the app window is reachable", async () => {
+    const r = await app(APP.windowTitle).run();
+    assertFlowOk(r);
+  });
+});

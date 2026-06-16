@@ -9,6 +9,8 @@ import {
   UnknownCommandError,
 } from "@myra/shared";
 
+import { DEMO_RUN_LOGS, demoCards } from "@/lib/conversation/demo";
+
 const CARDS_KEY = "myra-agents.dev.cards";
 const SETTINGS_KEY = "myra-agents.dev.settings";
 const SCHEDULES_KEY = "myra-agents.dev.schedules";
@@ -49,6 +51,14 @@ function writeJson<T>(key: string, value: T) {
  */
 const localStorageStore: Store = {
   async getCards() {
+    // First run (no persisted cards): seed demo conversations so the Logs /
+    // Conversation views have something to show in `bun run dev`.
+    const present = (browserStorage()?.getItem(CARDS_KEY) ?? memoryStore.get(CARDS_KEY)) != null;
+    if (!present) {
+      const seeded = demoCards();
+      writeJson(CARDS_KEY, seeded);
+      return seeded;
+    }
     const cards = readJson<KanbanCard[]>(CARDS_KEY, []);
     let changed = false;
     const counters = new Map<KanbanStatus, number>();
@@ -89,6 +99,13 @@ const localStorageStore: Store = {
 export async function browserInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   // Control commands are no-ops offline (no live log stream to throttle).
   if (cmd === "set_log_watch") return { ok: true } as T;
+  // Demo run logs (browser dev): serve the seeded stream-json transcript.
+  if (cmd === "get_run_log") {
+    const runId = args?.runId as string | undefined;
+    if (runId && runId in DEMO_RUN_LOGS) return DEMO_RUN_LOGS[runId] as T;
+    return "" as T;
+  }
+  if (cmd === "list_run_artifacts") return [] as T;
   try {
     return await dispatchData<T>(localStorageStore, cmd, args);
   } catch (error) {

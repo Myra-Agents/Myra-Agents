@@ -7,7 +7,7 @@ import { create } from "zustand";
  */
 type ShortcutStore = {
   // Persistent flag (not a nonce): survives navigation so the kanban page can
-  // consume it on mount when "New card" is triggered from another route.
+  // consume it on mount when "New task" is triggered from another route.
   pendingNewCard: boolean;
   focusSearchNonce: number;
   cancelNonce: number;
@@ -23,6 +23,7 @@ export const useShortcutStore = create<ShortcutStore>((set) => ({
   cancelNonce: 0,
   requestNewCard: () => set({ pendingNewCard: true }),
   consumeNewCard: () => set({ pendingNewCard: false }),
-  requestFocusSearch: () => set((state) => ({ focusSearchNonce: state.focusSearchNonce + 1 })),
+  requestFocusSearch: () =>
+    set((state) => ({ focusSearchNonce: state.focusSearchNonce + 1 })),
   requestCancel: () => set((state) => ({ cancelNonce: state.cancelNonce + 1 })),
 }));

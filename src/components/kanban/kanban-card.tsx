@@ -18,11 +18,17 @@ import type { KanbanCard } from "@/types/kanban";
 import { COLUMN_CONFIG } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
 
+// Statuses whose cards carry an agent run — body click opens the conversation
+// rather than the edit modal (the pencil button still edits).
+const CONVERSATION_STATUSES = new Set(["in_progress", "waiting_feedback", "awaiting_review", "done"]);
+
 interface KanbanCardProps {
   card: KanbanCard;
   onEdit: () => void;
   onTrash: () => void;
   onReview: () => void;
+  /** Open the agent conversation for this card (active/done columns). */
+  onOpenConversation?: () => void;
   onViewLogs?: () => void;
   logLines?: string[];
   schedule?: ScheduledTask;
@@ -38,6 +44,7 @@ export function KanbanCardComponent({
   onEdit,
   onTrash,
   onReview,
+  onOpenConversation,
   onViewLogs,
   logLines,
   schedule,
@@ -79,6 +86,9 @@ export function KanbanCardComponent({
     fn();
   };
 
+  // Active/done cards open the agent conversation on body click; others edit.
+  const handleBodyClick = onOpenConversation && CONVERSATION_STATUSES.has(card.status) ? onOpenConversation : onEdit;
+
   return (
     <Card
       ref={setNodeRef}
@@ -87,7 +97,7 @@ export function KanbanCardComponent({
       {...attributes}
       data-kanban-card
       size="sm"
-      onClick={isOverlay ? undefined : stop(onEdit)}
+      onClick={isOverlay ? undefined : stop(handleBodyClick)}
       className={cn(
         "group cursor-grab active:cursor-grabbing select-none transition-all duration-200",
         isDragging && !isOverlay && "opacity-30",
@@ -120,15 +130,18 @@ export function KanbanCardComponent({
           {/* Hover actions */}
           {!isOverlay && (
             <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={stop(onEdit)}
-                title={t("editCard")}
-              >
-                <PencilIcon />
-              </Button>
+              {/* Only draft tasks are editable — hide the pencil elsewhere. */}
+              {card.status === "draft" && (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={stop(onEdit)}
+                  title={t("editCard")}
+                >
+                  <PencilIcon />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-xs"
@@ -167,12 +180,14 @@ export function KanbanCardComponent({
                 {t("question")}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground italic line-clamp-2">&ldquo;{card.agentQuestion}&rdquo;</p>
+            <p data-ph-no-capture className="text-xs text-muted-foreground italic line-clamp-2">
+              &ldquo;{card.agentQuestion}&rdquo;
+            </p>
             <Button
               size="xs"
               variant="default"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={stop(onReview)}
+              onClick={stop(onOpenConversation ?? onReview)}
               className="w-full"
             >
               {t("answerFeedback")}
@@ -183,12 +198,16 @@ export function KanbanCardComponent({
         {/* Awaiting review */}
         {!isOverlay && card.status === "awaiting_review" && (
           <div className="pl-4 pt-2 border-t space-y-2">
-            {card.agentResult && <p className="text-xs text-muted-foreground line-clamp-2">{card.agentResult}</p>}
+            {card.agentResult && (
+              <p data-ph-no-capture className="text-xs text-muted-foreground line-clamp-2">
+                {card.agentResult}
+              </p>
+            )}
             <Button
               size="xs"
               variant="secondary"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={stop(onReview)}
+              onClick={stop(onOpenConversation ?? onReview)}
               className="w-full"
             >
               <ClipboardCheckIcon className="size-3" />
@@ -283,7 +302,10 @@ function InProgressBlock({ card, logLines, onViewLogs, stop }: InProgressBlockPr
       </div>
 
       {tail.length > 0 ? (
-        <div className="bg-foreground/95 text-background/85 font-mono text-[10px] leading-snug p-2 rounded max-h-20 overflow-hidden">
+        <div
+          data-ph-no-capture
+          className="bg-foreground/95 text-background/85 font-mono text-[10px] leading-snug p-2 rounded max-h-20 overflow-hidden"
+        >
           {tail.map((line, i) => (
             <div key={i} className={cn("truncate", line.startsWith("[err]") && "text-red-400")}>
               {line || "\u00a0"}

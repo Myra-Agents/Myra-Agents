@@ -87,10 +87,13 @@ export function KanbanCardContextMenu({
         <div onContextMenu={(e) => e.stopPropagation()}>{children}</div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52">
-        <ContextMenuItem onSelect={onEdit}>
-          <PencilIcon />
-          {t("editCard")}
-        </ContextMenuItem>
+        {/* Only draft tasks are editable. */}
+        {card.status === "draft" && (
+          <ContextMenuItem onSelect={onEdit}>
+            <PencilIcon />
+            {t("editCard")}
+          </ContextMenuItem>
+        )}
 
         {canLaunch && (
           <ContextMenuItem onSelect={onLaunch}>
