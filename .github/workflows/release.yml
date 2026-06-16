@@ -100,12 +100,17 @@ jobs:
           # tauri-action imports APPLE_CERTIFICATE into a temp keychain, signs
           # with APPLE_SIGNING_IDENTITY, then notarizes + staples via the Apple
           # ID + app-specific password. See SIGNING.md for how to mint these.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Sign + notarize ONLY on the hosted arm64 mac (macos-14). The
+          # x86_64 row runs on the self-hosted `myra-x64` Mac as a headless
+          # launchd service with no GUI keychain session, where `codesign`
+          # fails with `errSecInternalComponent`. Gate the Apple secrets to the
+          # arm64 target so the x86_64 build ships UNSIGNED instead of failing.
+          APPLE_CERTIFICATE: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.target == 'aarch64-apple-darwin' && secrets.APPLE_TEAM_ID || '' }}
         with:
           tagName: ${{ github.event.inputs.tag || github.ref_name }}
           releaseName: "Myra Agents __VERSION__"
