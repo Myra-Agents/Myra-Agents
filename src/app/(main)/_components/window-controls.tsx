@@ -244,11 +244,12 @@ export function HeaderLeftControls() {
   return (
     <div className="flex items-center gap-1">
       <SidebarTrigger
+        className="text-icon-primary hover:text-foreground"
         onMouseEnter={() => {
           if (isNarrow && !peek) setPeek(true);
         }}
       />
-      <SearchButton />
+      <SearchButton className="text-icon-primary hover:text-foreground" />
     </div>
   );
 }

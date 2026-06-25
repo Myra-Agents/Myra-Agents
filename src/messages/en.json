@@ -420,6 +420,67 @@
     "generatedTasks": "Generated Tasks ({selected}/{total} selected)",
     "createCards": "Create {count, plural, one {# Task} other {# Tasks}}"
   },
+  "runs": {
+    "title": "Runs",
+    "subtitle": "Lists all the running tasks",
+    "loading": "Loading…",
+    "empty": "No active runs yet.",
+    "tags": "Tags",
+    "search": "Search",
+    "filter": "Filter",
+    "showing": "Showing {shown} of {total}",
+    "needsYouHint": "“Needs you” lists the tasks where you need to steer the Agent. The idea is to reduce the “Needs you” tasks so the Agents can run without you.",
+    "view": {
+      "list": "List",
+      "kanban": "Kanban"
+    },
+    "summary": {
+      "backlog": {
+        "label": "Backlog",
+        "sub": "Next tasks"
+      },
+      "running": {
+        "label": "Running",
+        "sub": "In progress"
+      },
+      "needsYou": {
+        "label": "Needs you",
+        "sub": "Feedback - Review"
+      },
+      "done": {
+        "label": "Done",
+        "sub": "Task done"
+      }
+    },
+    "footer": "Showing {shown} of {total} — click to see all",
+    "columns": {
+      "task": "Task name",
+      "triggered": "Triggered",
+      "status": "Status",
+      "duration": "Duration",
+      "agent": "Agent"
+    },
+    "rowMenu": {
+      "viewLogs": "View logs",
+      "openKanban": "Open in Kanban",
+      "clearSearch": "Clear search",
+      "view": "View",
+      "edit": "Edit"
+    },
+    "emptyFiltered": "No runs in this status.",
+    "searchPlaceholder": "Search task, agent, status…",
+    "noResults": "No runs match your search.",
+    "sort": {
+      "label": "Sort",
+      "asc": "Ascending",
+      "desc": "Descending",
+      "clear": "Clear sort"
+    },
+    "filterBy": "Filter by",
+    "clearColumnFilter": "Clear filter",
+    "columnMenu": "{column} options",
+    "clearFilters": "Clear filters"
+  },
   "logs": {
     "title": "Logs & History",
     "description": "View agent run history and output logs",

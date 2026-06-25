@@ -1,4 +1,4 @@
-import { Calendar, House, Kanban, type LucideIcon, ScrollText } from "lucide-react";
+import { Activity, Calendar, House, Kanban, type LucideIcon, ScrollText } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -57,6 +57,16 @@ export const sidebarItems: NavGroup[] = [
     id: 2,
     label: "Workspace",
     items: [
+      {
+        // Temporary "Runs" view from the new UI refactor (Figma) — live overview
+        // of running tasks with status summary cards. Remove/merge once the
+        // redesign lands fully.
+        title: "Runs",
+        url: "/runs",
+        icon: Activity,
+        description: "Live overview of running tasks — counts by status and the active run list.",
+        isNew: true,
+      },
       {
         title: "Kanban",
         url: "/kanban",

@@ -420,6 +420,67 @@
     "generatedTasks": "Tâches générées ({selected}/{total} sélectionnées)",
     "createCards": "Créer {count, plural, one {# tâche} other {# tâches}}"
   },
+  "runs": {
+    "title": "Runs",
+    "subtitle": "Liste toutes les tâches en cours",
+    "loading": "Chargement…",
+    "empty": "Aucun run actif pour l’instant.",
+    "tags": "Tags",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "showing": "Affichage de {shown} sur {total}",
+    "needsYouHint": "« Needs you » liste les tâches où vous devez guider l’Agent. L’idée est de réduire les tâches « Needs you » pour que les Agents puissent tourner sans vous.",
+    "view": {
+      "list": "Liste",
+      "kanban": "Kanban"
+    },
+    "summary": {
+      "backlog": {
+        "label": "Backlog",
+        "sub": "Prochaines tâches"
+      },
+      "running": {
+        "label": "En cours",
+        "sub": "En progression"
+      },
+      "needsYou": {
+        "label": "Needs you",
+        "sub": "Retour - Revue"
+      },
+      "done": {
+        "label": "Terminé",
+        "sub": "Tâche terminée"
+      }
+    },
+    "footer": "Affichage de {shown} sur {total} — voir tout",
+    "columns": {
+      "task": "Tâche",
+      "triggered": "Déclenché",
+      "status": "Statut",
+      "duration": "Durée",
+      "agent": "Agent"
+    },
+    "rowMenu": {
+      "viewLogs": "Voir les logs",
+      "openKanban": "Ouvrir dans le Kanban",
+      "clearSearch": "Effacer la recherche",
+      "view": "Voir",
+      "edit": "Modifier"
+    },
+    "emptyFiltered": "Aucun run dans ce statut.",
+    "searchPlaceholder": "Rechercher tâche, agent, statut…",
+    "noResults": "Aucun run ne correspond à la recherche.",
+    "sort": {
+      "label": "Trier",
+      "asc": "Croissant",
+      "desc": "Décroissant",
+      "clear": "Effacer le tri"
+    },
+    "filterBy": "Filtrer par",
+    "clearColumnFilter": "Effacer le filtre",
+    "columnMenu": "Options {column}",
+    "clearFilters": "Effacer les filtres"
+  },
   "logs": {
     "title": "Journaux et historique",
     "description": "Consultez l'historique des exécutions et les logs des agents",
