@@ -4,27 +4,27 @@ value: myra
 */
 
 :root[data-theme-preset="myra"] {
-  /* Cursor-inspired warm light theme — bg #f7f7f4, ink #26251e, orange brand. */
+  /* Synced from Figma "Theme" variables (theme.json) — light mode. Warm paper #f7f7f4, ink #26251e. */
   --radius: 0.375rem;
   --background: #f7f7f4;
   --foreground: #26251e;
   --card: #ffffff;
   --card-foreground: #26251e;
-  --popover: #ffffff;
+  --popover: #dadada;
   --popover-foreground: #26251e;
   --primary: #26251e;
   --primary-foreground: #f7f7f4;
   --secondary: #ebeae5;
   --secondary-foreground: #26251e;
   --muted: #f0efeb;
-  --muted-foreground: color-mix(in oklab, #26251e 55%, transparent);
+  --muted-foreground: #26251e8c;
   --accent: #ebeae5;
   --accent-foreground: #26251e;
   --destructive: #cf2d56;
   --destructive-foreground: #ffffff;
-  --brand: #f54e00;
-  --brand-foreground: #ffffff;
-  --border: #e6e5e0;
+  --brand: #ffffff;
+  --brand-foreground: #000000;
+  --border: #d3d4d5;
   --input: #d7d6d5;
   --ring: #3b82f6;
   --chart-1: #3b82f6;
@@ -34,11 +34,11 @@ value: myra
   --chart-5: #db704b;
   --sidebar: #f2f1ed;
   --sidebar-foreground: #26251e;
-  --sidebar-primary: #f54e00;
+  --sidebar-primary: #0097f5;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #ebeae5;
   --sidebar-accent-foreground: #26251e;
-  --sidebar-border: #e6e5e0;
+  --sidebar-border: #e5e7eb;
   --sidebar-ring: #3b82f6;
   --font-sans: var(--font-lato);
   --font-mono: var(--font-lato);
@@ -54,27 +54,27 @@ value: myra
 }
 
 .dark:root[data-theme-preset="myra"] {
-  /* Cursor app dark — canvas #141414, cards #181818, ink #e4e4e4, blue focus. */
+  /* Synced from Figma "Theme" variables (theme.json) — dark mode. Canvas #141414, cards #181818, ink #e4e4e4. */
   --background: #141414;
   --foreground: #e4e4e4;
   --card: #181818;
   --card-foreground: #e4e4e4;
-  --popover: #181818;
-  --popover-foreground: #e4e4e4;
+  --popover: #1f1f1f;
+  --popover-foreground: #d4d4d4;
   --primary: #e4e4e4;
-  --primary-foreground: #181818;
-  --secondary: color-mix(in oklab, #e4e4e4 8%, transparent);
+  --primary-foreground: #141414;
+  --secondary: #e4e4e414;
   --secondary-foreground: #e4e4e4;
-  --muted: color-mix(in oklab, #e4e4e4 6%, transparent);
-  --muted-foreground: color-mix(in oklab, #e4e4e4 70%, transparent);
-  --accent: color-mix(in oklab, #e4e4e4 8%, transparent);
+  --muted: #e4e4e40f;
+  --muted-foreground: #e4e4e4b3;
+  --accent: #e4e4e414;
   --accent-foreground: #e4e4e4;
   --destructive: #e34671;
   --destructive-foreground: #ffffff;
   --brand: #f54e00;
   --brand-foreground: #ffffff;
-  --border: color-mix(in oklab, #e4e4e4 12%, transparent);
-  --input: color-mix(in oklab, #e4e4e4 12%, transparent);
+  --border: #e4e4e41f;
+  --input: #e4e4e41f;
   --ring: #5da1e5;
   --chart-1: #5da1e5;
   --chart-2: #3fa266;
@@ -83,11 +83,11 @@ value: myra
   --chart-5: #d08770;
   --sidebar: #141414;
   --sidebar-foreground: #e4e4e4;
-  --sidebar-primary: #f54e00;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: color-mix(in oklab, #e4e4e4 8%, transparent);
+  --sidebar-primary: #0097f5;
+  --sidebar-primary-foreground: #e4e4e4f0;
+  --sidebar-accent: #e4e4e414;
   --sidebar-accent-foreground: #e4e4e4;
-  --sidebar-border: color-mix(in oklab, #e4e4e4 10%, transparent);
+  --sidebar-border: #252525;
   --sidebar-ring: #5da1e5;
   --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
   --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);

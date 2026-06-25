@@ -10,3 +10,4 @@ Schedule:
 - Self improve frontend based on posthog A/B testing
 - Surveille la prod et regarde les logs s'il y a un crash (sentry / posthog) ou un downtime (uptime)
 - Build in public skill (invoked each new feature/release)
+- Prune old code (deprecated ones)

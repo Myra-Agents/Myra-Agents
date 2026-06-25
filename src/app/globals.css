@@ -89,6 +89,13 @@ These serve as the fallback; there is no separate default.css file. */
   --font-mono: var(--font-geist-mono);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+
+  /* App chrome dimensions (Figma theme.json float vars) — invariant across
+     presets, so they live here, not in a preset. */
+  --app-sidebar-width: 280px;
+  --mac-top-height: 42px;
+  --window-radius: 15px;
+  --kanban-radius: 10px;
 }
 
 .dark {

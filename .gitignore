@@ -45,3 +45,4 @@ sign/*.p12
 scripts/asc-metadata.json
 .playwright-cli
 next-env.d.ts
+build-in-public
