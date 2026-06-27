@@ -140,3 +140,91 @@ jobs:
           }
           Remove-Item C:\smoke -Recurse -Force -ErrorAction SilentlyContinue
           Write-Host "cleanup done"
+
+  linux:
+    name: Linux · install + run
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: [self-hosted, myra-ubuntu-vm]
+    timeout-minutes: 15
+    # One-time runner prereqs (no sudo at job time): webkit2gtk-4.1, xvfb,
+    # imagemagick, dbus-x11. The Tauri GUI links the SYSTEM webkit2gtk, which
+    # falls back to software GL under Xvfb (the AppImage's bundled webkit aborts
+    # on EGL headless, so we use the .deb payload instead).
+    env:
+      DISPLAY: ":97"
+    steps:
+      - name: Resolve release + download .deb
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_TAG:-}" ]; then TAG="$RELEASE_TAG"
+          elif [ -n "${INPUT_VERSION:-}" ] && [ "$INPUT_VERSION" != latest ]; then TAG="$INPUT_VERSION"
+          else TAG=""; fi
+          # Ubuntu has no curl; use python3 (always present) for the API + download.
+          python3 - "$TAG" <<'PY'
+          import json, os, sys, urllib.request
+          tag = sys.argv[1]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          tok = os.environ["GH_TOKEN"]
+          base = f"https://api.github.com/repos/{repo}/releases"
+          url = f"{base}/tags/{tag}" if tag else f"{base}/latest"
+          req = urllib.request.Request(url, headers={"Authorization": f"Bearer {tok}", "User-Agent": "myra-ci", "Accept": "application/vnd.github+json"})
+          rel = json.load(urllib.request.urlopen(req))
+          asset = next((a for a in rel["assets"] if a["name"].endswith("_amd64.deb")), None)
+          if not asset: sys.exit(f"no amd64 .deb asset in {rel['tag_name']}")
+          deb = os.path.join(os.environ["RUNNER_TEMP"], "myra.deb")
+          urllib.request.urlretrieve(asset["browser_download_url"], deb)
+          print(f"downloaded {asset['name']} -> {deb}")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"DEB={deb}\nTAG={rel['tag_name']}\n")
+          PY
+
+      - name: Extract (no root) + launch + assert
+        shell: bash
+        run: |
+          set -euo pipefail
+          EX="$RUNNER_TEMP/myra-ex"
+          rm -rf "$EX"; dpkg-deb -x "$DEB" "$EX"          # extract payload, no sudo
+          APP="$EX/usr/bin/app"
+          test -x "$APP" || { echo "no app binary in .deb"; exit 1; }
+
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/xdg"; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
+          export WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+          pkill -f myra-ex 2>/dev/null || true; pkill Xvfb 2>/dev/null || true; sleep 1
+          Xvfb "$DISPLAY" -screen 0 1280x800x24 >"$RUNNER_TEMP/xvfb.log" 2>&1 &
+          sleep 3
+          dbus-run-session -- "$APP" >"$RUNNER_TEMP/app.log" 2>&1 &
+          sleep 16
+
+          echo "::group::app.log"; tail -20 "$RUNNER_TEMP/app.log" || true; echo "::endgroup::"
+          if ! pgrep -f "myra-ex/usr/bin/app" >/dev/null; then echo "app process not running (crash)"; exit 1; fi
+          echo "APP OK  pid=$(pgrep -f 'myra-ex/usr/bin/app' | head -1)"
+          if pgrep -f "myra-ex/usr/bin/myra-server" >/dev/null; then echo "SIDECAR OK  pid=$(pgrep -f 'myra-ex/usr/bin/myra-server' | head -1)"; else echo "::warning::sidecar myra-server not running"; fi
+
+      - name: Screenshot (best-effort)
+        if: always()
+        shell: bash
+        run: |
+          export DISPLAY="${DISPLAY:-:97}"
+          import -window root "$RUNNER_TEMP/smoke-linux.png" 2>/dev/null && echo "captured" || echo "::warning::screenshot failed"
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ env.TAG }}-linux
+          path: ${{ runner.temp }}/smoke-linux.png
+          if-no-files-found: warn
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: |
+          pkill -f myra-ex 2>/dev/null || true
+          pkill Xvfb 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/myra-ex" "$RUNNER_TEMP/myra.deb" 2>/dev/null || true
+          echo "cleanup done"
