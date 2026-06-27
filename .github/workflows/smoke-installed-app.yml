@@ -228,3 +228,77 @@ jobs:
           pkill Xvfb 2>/dev/null || true
           rm -rf "$RUNNER_TEMP/myra-ex" "$RUNNER_TEMP/myra.deb" 2>/dev/null || true
           echo "cleanup done"
+
+  macos:
+    name: macOS · install + serve (headless core)
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: [self-hosted, myra-mac-vm]
+    timeout-minutes: 15
+    # NOTE: this is a HEADLESS CORE smoke, not a GUI test. The runner is a
+    # LaunchDaemon (Background session) with no Aqua login, so a Tauri GUI window
+    # can't be shown. Instead we verify the shipped .dmg installs (mounts +
+    # extracts), the .app bundle is code-signed + valid, and its bundled
+    # myra-server sidecar runs headlessly and serves. (Driving the GUI would
+    # need a kept-alive interactive login — see the PR notes.)
+    steps:
+      - name: Resolve release + download .dmg
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_TAG:-}" ]; then TAG="$RELEASE_TAG"
+          elif [ -n "${INPUT_VERSION:-}" ] && [ "$INPUT_VERSION" != latest ]; then TAG="$INPUT_VERSION"
+          else TAG=""; fi
+          case "$(uname -m)" in arm64) ARCH=aarch64 ;; *) ARCH=x64 ;; esac
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
+          url="$api/latest"; [ -n "$TAG" ] && url="$api/tags/$TAG"
+          json=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: myra-ci" "$url")
+          tag=$(printf '%s' "$json" | /usr/bin/python3 -c 'import sys,json;print(json.load(sys.stdin)["tag_name"])')
+          dl=$(printf '%s' "$json" | /usr/bin/python3 -c "import sys,json;a=[x for x in json.load(sys.stdin)['assets'] if x['name'].endswith('_${ARCH}.dmg')];print(a[0]['browser_download_url'] if a else '')")
+          [ -n "$dl" ] || { echo "no _${ARCH}.dmg asset in $tag"; exit 1; }
+          dmg="$RUNNER_TEMP/myra.dmg"; curl -fsSL -o "$dmg" "$dl"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"; echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "downloaded $dl"
+
+      - name: Mount + extract + verify bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mnt="$RUNNER_TEMP/mnt"; rm -rf "$mnt" "$RUNNER_TEMP/Myra.app"; mkdir -p "$mnt"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" >/dev/null
+          src=$(find "$mnt" -maxdepth 1 -name '*.app' | head -1)
+          cp -R "$src" "$RUNNER_TEMP/Myra.app"
+          hdiutil detach "$mnt" >/dev/null || true
+          APP="$RUNNER_TEMP/Myra.app"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          echo "version: $(defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString)"
+          codesign --verify --verbose=1 "$APP" 2>&1 | tail -1
+          test -x "$APP/Contents/MacOS/myra-server" || { echo "no bundled sidecar"; exit 1; }
+
+      - name: Run sidecar headless + assert it serves
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkill myra-server 2>/dev/null || true; sleep 1
+          log="$RUNNER_TEMP/sidecar.log"
+          nohup "$APP/Contents/MacOS/myra-server" >"$log" 2>&1 &
+          for i in $(seq 1 15); do sleep 2; grep -qE 'http://127\.0\.0\.1:[0-9]+' "$log" && break; done
+          echo "::group::sidecar.log"; cat "$log"; echo "::endgroup::"
+          pgrep -f 'Myra.app/Contents/MacOS/myra-server' >/dev/null || { echo "sidecar not running"; exit 1; }
+          port_url=$(grep -oE 'http://127\.0\.0\.1:[0-9]+' "$log" | head -1)
+          [ -n "$port_url" ] || { echo "sidecar never reported a listen address"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$port_url" || echo 000)
+          echo "SERVE OK  $port_url -> HTTP $code"
+          [ "$code" != 000 ] || { echo "sidecar port not reachable"; exit 1; }
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: |
+          pkill myra-server 2>/dev/null || true
+          hdiutil detach "$RUNNER_TEMP/mnt" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/Myra.app" "$RUNNER_TEMP/myra.dmg" 2>/dev/null || true
+          echo "cleanup done"
