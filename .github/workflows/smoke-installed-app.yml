@@ -1,0 +1,142 @@
+# Post-release smoke test: install the published Windows build on the self-hosted
+# `myra-win-vm` runner (a real Windows 11 VM, see Myrastack runner.sh / the cergy
+# remote lab) and assert the app actually launches and stays up — not just that
+# the installer ran. Complements release.yml (which BUILDS on windows-latest);
+# this VERIFIES the shipped artifact installs + runs on a clean-ish Windows box.
+#
+# SECURITY: self-hosted runners must never execute untrusted code from forks.
+# This workflow only fires on workflow_dispatch and on our own published
+# releases (tag `v*`) — never on pull_request. Do not add a pull_request trigger.
+name: Smoke test (installed app)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag to test (e.g. v0.2.1), or "latest"'
+        default: "latest"
+        required: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows · install + run
+    # Only app releases (v*) — skip server-v* / other tags. Always run on manual dispatch.
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: [self-hosted, myra-win-vm]
+    timeout-minutes: 20
+    steps:
+      - name: Resolve release + download MSI
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = if ($env:RELEASE_TAG) { $env:RELEASE_TAG }
+                 elseif ($env:INPUT_VERSION -and $env:INPUT_VERSION -ne 'latest') { $env:INPUT_VERSION }
+                 else { '' }
+          $hdr = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'myra-ci'; Accept = 'application/vnd.github+json' }
+          $api = "https://api.github.com/repos/${{ github.repository }}/releases"
+          $rel = if ($tag) { Invoke-RestMethod "$api/tags/$tag" -Headers $hdr } else { Invoke-RestMethod "$api/latest" -Headers $hdr }
+          Write-Host "Testing release: $($rel.tag_name)"
+          $asset = $rel.assets | Where-Object { $_.name -match '_x64_.*\.msi$' } | Select-Object -First 1
+          if (-not $asset) { throw "no x64 .msi asset found in release $($rel.tag_name)" }
+          $msi = Join-Path $env:RUNNER_TEMP 'myra.msi'
+          Write-Host "Downloading $($asset.name) ..."
+          Invoke-WebRequest $asset.browser_download_url -OutFile $msi
+          "MSI=$msi"            | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+          "TAG=$($rel.tag_name)" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+
+      - name: Install (silent MSI)
+        shell: powershell
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'msi.log'
+          $p = Start-Process msiexec -ArgumentList '/i', "$env:MSI", '/qn', '/norestart', '/l*v', "$log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log -Tail 40 }; throw "msiexec install failed: $($p.ExitCode)" }
+          Write-Host "installed $env:TAG"
+
+      - name: Launch + assert running
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Resolve the installed exe via its Start Menu shortcut (name-agnostic:
+          # the Tauri binary is `app.exe`, productName "Myra Agents").
+          $lnk = Get-ChildItem `
+            "C:\ProgramData\Microsoft\Windows\Start Menu\Programs", `
+            "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" `
+            -Recurse -Filter '*Myra*.lnk' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $lnk) { throw "no 'Myra*' Start Menu shortcut after install" }
+          $exe  = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk.FullName).TargetPath
+          $proc = [System.IO.Path]::GetFileNameWithoutExtension($exe)
+          Write-Host "exe=$exe  proc=$proc"
+
+          # The runner is a service in session 0; a GUI app launched there has no
+          # desktop. Launch into the interactive console session via schtasks /it.
+          # A no-space .cmd wrapper avoids schtasks's broken quoting on the spaced
+          # install path ("...\Myra Agents\app.exe").
+          New-Item -ItemType Directory -Force C:\smoke | Out-Null
+          "start `"`" `"$exe`"" | Set-Content -Encoding ascii C:\smoke\launch.cmd
+          schtasks /create /tn myrasmoke /tr 'C:\smoke\launch.cmd' /sc once /st 23:59 /it /ru admin /f | Out-Null
+          schtasks /run /tn myrasmoke | Out-Null
+
+          # Poll up to 30s for the process to appear, then confirm it survives.
+          $app = $null
+          for ($i = 0; $i -lt 15; $i++) { Start-Sleep 2; $app = Get-Process $proc -ErrorAction SilentlyContinue | Select-Object -First 1; if ($app) { break } }
+          if (-not $app) { throw "app process '$proc' never started" }
+          Start-Sleep 6
+          $app = Get-Process $proc -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $app) { throw "app exited shortly after launch (crash on startup)" }
+          Write-Host "APP OK  pid=$($app.Id)  responding=$($app.Responding)"
+
+          $side = Get-Process myra-server -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($side) { Write-Host "SIDECAR OK  pid=$($side.Id)" } else { Write-Warning "sidecar 'myra-server' not running" }
+
+      - name: Screenshot (best-effort)
+        if: always()
+        shell: powershell
+        run: |
+          @'
+          Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+          $b  = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bm = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bm).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bm.Save("C:\smoke\smoke.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          '@ | Set-Content C:\smoke\cap.ps1
+          schtasks /create /tn capsmoke /tr 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\smoke\cap.ps1' /sc once /st 23:58 /it /ru admin /f | Out-Null
+          schtasks /run /tn capsmoke | Out-Null
+          Start-Sleep 5
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ env.TAG }}-windows
+          path: C:\smoke\smoke.png
+          if-no-files-found: warn
+
+      - name: Cleanup (uninstall + kill)
+        if: always()
+        shell: powershell
+        run: |
+          Get-Process app, myra-server -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          schtasks /delete /tn myrasmoke /f 2>$null | Out-Null
+          schtasks /delete /tn capsmoke /f 2>$null | Out-Null
+          $entries = Get-ItemProperty `
+            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", `
+            "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+            -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'Myra' }
+          foreach ($e in $entries) {
+            if ($e.UninstallString -match 'MsiExec') {
+              Start-Process msiexec -ArgumentList '/x', $e.PSChildName, '/qn', '/norestart' -Wait
+            } elseif ($e.UninstallString -match 'uninstall\.exe') {
+              $u = ($e.UninstallString -replace '"', ''); if (Test-Path $u) { Start-Process $u -ArgumentList '/S' -Wait }
+            }
+          }
+          Remove-Item C:\smoke -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "cleanup done"
