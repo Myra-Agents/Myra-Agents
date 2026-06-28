@@ -18,6 +18,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 ### Fixed
 
 - Prevent native drag ghost on images and links inside the sidebar in the Tauri desktop app (`-webkit-user-drag: none` on `body`, `img`, and `a`).
+- **Windows title bar** — minimize/maximize/close buttons now span the full header height on hover (Windows 11-style flush coverage).
+- **Windows/Linux window** — removed rounded corners; window now has sharp edges on Windows and Linux.
 
 ---
 
