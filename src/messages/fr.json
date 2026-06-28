@@ -574,7 +574,15 @@
         "revoked": "Instance révoquée.",
         "revokeFailed": "Révocation de l'instance impossible.",
         "osUnix": "macOS / Linux",
-        "osWindows": "Windows"
+        "osWindows": "Windows",
+        "selfHostedTitle": "Hub auto-hébergé",
+        "selfHostedDescription": "Connectez cette app à votre hub on-prem. Collez son URL et son token d'accès ; chaque machine enrôlée apparaît comme une origine du tableau.",
+        "urlField": "URL du hub",
+        "labelPlaceholder": "Mon hub",
+        "tokenField": "Token d'accès",
+        "tokenPlaceholder": "Collez MYRA_HUB_TOKEN",
+        "invalidUrl": "Saisissez une URL complète (https://…).",
+        "tokenRequired": "Collez le token d'accès du hub."
       },
       "localServer": {
         "title": "Serveur local",
