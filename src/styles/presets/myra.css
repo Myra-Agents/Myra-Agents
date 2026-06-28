@@ -58,7 +58,8 @@ value: myra
   /* Opaque icon ink composited over the warm-paper surface (no stroke doubling). */
   --icon-primary: #43423c;
   --icon-tertiary: #65645e;
-  --card-background: #ffffff;
+  --card-background: #fcfcfc;
+  --card-background-secondary: #ebeae4;
   --border-cards: #26251e0f;
   --task-status-backlog: #888780;
   --task-status-running: #ff6900;
@@ -118,6 +119,7 @@ value: myra
   --icon-primary: #c7c7c7;
   --icon-tertiary: #a6a6a6;
   --card-background: #181818;
+  --card-background-secondary: #1f1f1f;
   --border-cards: #e4e4e40a;
   --task-status-backlog: #888780;
   --task-status-running: #ff6900;

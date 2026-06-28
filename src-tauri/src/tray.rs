@@ -44,9 +44,10 @@ impl TrayState {
 /// and (optionally) trigger the new-task flow.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct TrayNavigate {
-    path: String,
-    new_task: bool,
+pub struct TrayNavigate {
+    pub path: String,
+    pub new_task: bool,
+    pub new_schedule: bool,
 }
 
 /// Build the system tray: left-click toggles the popover, right-click opens a
@@ -239,7 +240,7 @@ pub fn hide_tray_popover(app: AppHandle) {
 #[tauri::command]
 pub fn open_main(app: AppHandle, path: String, new_task: bool) {
     show_window(&app);
-    let _ = app.emit("tray-navigate", TrayNavigate { path, new_task });
+    let _ = app.emit("tray-navigate", TrayNavigate { path, new_task, new_schedule: false });
     if let Some(w) = app.get_webview_window(POPOVER_LABEL) {
         let _ = w.hide();
     }

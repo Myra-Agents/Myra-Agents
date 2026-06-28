@@ -13,6 +13,7 @@ import { useShortcutStore } from "@/stores/shortcut-store";
 interface TrayNavigate {
   path: string;
   newTask: boolean;
+  newSchedule: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ interface TrayNavigate {
 export function TrayActionListener() {
   const router = useRouter();
   const requestNewCard = useShortcutStore((s) => s.requestNewCard);
+  const requestNewSchedule = useShortcutStore((s) => s.requestNewSchedule);
 
   useEffect(() => {
     // The tray only exists in the desktop shell; in a plain browser the Tauri
@@ -33,11 +35,12 @@ export function TrayActionListener() {
     void listen<TrayNavigate>("tray-navigate", ({ payload }) => {
       router.push(payload.path);
       if (payload.newTask) requestNewCard();
+      if (payload.newSchedule) requestNewSchedule();
     }).then((un) => {
       unlisten = un;
     });
     return () => unlisten?.();
-  }, [router, requestNewCard]);
+  }, [router, requestNewCard, requestNewSchedule]);
 
   return null;
 }

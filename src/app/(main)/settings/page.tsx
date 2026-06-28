@@ -1,8 +1,7 @@
 "use client";
 
-import { type ChangeEvent, useCallback, useRef, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import { isTauri } from "@tauri-apps/api/core";
 import {
   CheckCircle2Icon,
   CopyIcon,
@@ -24,7 +23,6 @@ import { toast } from "sonner";
 import { AgentOptions } from "@/components/agents/agent-options";
 import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
-import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { LocalModelsPanel } from "@/components/settings/local-models-panel";
 // User connection disabled — hub status, remote access and cloud sync are off.
 // import { HubStatusCard } from "@/components/settings/hub-status-card";
@@ -58,6 +56,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
 import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
+import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
@@ -156,7 +155,7 @@ function AgentPresetCard({
           <AgentStatusBadge {...bin} />
           {storedResult && (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium text-[10px] ${
                 storedResult.status === "passed"
                   ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                   : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
@@ -225,7 +224,7 @@ function AgentPresetCard({
           </div>
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">{t("agents.advancedArgs")}</Label>
+              <Label className="text-muted-foreground text-xs">{t("agents.advancedArgs")}</Label>
               <Switch checked={showAdvancedArgs} onCheckedChange={setShowAdvancedArgs} className="scale-75" />
             </div>
             {showAdvancedArgs && (
@@ -272,7 +271,7 @@ function AgentPresetCard({
                 {t("agents.testCommand")}
               </span>
             </summary>
-            <p className="mt-1 rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] break-all">
+            <p className="mt-1 break-all rounded-md bg-muted px-2 py-1.5 font-mono text-[11px]">
               {[
                 preset.binary,
                 (preset.argsTemplate ?? "{prompt}").replace("{prompt}", '"hello"'),
@@ -345,6 +344,19 @@ export default function SettingsPage() {
   const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
   const [dataAction, setDataAction] = useState<DataAction | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Home folder is stored app-locally (not in server-persisted AppSettings) and
+  // saved immediately on change. Empty = the OS home directory.
+  const [homeFolder, setHomeFolderState] = useState("");
+  const [osHome, setOsHome] = useState("");
+  useEffect(() => {
+    setHomeFolderState(getHomeFolderSetting());
+    void osHomeDir().then(setOsHome);
+  }, []);
+  const updateHomeFolder = useCallback((v: string) => {
+    setHomeFolderState(v);
+    setHomeFolderSetting(v);
+  }, []);
 
   const current = draft ?? settings;
 
@@ -620,6 +632,12 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t("preferences.homeFolder")}</Label>
+                <WorkingDirField value={homeFolder} onChange={updateHomeFolder} placeholder={osHome || "~"} />
+                <p className="text-muted-foreground text-xs">{t("preferences.homeFolderHint")}</p>
               </div>
 
               <div className="rounded-lg border border-dashed px-4 py-3 text-muted-foreground text-sm">

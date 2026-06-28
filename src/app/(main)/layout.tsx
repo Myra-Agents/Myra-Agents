@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { GlobalShortcuts } from "./_components/global-shortcuts";
 import { HEADER_ACTIONS_ID } from "./_components/header-actions";
 import { HeaderBreadcrumb } from "./_components/header-breadcrumb";
+import { NavHistoryControls } from "./_components/nav-history-controls";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
@@ -71,6 +72,7 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
             <div className="flex items-center gap-2">
               <MacHeaderControlsSpacer />
               <HeaderLeftControls />
+              <NavHistoryControls />
             </div>
             <WindowDragRegion />
             {/* Centered breadcrumb — flanked by drag regions so it stays centered. */}

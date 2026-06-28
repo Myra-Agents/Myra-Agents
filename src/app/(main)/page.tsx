@@ -182,7 +182,7 @@ function StatsSection({ cards }: { cards: KanbanCard[] }) {
     failed: { label: t("failed"), color: "var(--destructive)" },
   } satisfies ChartConfig;
   const costConfig = {
-    cost: { label: t("cost"), color: "var(--chart-2)" },
+    cost: { label: t("cost", { days: KPI_DAYS }), color: "var(--chart-2)" },
   } satisfies ChartConfig;
 
   return (

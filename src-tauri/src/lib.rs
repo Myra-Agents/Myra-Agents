@@ -13,7 +13,7 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
-use tray::{hide_tray_popover, open_main, quit_app, TrayState};
+use tray::{hide_tray_popover, open_main, quit_app, TrayNavigate, TrayState};
 
 /// Buffer for a `myra://auth/callback?code=…` that arrives before the webview's
 /// listener is ready (the deep link can launch/focus the app first). The
@@ -346,6 +346,107 @@ fn get_sidecar_port(state: tauri::State<'_, SidecarState>) -> u16 {
     *state.port.lock().unwrap()
 }
 
+/// Git branches of a working directory: the checked-out branch plus all local
+/// and remote-tracking refs. Used by the schedule editor's branch picker.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GitBranches {
+    /// True when `path` is inside a git work tree (false → fall back gracefully).
+    is_git: bool,
+    /// Currently checked-out branch (None when detached HEAD / not git).
+    current: Option<String>,
+    /// Local branches (`refs/heads`).
+    local: Vec<String>,
+    /// Remote-tracking branches (`refs/remotes`, e.g. `origin/main`).
+    remote: Vec<String>,
+}
+
+/// Inspect a folder's git branches. Returns `is_git: false` rather than erroring
+/// when the path is not a git work tree, so the UI degrades cleanly.
+#[tauri::command]
+fn git_branches(path: String) -> Result<GitBranches, String> {
+    let run = |args: &[&str]| -> Result<String, String> {
+        let out = StdCommand::new("git")
+            .arg("-C")
+            .arg(&path)
+            .args(args)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    };
+
+    // Not a git work tree → graceful empty result.
+    let inside = run(&["rev-parse", "--is-inside-work-tree"]).map(|s| s == "true").unwrap_or(false);
+    if !inside {
+        return Ok(GitBranches { is_git: false, current: None, local: vec![], remote: vec![] });
+    }
+
+    let split = |s: String| {
+        s.lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+    };
+    let current = run(&["rev-parse", "--abbrev-ref", "HEAD"]).ok().filter(|s| !s.is_empty() && s != "HEAD");
+    let local = run(&["for-each-ref", "--format=%(refname:short)", "refs/heads"]).map(split).unwrap_or_default();
+    let mut remote = run(&["for-each-ref", "--format=%(refname:short)", "refs/remotes"]).map(split).unwrap_or_default();
+    // Keep real remote branches (`origin/main`); drop the symbolic remote HEAD,
+    // which `%(refname:short)` collapses to the bare remote name (e.g. `origin`).
+    remote.retain(|r| r.contains('/') && !r.ends_with("/HEAD"));
+
+    Ok(GitBranches { is_git: true, current, local, remote })
+}
+
+/// The OS user home directory — the schedule folder picker's default base when
+/// no custom "home folder" is configured.
+#[tauri::command]
+fn home_dir(app: AppHandle) -> Result<String, String> {
+    app.path()
+        .home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+/// Immediate subdirectories of `path` (absolute paths, dotfiles skipped, sorted).
+/// Powers the folder picker's list of working folders under the home folder.
+#[tauri::command]
+fn list_subfolders(path: String) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let name = entry.file_name().to_string_lossy().to_string();
+        if is_dir && !name.starts_with('.') {
+            out.push(entry.path().to_string_lossy().to_string());
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
+/// Create a new local branch (from the current HEAD) in a git work tree.
+#[tauri::command]
+fn git_create_branch(path: String, name: String) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("branch name is empty".into());
+    }
+    // `--` separates the branch name from option parsing (safety).
+    let out = StdCommand::new("git")
+        .arg("-C")
+        .arg(&path)
+        .args(["branch", "--", name])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    Ok(())
+}
+
 /// Re-resolve the local backend (kill any ephemeral child first, then adopt the
 /// service or re-spawn). Returns the new port. Called by the frontend after
 /// enabling/disabling remote access.
@@ -587,6 +688,83 @@ fn setup_deep_link(handle: &AppHandle) {
     });
 }
 
+fn build_app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
+    use tauri::menu::{Menu, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
+
+    // Start from the OS default menu so macOS adds Fill / Center /
+    // Move & Resize / Bring All to Front automatically to the Window submenu.
+    let menu = Menu::default(app)?;
+
+    let settings = MenuItemBuilder::with_id("settings", "Settings…")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
+    let new_schedule = MenuItemBuilder::with_id("new_schedule", "New Patrol")
+        .accelerator("CmdOrCtrl+Shift+N")
+        .build(app)?;
+    let sep = PredefinedMenuItem::separator(app)?;
+
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::menu::MenuItemKind;
+        let items = menu.items()?;
+
+        // items[0] = "Myra Agents" app submenu. macOS convention: Settings
+        // goes right after the first separator (position 2 = after About + sep).
+        if let Some(MenuItemKind::Submenu(app_sub)) = items.first() {
+            app_sub.insert_items(&[&settings, &sep], 2)?;
+        }
+
+        // Find the existing "File" submenu from Menu::default() and prepend
+        // New Schedule to it. If absent (unlikely), create one at position 1.
+        let mut has_file = false;
+        for item in &items {
+            if let MenuItemKind::Submenu(sub) = item {
+                if sub.text().unwrap_or_default().eq_ignore_ascii_case("file") {
+                    let sep2 = PredefinedMenuItem::separator(app)?;
+                    sub.prepend_items(&[&new_schedule, &sep2])?;
+                    has_file = true;
+                    break;
+                }
+            }
+        }
+        if !has_file {
+            let file_menu = SubmenuBuilder::new(app, "File")
+                .item(&new_schedule)
+                .separator()
+                .close_window()
+                .build()?;
+            menu.insert(&file_menu, 1)?;
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Prepend a File submenu; Settings goes inside it alongside Quit.
+        let file_menu = SubmenuBuilder::new(app, "File")
+            .item(&new_schedule)
+            .separator()
+            .item(&settings)
+            .separator()
+            .quit()
+            .build()?;
+        menu.prepend(&file_menu)?;
+    }
+
+    Ok(menu)
+}
+
+fn navigate_main(app: &AppHandle, path: &str, new_task: bool, new_schedule: bool) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+    }
+    let _ = app.emit(
+        "tray-navigate",
+        TrayNavigate { path: path.to_string(), new_task, new_schedule },
+    );
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -609,6 +787,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
+        .menu(build_app_menu)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "new_schedule" => navigate_main(app, "/schedules", false, true),
+            "settings" => navigate_main(app, "/settings", false, false),
+            _ => {}
+        })
         .manage(TrayState::default())
         .manage(PendingAuth::default())
         .setup(|app| {
@@ -626,6 +810,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_sidecar_port,
+            git_branches,
+            git_create_branch,
+            home_dir,
+            list_subfolders,
             refresh_local_backend,
             local_server_status,
             install_local_server,

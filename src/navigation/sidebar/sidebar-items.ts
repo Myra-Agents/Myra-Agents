@@ -1,4 +1,4 @@
-import { Activity, Calendar, House, Kanban, type LucideIcon, ScrollText } from "lucide-react";
+import { Activity, History, House, Kanban, type LucideIcon, Route, ScrollText } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -61,7 +61,7 @@ export const sidebarItems: NavGroup[] = [
         // Temporary "Runs" view from the new UI refactor (Figma) — live overview
         // of running tasks with status summary cards. Remove/merge once the
         // redesign lands fully.
-        title: "Runs",
+        title: "Operations",
         url: "/runs",
         icon: Activity,
         description: "Live overview of running tasks — counts by status and the active run list.",
@@ -74,9 +74,9 @@ export const sidebarItems: NavGroup[] = [
         description: "Track your agents' tasks across columns — drag cards to move work along.",
       },
       {
-        title: "Schedules",
+        title: "Patrols",
         url: "/schedules",
-        icon: Calendar,
+        icon: Route,
         description: "Set up recurring and cron-triggered runs so agents fire on their own.",
       },
       // Day Planner is parked for now — re-enable with the ClipboardList icon import.
@@ -85,6 +85,16 @@ export const sidebarItems: NavGroup[] = [
       //   url: "/planner",
       //   icon: ClipboardList,
       // },
+      {
+        // "History" view from the new UI refactor (Figma `history` + `agent-session`)
+        // — past runs of every schedule (succeeded or failed) with stats, plus a
+        // per-run agent-session detail at `/history/run`.
+        title: "History",
+        url: "/history",
+        icon: History,
+        description: "Past runs of every patrol — stats and per-run agent discussion, succeeded or failed.",
+        isNew: true,
+      },
       {
         title: "Logs",
         url: "/logs",

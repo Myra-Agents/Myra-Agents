@@ -54,6 +54,7 @@
   --color-icon-primary: var(--icon-primary);
   --color-icon-tertiary: var(--icon-tertiary);
   --color-card-background: var(--card-background);
+  --color-card-background-secondary: var(--card-background-secondary);
   --color-border-cards: var(--border-cards);
   --color-task-status-backlog: var(--task-status-backlog);
   --color-task-status-running: var(--task-status-running);
@@ -115,7 +116,10 @@ These serve as the fallback; there is no separate default.css file. */
      stroke-overlap double-darkening that semi-transparent SVG icons produce. */
   --icon-primary: #353535;
   --icon-tertiary: #5b5b5b;
-  --card-background: #ffffff;
+  --card-background: #fcfcfc;
+  /* Kanban column "task list" surface — one step off the card surface so the
+     buckets read as containers behind their cards (Figma Theme/card-background-secondary). */
+  --card-background-secondary: #ebeae4;
   --border-cards: #1414140f;
   --task-status-backlog: #888780;
   --task-status-running: #ff6900;
@@ -175,6 +179,7 @@ These serve as the fallback; there is no separate default.css file. */
   --icon-primary: #c7c7c7;
   --icon-tertiary: #a6a6a6;
   --card-background: #181818;
+  --card-background-secondary: #1f1f1f;
   --border-cards: #e4e4e40a;
   --task-status-backlog: #888780;
   --task-status-running: #ff6900;
@@ -195,6 +200,13 @@ These serve as the fallback; there is no separate default.css file. */
     /* App-wide: text is not selectable/copyable (desktop-app feel). */
     user-select: none;
     -webkit-user-select: none;
+    /* Prevent native drag ghost on images and links. */
+    -webkit-user-drag: none;
+  }
+
+  img,
+  a {
+    -webkit-user-drag: none;
   }
   /* Keep editable fields selectable so typing/editing still works. */
   input,

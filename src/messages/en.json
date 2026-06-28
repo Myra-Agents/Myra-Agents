@@ -64,11 +64,13 @@
   },
   "nav": {
     "newCard": "New Task",
+    "back": "Back",
+    "forward": "Forward",
     "home": "Home",
     "workspace": "Workspace",
     "configuration": "Configuration",
     "kanban": "Kanban",
-    "schedules": "Schedules",
+    "schedules": "Patrols",
     "planner": "Day Planner",
     "logs": "Logs",
     "settings": "Settings",
@@ -260,11 +262,11 @@
     }
   },
   "schedules": {
-    "title": "Schedules",
+    "title": "Patrols",
     "description": "Configure recurring tasks and automated agent runs",
-    "addSchedule": "Add schedule",
-    "editSchedule": "Edit schedule",
-    "noSchedules": "No schedules configured yet",
+    "addSchedule": "Add patrol",
+    "editSchedule": "Edit patrol",
+    "noSchedules": "No patrols configured yet",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "triggerNow": "Trigger now",
@@ -284,14 +286,14 @@
       "cardDescription": "Task description",
       "agentPrompt": "Agent prompt",
       "tags": "Tags",
-      "scheduleKind": "Schedule",
+      "scheduleKind": "Recurrence",
       "time": "Time",
       "days": "Days",
       "minutes": "Minutes",
       "cronExpression": "Cron expression",
       "startTime": "Start time",
       "dateTime": "Date and time",
-      "scheduleName": "Schedule Name",
+      "scheduleName": "Patrol Name",
       "scheduleNamePlaceholder": "e.g. Daily code review",
       "description": "Description",
       "cardTitlePlaceholder": "Title of the generated task",
@@ -307,15 +309,18 @@
       "cronNotExpressible": "n/a",
       "typeLabel": "Type"
     },
-    "loading": "Loading schedules…",
-    "newSchedule": "New Schedule",
-    "emptyState": "No schedules yet. Create one to get started.",
+    "loading": "Loading patrols…",
+    "newSchedule": "New Patrol",
+    "emptyState": "No patrols yet. Create one to get started.",
     "next": "Next: {time}",
     "columns": {
       "automation": "Automation",
       "source": "Source",
       "tools": "Tools",
-      "created": "Created"
+      "created": "Created",
+      "name": "Patrol Name",
+      "agent": "Agent",
+      "nextRun": "Next Run"
     },
     "status": {
       "active": "Active",
@@ -331,7 +336,10 @@
       "create": "Create",
       "saving": "Saving…",
       "generate": "Generate",
-      "suggestTags": "Suggest"
+      "suggestTags": "Suggest",
+      "editDetails": "Edit details",
+      "duplicate": "Duplicate",
+      "copyJson": "Copy as JSON"
     },
     "days": {
       "mon": "Mon",
@@ -378,6 +386,56 @@
         "cardTitle": "Test sweep",
         "description": "Run the test suite and report failures.",
         "prompt": "Run the full test suite. If anything fails, summarize the failures and the most likely cause for each."
+      },
+      "add": "Add",
+      "categories": {
+        "popular": "Popular",
+        "codeReview": "Code Review",
+        "security": "Security",
+        "incidents": "Incidents & Triage",
+        "dataResearch": "Data & Research"
+      },
+      "prReview": {
+        "label": "PR review",
+        "name": "PR review",
+        "cardTitle": "PR review",
+        "description": "Review open pull requests for issues and summarize what needs attention.",
+        "prompt": "Review the currently open pull requests. For each, summarize what it changes, flag correctness, security or style concerns, and tell me which ones are ready to merge and which need work."
+      },
+      "findVulns": {
+        "label": "Find vulnerabilities",
+        "name": "Find Vulnerabilities",
+        "cardTitle": "Find Vulnerabilities",
+        "description": "Review pull requests for exploitable security issues and flag only validated findings before merge.",
+        "prompt": "Scan the open pull requests and recently changed code for exploitable security vulnerabilities (injection, auth bypass, secret leakage, unsafe deserialization). Report only validated findings with the file, the risk, and a suggested fix."
+      },
+      "secretScan": {
+        "label": "Secret scan",
+        "name": "Secret scan",
+        "cardTitle": "Secret scan",
+        "description": "Scan the repository for committed secrets, tokens and credentials.",
+        "prompt": "Scan the repository for committed secrets: API keys, tokens, passwords, private keys and connection strings. List each match with its file and line, and recommend whether to rotate and how to remove it from history."
+      },
+      "incidentTriage": {
+        "label": "Incident triage",
+        "name": "Incident triage",
+        "cardTitle": "Incident triage",
+        "description": "Triage new incidents and error spikes, then propose an owner and next step.",
+        "prompt": "Check for new incidents and error spikes since the last run. For each, summarize the likely cause from recent commits and logs, propose an owner, and suggest the first remediation step. Keep each incident to a few lines."
+      },
+      "errorDigest": {
+        "label": "Error digest",
+        "name": "Error digest",
+        "cardTitle": "Error digest",
+        "description": "Daily digest of the top errors with frequency and a probable cause.",
+        "prompt": "Produce a digest of the top errors over the last 24 hours: group by message, show frequency and first/last seen, and for the top five give a probable cause and a suggested fix."
+      },
+      "competitorWatch": {
+        "label": "Competitor watch",
+        "name": "Competitor watch",
+        "cardTitle": "Competitor watch",
+        "description": "Weekly summary of notable competitor releases, pricing and announcements.",
+        "prompt": "Summarize notable competitor activity from the past week: product releases, pricing changes, and public announcements. Group by competitor and end with what is most relevant to our roadmap."
       }
     },
     "agent": {
@@ -394,14 +452,49 @@
       "generateHint": "Draft from the name and description using this agent",
       "generateError": "The agent could not generate a result",
       "generateEmpty": "The agent returned nothing usable",
-      "promptMeta": "Write a single, concise agent task prompt (imperative, 2-5 sentences) for a recurring scheduled coding-agent run named \"{name}\". Context: \"{description}\". Output ONLY the prompt text the agent should follow — no preamble, no quotes, no markdown.",
-      "tagsMeta": "Propose 2 to 5 short lowercase keyword tags for a scheduled task named \"{name}\" described as \"{description}\". Output ONLY a comma-separated list of tags, nothing else.",
+      "promptMeta": "Write a single, concise agent task prompt (imperative, 2-5 sentences) for a recurring patrol coding-agent run named \"{name}\". Context: \"{description}\". Output ONLY the prompt text the agent should follow — no preamble, no quotes, no markdown.",
+      "tagsMeta": "Propose 2 to 5 short lowercase keyword tags for a patrol named \"{name}\" described as \"{description}\". Output ONLY a comma-separated list of tags, nothing else.",
       "needContext": "Add a name and a description first so the agent has context",
       "previewTitle": "Suggested prompt — review before using",
       "previewQuestion": "The agent raised a question — refine the description, then regenerate",
       "useDraft": "Use",
       "dismissDraft": "Dismiss"
-    }
+    },
+    "subtitle": "Deploy recurring patrols with AI agents triggered by events.",
+    "tags": "Tags",
+    "noTags": "No tags yet",
+    "search": "Search patrols",
+    "searchPlaceholder": "Search patrols…",
+    "clearSearch": "Clear search",
+    "clearFilters": "Clear filters",
+    "showing": "Showing {shown} of {total}",
+    "seeAll": "Showing {shown} of {total} — Click to see all patrols",
+    "showLess": "Show less",
+    "emptyFiltered": "No patrols match your filters.",
+    "relative": {
+      "now": "Now",
+      "min": "In {n} min",
+      "hours": "In {n}h",
+      "days": "In {n}d"
+    },
+    "sort": {
+      "label": "Sort",
+      "asc": "Ascending",
+      "desc": "Descending",
+      "clear": "Clear sort"
+    },
+    "filterBy": "Filter by",
+    "clearColumnFilter": "Clear filter",
+    "columnMenu": "{column} options",
+    "browseTemplates": "Browse templates",
+    "templatesHeading": "Need ideas? Start from a template",
+    "duplicateName": "{name} (copy)",
+    "toast": {
+      "duplicated": "Duplicated “{name}”",
+      "copiedJson": "Patrol JSON copied",
+      "copyFailed": "Couldn't copy to clipboard"
+    },
+    "templatesShort": "Templates"
   },
   "planner": {
     "title": "Day Planner",
@@ -421,7 +514,7 @@
     "createCards": "Create {count, plural, one {# Task} other {# Tasks}}"
   },
   "runs": {
-    "title": "Runs",
+    "title": "Operations",
     "subtitle": "Lists all the running tasks",
     "loading": "Loading…",
     "empty": "No active runs yet.",
@@ -433,6 +526,19 @@
     "view": {
       "list": "List",
       "kanban": "Kanban"
+    },
+    "kanban": {
+      "running": "Running",
+      "waitingOutput": "Waiting for output…",
+      "question": "Question",
+      "answer": "Answer",
+      "emptyColumn": "No tasks",
+      "dropHere": "Drop here",
+      "dropBlocked": "Can't move here",
+      "edit": "Edit",
+      "trash": "Move to trash",
+      "trashed": "Moved to trash",
+      "undo": "Undo"
     },
     "summary": {
       "backlog": {
@@ -480,6 +586,87 @@
     "clearColumnFilter": "Clear filter",
     "columnMenu": "{column} options",
     "clearFilters": "Clear filters"
+  },
+  "history": {
+    "title": "History",
+    "subtitle": "Lists the past runs, analyse the agent discussion",
+    "loading": "Loading…",
+    "empty": "No past runs yet.",
+    "noResults": "No runs match your search.",
+    "search": "Search",
+    "searchPlaceholder": "Search a task…",
+    "clearFilters": "Clear filters",
+    "showing": "Showing {shown} of {total}",
+    "footer": "Showing {shown} of {total} — Click to see all schedules",
+    "ranges": {
+      "today": "Today",
+      "7d": "7d",
+      "14d": "14d",
+      "30d": "30d",
+      "all": "all"
+    },
+    "stats": {
+      "total": "Total runs",
+      "success": "Successful - {range}",
+      "failed": "Failed - {range}",
+      "tokens": "Tokens used"
+    },
+    "graph1": "Runs over time",
+    "graph2": "Success rate",
+    "columns": {
+      "task": "Task name",
+      "triggered": "Triggered",
+      "duration": "Duration",
+      "result": "Result",
+      "usage": "Usage"
+    },
+    "result": {
+      "success": "Success",
+      "failed": "Failed",
+      "running": "Running"
+    },
+    "usage": "{tokens} Token",
+    "rowMenu": {
+      "open": "Open session",
+      "schedule": "Edit patrol"
+    },
+    "sort": {
+      "label": "Sort",
+      "asc": "Ascending",
+      "desc": "Descending",
+      "clear": "Clear sort"
+    },
+    "filterBy": "Filter by",
+    "clearColumnFilter": "Clear filter",
+    "columnMenu": "{column} options"
+  },
+  "agentSession": {
+    "back": "Back",
+    "settings": "Settings",
+    "rerun": "Run again",
+    "run": "Run #{id}",
+    "triggered": "Triggered {date}",
+    "result": {
+      "failed": "Failed",
+      "success": "Success",
+      "running": "Running"
+    },
+    "agentInstruction": "Agent Instruction",
+    "model": "Model:",
+    "effort": "Effort:",
+    "discussionEmpty": "No agent output recorded for this run.",
+    "followUp": "Follow up",
+    "notFound": "This run could not be found.",
+    "backToHistory": "Back to History",
+    "started": "Started",
+    "ended": "Ended",
+    "exitCode": "Exit code",
+    "duration": "Duration",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "openWorkingDir": "Open working dir",
+    "loadingLog": "Loading log…",
+    "approved": "Run approved"
   },
   "logs": {
     "title": "Logs & History",
@@ -847,10 +1034,12 @@
       },
       "pageOptions": {
         "kanban": "Kanban",
-        "schedules": "Schedules",
+        "schedules": "Patrols",
         "planner": "Planner",
         "logs": "Logs"
-      }
+      },
+      "homeFolder": "Home folder",
+      "homeFolderHint": "Base folder the patrol folder picker browses. Defaults to your user home folder."
     },
     "data": {
       "title": "Data Management",
@@ -905,6 +1094,7 @@
       "installFailed": "Ollama install failed",
       "updateHint": "Your Ollama is too old to launch coding agents. Update it to continue.",
       "update": "Update Ollama",
+      "updateAvailable": "A new Ollama version is available — you have {current}, latest is {latest}.",
       "openDownloads": "Open downloads",
       "startDaemon": "Start Ollama",
       "ready": "Ollama is ready — pull a model below.",
@@ -972,5 +1162,164 @@
     "selectModel": "Select a model…",
     "effortNeedsModel": "Select a model first",
     "effortNoVariants": "This model has no effort variants"
+  },
+  "scheduleEdit": {
+    "loading": "Loading patrol…",
+    "discardTitle": "Discard changes?",
+    "discardDescription": "Your unsaved changes will be lost and won't be applied.",
+    "discardKeepEditing": "Keep editing",
+    "discardConfirm": "Discard changes",
+    "notFound": "Patrol not found.",
+    "backToSchedules": "Back to patrols",
+    "subtitle": "Deploy recurring patrols with AI agents triggered by events.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "tags": "Tags",
+    "newTag": "+ New tag",
+    "save": "Save",
+    "runNow": "Run now",
+    "stopAllRuns": "Stop all runs",
+    "triggers": "Triggers",
+    "agentInstruction": "Agent Instruction",
+    "instructionPlaceholder": "Describe what the agent should do on each run…",
+    "model": "Model:",
+    "modelDefault": "Default",
+    "effort": "Effort:",
+    "efforts": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "editTrigger": "Edit trigger",
+    "time": "Time",
+    "everyMinutes": "Every (minutes)",
+    "kinds": {
+      "once": "Once",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "interval": "Interval",
+      "cron": "Cron"
+    },
+    "tabs": {
+      "settings": "Settings",
+      "runs": "Operations & History"
+    },
+    "ranges": {
+      "today": "Today",
+      "7d": "7d",
+      "14d": "14d",
+      "30d": "30d",
+      "all": "all"
+    },
+    "stats": {
+      "total": "Total runs",
+      "successful": "Successful - 7d",
+      "failed": "Failed - 7d",
+      "summary": "Summary"
+    },
+    "graph1": "Graph 1",
+    "graph2": "Graph 2",
+    "search": "Search",
+    "filter": "Filter",
+    "showing": "Showing {shown} of {total}",
+    "rowMenu": "Row actions",
+    "cols": {
+      "taskName": "Task name",
+      "triggered": "Triggered",
+      "status": "Status",
+      "duration": "Duration",
+      "result": "Result",
+      "agent": "Agent"
+    },
+    "status": {
+      "running": "Running",
+      "needsYou": "Needs you",
+      "done": "Done",
+      "queued": "Queued"
+    },
+    "resultFailed": "Failed",
+    "footer": "Showing {shown} of {total} - Click to see all patrols",
+    "toast": {
+      "saved": "Patrol saved",
+      "triggered": "Run triggered",
+      "stopped": "Stopped {count} run(s)",
+      "undo": "Undo",
+      "needTrigger": "Add a trigger before saving."
+    },
+    "addTrigger": "Add Trigger",
+    "searchTriggers": "Search Triggers...",
+    "comingSoon": "Coming soon",
+    "noTriggers": "No matching triggers",
+    "categories": {
+      "scheduled": "Scheduled",
+      "github": "GitHub / GitLab",
+      "slack": "Slack",
+      "teams": "Microsoft Teams",
+      "sentry": "Sentry",
+      "linear": "Linear"
+    },
+    "scheduledOptions": {
+      "hourly": "Hourly",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "custom": "Custom (cron)"
+    },
+    "days": "Days",
+    "weekdays": {
+      "1": "Mo",
+      "2": "Tu",
+      "3": "We",
+      "4": "Th",
+      "5": "Fr",
+      "6": "Sa",
+      "7": "Su"
+    },
+    "removeTrigger": "Remove trigger",
+    "oneScheduledOnly": "Only one scheduled trigger is allowed. Remove the existing one to add another.",
+    "noRepository": "No Repository",
+    "recents": "Recents",
+    "allRepositories": "All Repositories",
+    "addRepositories": "Add Repositories",
+    "refresh": "Refresh",
+    "searchRepositories": "Search repositories, environments...",
+    "searchBranches": "Search branches...",
+    "branchDefault": "Default",
+    "branches": "Branches",
+    "useBranch": "Use \"{branch}\"",
+    "noResults": "No results",
+    "noFolder": "No folder",
+    "folders": "Folders",
+    "noFoldersYet": "No folders yet — add one below",
+    "addFolders": "Add folder(s)…",
+    "searchFolders": "Search folders…",
+    "branchCurrent": "Current",
+    "branchLocal": "Local",
+    "branchOrigin": "Origin",
+    "createBranch": "Create \"{branch}\" branch",
+    "startTime": "Start time",
+    "home": "Home folder",
+    "selectFolder": "Select folder",
+    "branchesCount": "{count} branches",
+    "branchPerFolder": "Branch per folder",
+    "primary": "primary",
+    "changeColor": "Change color",
+    "colorReset": "Reset to auto",
+    "addColor": "Add color",
+    "deleteColor": "Delete color",
+    "deleteColorTitle": "Delete color?",
+    "deleteColorDescription": "Used by: {patrols}. Tags will revert to their default color.",
+    "deleteColorConfirm": "Delete",
+    "deleteColorCancel": "Cancel",
+    "removeTag": "Remove tag",
+    "tagPlaceholder": "tag name…",
+    "agentPreset": "Agent preset",
+    "override": "Override",
+    "tested": "tested",
+    "testFailed": "test failed",
+    "untested": "not tested",
+    "overridden": "overridden",
+    "resetOverrides": "Reset",
+    "cancel": "Cancel",
+    "createTag": "Create \"{tag}\""
   }
 }

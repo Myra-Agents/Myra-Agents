@@ -1,24 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
 import {
+  ActivityIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   BotIcon,
   CheckIcon,
   EyeIcon,
   ListFilterIcon,
+  LogInIcon,
+  MessageSquareIcon,
   MoreHorizontalIcon,
   PencilIcon,
   SearchIcon,
   SparklesIcon,
   TerminalIcon,
+  Trash2Icon,
   XIcon,
 } from "lucide-react";
+import {
+  DndContext,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+  DragOverlay,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { HeaderActions } from "@/app/(main)/_components/header-actions";
 import {
@@ -33,16 +50,23 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSettings } from "@/hooks/use-settings";
+import { connIdOf } from "@/lib/aggregate/global-id";
+import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
 import { cn } from "@/lib/utils";
+import { isTransitionAllowed } from "@/types/kanban";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
 import type { AgentPreset } from "@/types/settings";
 
 /**
- * Temporary "Runs" view from the new UI refactor (Figma `current-runs`).
- * A live overview of running tasks: four status-summary cards + the run table
- * (Task name · Triggered · Status · Duration · Agent), wired to the real kanban
- * data via {@link useKanban}. Each column header reveals a sort + filter menu on
- * hover.
+ * "Runs" view from the new UI refactor (Figma `current-runs` + `current-runs-kanban`).
+ * A live overview of running tasks with two layouts, toggled from the top-bar
+ * List/Kanban tabs:
+ *  - **List** — four status-summary cards + the run table (Task name · Triggered ·
+ *    Status · Duration · Agent); each column header reveals a sort + filter menu.
+ *  - **Kanban** — the four buckets as side-by-side columns of run cards, each card
+ *    surfacing bucket-specific detail (Running output line, "Needs you" question +
+ *    Answer affordance, tags). Same data + filters as the list, wired via
+ *    {@link useKanban}.
  *
  * Built from the Figma "Theme" semantic tokens added in this refactor
  * (text/icon tiers, card surfaces, task-status accents).
@@ -83,15 +107,83 @@ const LISTED: KanbanStatus[] = ["todo", "in_progress", "waiting_feedback", "awai
 type SortKey = "task" | "triggered" | "status" | "duration" | "agent";
 type SortDir = "asc" | "desc";
 
+/** Top-bar layout toggle. */
+type RunsView = "list" | "kanban";
+
+/** Persists the List/Kanban choice across reloads. */
+const RUNS_VIEW_KEY = "myra-agents-runs-view";
+
 const bucketOf = (card: KanbanCard): RunBucket => BUCKET_OF[card.status] ?? "backlog";
+
+/**
+ * Target status when a card is dropped into a bucket column (Runs board DnD).
+ * `needsYou` aggregates two statuses — keep the card's own when it's already
+ * there, otherwise default to `awaiting_review` (the only `needsYou` status
+ * reachable via drag; `waiting_feedback` is set by the agent asking a question).
+ */
+const STATUS_FOR_BUCKET: Record<RunBucket, KanbanStatus> = {
+  backlog: "todo",
+  running: "in_progress",
+  needsYou: "awaiting_review",
+  done: "done",
+};
+const dropStatus = (bucket: RunBucket, card: KanbanCard): KanbanStatus =>
+  bucket === "needsYou" && (card.status === "waiting_feedback" || card.status === "awaiting_review")
+    ? card.status
+    : STATUS_FOR_BUCKET[bucket];
+
+/**
+ * Whether `card` may be dropped into `bucket` by drag. Reorder within the same
+ * bucket is always allowed; **"Needs you" is agent-driven** so cards (e.g. Done)
+ * can't be moved into it manually; every other move follows the shared lifecycle
+ * rules. Shared by the drop handler and the column's hover hint so they agree.
+ */
+function canMoveToBucket(card: KanbanCard, bucket: RunBucket): boolean {
+  if (bucket === bucketOf(card)) return true;
+  if (bucket === "needsYou") return false;
+  return isTransitionAllowed(card.status, dropStatus(bucket, card));
+}
+
+const noop = () => undefined;
+
+/** Position for a card reordered before `targetId` within its (sorted) status column. */
+function insertPosition(column: KanbanCard[], movingId: string, targetId: string): number {
+  const sorted = column.slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const withoutMoving = sorted.filter((c) => c.id !== movingId);
+  const idx = withoutMoving.findIndex((c) => c.id === targetId);
+  if (idx === -1) return (sorted[sorted.length - 1]?.position ?? 0) + 1000;
+  const movingIdx = sorted.findIndex((c) => c.id === movingId);
+  const targetIdx = sorted.findIndex((c) => c.id === targetId);
+  const before = movingIdx !== -1 && movingIdx < targetIdx;
+  const prev = before ? withoutMoving[idx] : withoutMoving[idx - 1];
+  const next = before ? withoutMoving[idx + 1] : withoutMoving[idx];
+  const prevPos = prev?.position ?? 0;
+  const nextPos = next?.position ?? prevPos + 2000;
+  return (prevPos + nextPos) / 2;
+}
 
 export default function RunsPage() {
   const t = useTranslations("runs");
   const router = useRouter();
-  const { cards, loading, error } = useKanban();
+  const { cards, loading, error, trashCard, restoreCard, moveCard, reorderCard } = useKanban();
   const { settings } = useSettings();
 
+  // List (table) ↔ Kanban (board) layout — toggled from the top-bar tabs and
+  // remembered across reloads. Default to "list", then restore the saved choice
+  // after mount (localStorage is client-only — reading it in the initializer
+  // would mismatch the static-export prerender).
+  const [view, setView] = useState<RunsView>("list");
+  useEffect(() => {
+    const saved = getLocalStorageValue(RUNS_VIEW_KEY);
+    if (saved === "list" || saved === "kanban") setView(saved);
+  }, []);
+  const selectView = useCallback((next: RunsView) => {
+    setView(next);
+    setLocalStorageValue(RUNS_VIEW_KEY, next);
+  }, []);
+
   // Clicking a summary card filters the table to that bucket; clicking it again clears.
+  // (List-only — the Kanban board renders every bucket as its own column.)
   const [activeBucket, setActiveBucket] = useState<RunBucket | null>(null);
   const toggleBucket = (bucket: RunBucket) => setActiveBucket((prev) => (prev === bucket ? null : bucket));
 
@@ -143,13 +235,13 @@ export default function RunsPage() {
     return [...names].sort((a, b) => a.localeCompare(b));
   }, [listed, settings.agents, settings.defaultAgentId]);
 
-  // The displayed rows: summary-card bucket → column value filters → search → sort.
-  const rows = useMemo(() => {
+  // Filtered list with everything *except* the summary-card bucket applied
+  // (column value filters → search → sort). Shared by the table and the board.
+  const filteredBase = useMemo(() => {
     const agentName = (c: KanbanCard) =>
       settings.agents.find((a) => a.id === (c.agentPresetId ?? settings.defaultAgentId))?.name ?? "";
 
     let r = listed;
-    if (activeBucket) r = r.filter((c) => bucketOf(c) === activeBucket);
     if (statusFilter.length) r = r.filter((c) => statusFilter.includes(bucketOf(c)));
     if (agentFilter.length) r = r.filter((c) => agentFilter.includes(agentName(c)));
     if (tagFilter.length) r = r.filter((c) => c.tags.some((tg) => tagFilter.includes(tg)));
@@ -171,18 +263,23 @@ export default function RunsPage() {
       r = [...r].sort((a, b) => dir * compareBy(sort.key, a, b, agentName));
     }
     return r;
-  }, [
-    listed,
-    activeBucket,
-    statusFilter,
-    agentFilter,
-    tagFilter,
-    query,
-    sort,
-    t,
-    settings.agents,
-    settings.defaultAgentId,
-  ]);
+  }, [listed, statusFilter, agentFilter, tagFilter, query, sort, t, settings.agents, settings.defaultAgentId]);
+
+  // Table rows additionally honor the summary-card bucket (List view only).
+  const rows = useMemo(
+    () => (activeBucket ? filteredBase.filter((c) => bucketOf(c) === activeBucket) : filteredBase),
+    [filteredBase, activeBucket],
+  );
+
+  // Board groups the filtered list into its four bucket columns (Kanban view).
+  const boardColumns = useMemo(() => {
+    const groups: Record<RunBucket, KanbanCard[]> = { backlog: [], running: [], needsYou: [], done: [] };
+    for (const c of filteredBase) groups[bucketOf(c)].push(c);
+    return groups;
+  }, [filteredBase]);
+
+  // What the "Showing N of M" line counts in each view.
+  const shownCount = view === "kanban" ? filteredBase.length : rows.length;
 
   const toggleStatusFilter = (b: RunBucket) =>
     setStatusFilter((prev) => (prev.includes(b) ? prev.filter((x) => x !== b) : [...prev, b]));
@@ -200,6 +297,14 @@ export default function RunsPage() {
     setTagFilter([]);
     setSort(null);
   };
+
+  const openLogs = (id: string) => router.push(`/logs?card=${encodeURIComponent(id)}`);
+  const trashRun = (id: string) =>
+    void trashCard(id).then(() =>
+      toast.success(t("kanban.trashed"), {
+        action: { label: t("kanban.undo"), onClick: () => void restoreCard(id) },
+      }),
+    );
 
   // True when a card/column/tag/search filter is narrowing the list (sort excluded —
   // it never empties results). Drives the "Clear filters" affordance.
@@ -227,19 +332,34 @@ export default function RunsPage() {
   }
 
   return (
-    // Figma "App" content width — 968px, centered in the window (1440 artboard).
-    // Section gaps are tight + per-Figma (24/8/4/8/10px), not a uniform gap.
-    <div className="mx-auto flex w-full max-w-[968px] flex-col">
+    // Figma "App" content width — 968px, shared by the table and the board so the
+    // title, filter row and content all align. Centered in the window. The Kanban
+    // view fills the viewport height (columns scroll internally, page doesn't).
+    <div className={cn("mx-auto flex w-full max-w-[968px] flex-col", view === "kanban" && "h-full min-h-0")}>
       {/* List / Kanban view tabs live in the top bar (Figma) via the header slot. */}
       <HeaderActions>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-text-primary">{t("view.list")}</span>
+          <button
+            type="button"
+            onClick={() => selectView("list")}
+            aria-pressed={view === "list"}
+            className={cn(
+              "transition-colors",
+              view === "list" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary",
+            )}
+          >
+            {t("view.list")}
+          </button>
           {/* Vertical divider between the tabs (Figma). */}
           <span aria-hidden className="h-4 w-px bg-text-tertiary/40" />
           <button
             type="button"
-            onClick={() => router.push("/kanban")}
-            className="text-text-tertiary transition-colors hover:text-text-secondary"
+            onClick={() => selectView("kanban")}
+            aria-pressed={view === "kanban"}
+            className={cn(
+              "transition-colors",
+              view === "kanban" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary",
+            )}
           >
             {t("view.kanban")}
           </button>
@@ -324,8 +444,10 @@ export default function RunsPage() {
         </div>
       </div>
 
-      {/* Status summary cards — click to filter the table to that bucket. */}
-      <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      {view === "list" ? (
+        <>
+          {/* Status summary cards — click to filter the table to that bucket. */}
+          <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {BUCKETS.map((b) => {
           const active = activeBucket === b.key;
           return (
@@ -496,6 +618,22 @@ export default function RunsPage() {
           )}
         </div>
       </div>
+        </>
+      ) : (
+        <RunsKanbanBoard
+          columns={boardColumns}
+          allCards={filteredBase}
+          shown={shownCount}
+          total={totalRuns}
+          narrowed={narrowed}
+          onClear={clearAll}
+          onOpenLogs={openLogs}
+          onTrash={trashRun}
+          onEdit={() => router.push("/kanban")}
+          onMove={moveCard}
+          onReorder={reorderCard}
+        />
+      )}
     </div>
   );
 }
@@ -654,6 +792,388 @@ function RowMenu({
 /** True when any column/card filter (not search) narrows the list. */
 function isFiltering(bucket: RunBucket | null, status: RunBucket[], agent: string[]): boolean {
   return bucket !== null || status.length > 0 || agent.length > 0;
+}
+
+/**
+ * The Kanban layout (Figma `current-runs-kanban`): the four buckets as
+ * side-by-side columns of run cards. Shares the list's filtered data — only the
+ * presentation differs.
+ */
+function RunsKanbanBoard({
+  columns,
+  allCards,
+  shown,
+  total,
+  narrowed,
+  onClear,
+  onOpenLogs,
+  onTrash,
+  onEdit,
+  onMove,
+  onReorder,
+}: {
+  columns: Record<RunBucket, KanbanCard[]>;
+  allCards: KanbanCard[];
+  shown: number;
+  total: number;
+  narrowed: boolean;
+  onClear: () => void;
+  onOpenLogs: (id: string) => void;
+  onTrash: (id: string) => void;
+  onEdit: () => void;
+  onMove: (id: string, status: KanbanStatus) => void | Promise<unknown>;
+  onReorder: (id: string, newPosition: number, status?: KanbanStatus) => void;
+}) {
+  const t = useTranslations("runs");
+  const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
+  // Bucket the dragged card is currently over (column or any card within it) —
+  // drives the per-column drop hint even when hovering over a card.
+  const [overBucket, setOverBucket] = useState<RunBucket | null>(null);
+  // Brief red flash on a card whose drop the lifecycle rules reject.
+  const [invalidDropId, setInvalidDropId] = useState<string | null>(null);
+  // distance:8 → a plain click still opens logs; only a real drag picks the card up.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const cardById = useMemo(() => {
+    const m = new Map<string, KanbanCard>();
+    for (const c of allCards) m.set(c.id, c);
+    return m;
+  }, [allCards]);
+
+  const rejectDrop = (id: string) => {
+    setInvalidDropId(id);
+    setTimeout(() => setInvalidDropId(null), 450);
+  };
+
+  const resolveBucket = (overId: string | null): RunBucket | null => {
+    if (!overId) return null;
+    const col = BUCKETS.find((b) => b.key === overId)?.key;
+    if (col) return col;
+    const c = cardById.get(overId);
+    return c ? bucketOf(c) : null;
+  };
+
+  const handleDragStart = (e: DragStartEvent) => setActiveCard(cardById.get(e.active.id as string) ?? null);
+
+  const handleDragOver = (e: DragOverEvent) => setOverBucket(resolveBucket((e.over?.id as string) ?? null));
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    setActiveCard(null);
+    setOverBucket(null);
+    if (!over) return;
+
+    const card = cardById.get(active.id as string);
+    if (!card) return;
+
+    const overId = over.id as string;
+    const overBucket = BUCKETS.find((b) => b.key === overId)?.key ?? null;
+    const overCard = overBucket ? null : cardById.get(overId);
+    const targetBucket = overBucket ?? (overCard ? bucketOf(overCard) : null);
+    if (!targetBucket) return;
+
+    // Same bucket → reorder among cards of the same status (positions are
+    // per-status, per-server). Cross-status within a bucket isn't a move.
+    if (targetBucket === bucketOf(card)) {
+      if (
+        overCard &&
+        overCard.id !== card.id &&
+        overCard.status === card.status &&
+        connIdOf(overCard.id) === connIdOf(card.id)
+      ) {
+        const column = allCards.filter((c) => c.status === card.status && connIdOf(c.id) === connIdOf(card.id));
+        onReorder(card.id, insertPosition(column, card.id, overCard.id));
+      }
+      return;
+    }
+
+    // Cross-bucket move — "Needs you" is agent-driven (no manual drops in), the
+    // rest follow the shared lifecycle rules. Rejected drops flash red instead.
+    if (!canMoveToBucket(card, targetBucket)) return rejectDrop(card.id);
+    void onMove(card.id, dropStatus(targetBucket, card));
+  };
+
+  return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+      <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2.5">
+        <div className="flex shrink-0 items-center justify-end gap-2 text-xs">
+          {shown === 0 && narrowed && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
+            >
+              {t("clearFilters")}
+            </button>
+          )}
+          <span className="text-text-tertiary font-light">{t("showing", { shown, total })}</span>
+        </div>
+        {/* Four buckets filling the content width (like the List table); columns are
+            fixed to the viewport height and scroll internally, so the page never
+            scrolls vertically. Horizontal scroll only when the window is too narrow. */}
+        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden pb-2">
+          <div className="flex h-full gap-2.5">
+            {BUCKETS.map((b) => (
+              <RunsBucketColumn
+                key={b.key}
+                bucket={b.key}
+                dot={b.dot}
+                cards={columns[b.key]}
+                activeCard={activeCard}
+                isTarget={overBucket === b.key}
+                onOpenLogs={onOpenLogs}
+                onTrash={onTrash}
+                onEdit={onEdit}
+                invalidDropId={invalidDropId}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <DragOverlay dropAnimation={null}>
+        {activeCard && (
+          <KanbanRunCard card={activeCard} bucket={bucketOf(activeCard)} onOpen={noop} onTrash={noop} onEdit={noop} isOverlay />
+        )}
+      </DragOverlay>
+    </DndContext>
+  );
+}
+
+/** One bucket column: top-rounded header card + a droppable, internally-scrolling task list. */
+function RunsBucketColumn({
+  bucket,
+  dot,
+  cards,
+  activeCard,
+  isTarget,
+  onOpenLogs,
+  onTrash,
+  onEdit,
+  invalidDropId,
+}: {
+  bucket: RunBucket;
+  dot: string;
+  cards: KanbanCard[];
+  activeCard: KanbanCard | null;
+  isTarget: boolean;
+  onOpenLogs: (id: string) => void;
+  onTrash: (id: string) => void;
+  onEdit: () => void;
+  invalidDropId: string | null;
+}) {
+  const t = useTranslations("runs");
+  const { setNodeRef } = useDroppable({ id: bucket, data: { type: "bucket", bucket } });
+  // While the dragged card targets this column (even hovering a card inside it),
+  // hint whether it can land here (mirrors /kanban).
+  const canDrop = activeCard ? canMoveToBucket(activeCard, bucket) : false;
+  const showHint = isTarget && activeCard !== null;
+
+  return (
+    <div className="flex h-full min-h-0 min-w-[200px] flex-1 flex-col">
+      {/* Column header — its own top-rounded card, inset over the list (Figma
+          "Total Schedules"): dot + label + sub on the card surface. */}
+      <div className="mx-2 flex shrink-0 flex-col gap-0.5 rounded-t-card border-x border-t border-border-cards bg-card-background px-[18px] py-2">
+        <div className="flex items-center gap-1">
+          <span className={cn("size-2 rounded-full", dot)} />
+          <span className="text-text-secondary text-xs font-medium">{t(`summary.${bucket}.label`)}</span>
+        </div>
+        <span className="text-text-tertiary text-[10px]">{t(`summary.${bucket}.sub`)}</span>
+      </div>
+      {/* Task list — secondary surface, droppable; fills the column and scrolls
+          internally. Outline brightens while a card hovers over it. */}
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-[var(--kanban-radius)] border bg-card-background-secondary p-2.5 transition-colors",
+          showHint ? (canDrop ? "border-text-tertiary/50" : "border-destructive/50") : "border-border-cards",
+        )}
+      >
+        {/* Drop hint while a card hovers the column — allowed vs. blocked (e.g. a
+            Done card can't enter "Needs you"). */}
+        {showHint && (
+          <p
+            className={cn(
+              "shrink-0 rounded-md border border-dashed px-2 py-2 text-center text-[11px]",
+              canDrop
+                ? "border-text-tertiary/40 text-text-secondary"
+                : "border-destructive/50 text-destructive",
+            )}
+          >
+            {canDrop ? t("kanban.dropHere") : t("kanban.dropBlocked")}
+          </p>
+        )}
+        {cards.length === 0
+          ? !showHint && (
+              <p className="px-2 py-6 text-center text-text-tertiary text-[11px]">{t("kanban.emptyColumn")}</p>
+            )
+          : null}
+        {cards.length > 0 && (
+          <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            {cards.map((card) => (
+              <KanbanRunCard
+                key={card.id}
+                card={card}
+                bucket={bucket}
+                onOpen={() => onOpenLogs(card.id)}
+                onTrash={() => onTrash(card.id)}
+                onEdit={onEdit}
+                isShaking={invalidDropId === card.id}
+              />
+            ))}
+          </SortableContext>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A single run card on the board — bucket drives the body it surfaces. Draggable
+ *  via @dnd-kit; a plain click (no movement) still opens the run's logs. */
+function KanbanRunCard({
+  card,
+  bucket,
+  onOpen,
+  onTrash,
+  onEdit,
+  isOverlay = false,
+  isShaking = false,
+}: {
+  card: KanbanCard;
+  bucket: RunBucket;
+  onOpen: () => void;
+  onTrash: () => void;
+  onEdit: () => void;
+  isOverlay?: boolean;
+  isShaking?: boolean;
+}) {
+  const t = useTranslations("runs");
+  const stop = (e: ReactMouseEvent) => e.stopPropagation();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    disabled: isOverlay,
+  });
+  const style = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transition,
+  };
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      data-kanban-card
+      type="button"
+      onClick={isOverlay ? undefined : onOpen}
+      className={cn(
+        "group/card flex cursor-pointer flex-col gap-2.5 rounded-card border border-border-cards bg-card-background p-4 text-left transition-colors hover:border-text-tertiary/30",
+        isDragging && !isOverlay && "opacity-30",
+        isOverlay && "rotate-1 shadow-lg",
+        isShaking && "border-destructive ring-1 ring-destructive",
+      )}
+    >
+      {/* Top: status dot + hover edit/trash affordances. */}
+      <div className="flex items-start justify-between">
+        <span className={cn("mt-0.5 size-2 shrink-0 rounded-full", DOT_OF[bucket])} />
+        <div className="flex items-center gap-1 text-icon-tertiary opacity-0 transition group-hover/card:opacity-100">
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              stop(e);
+              onEdit();
+            }}
+            aria-label={t("kanban.edit")}
+            className="rounded p-0.5 transition-colors hover:text-icon-primary"
+          >
+            <PencilIcon className="size-3.5" />
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              stop(e);
+              onTrash();
+            }}
+            aria-label={t("kanban.trash")}
+            className="rounded p-0.5 transition-colors hover:text-destructive"
+          >
+            <Trash2Icon className="size-3.5" />
+          </span>
+        </div>
+      </div>
+
+      <h3 className="text-text-primary text-sm leading-snug">{card.title}</h3>
+
+      {/* Running: live status line + output hint. */}
+      {bucket === "running" && (
+        <>
+          <span aria-hidden className="h-px w-full bg-border-cards" />
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-task-status-running text-xs font-medium">
+                <ActivityIcon className="size-3.5" />
+                {t("kanban.running")}
+              </span>
+              <span className="text-text-tertiary text-xs tabular-nums">{durationOf(card)}</span>
+            </div>
+            <span className="truncate text-text-tertiary text-xs">{t("kanban.waitingOutput")}</span>
+          </div>
+        </>
+      )}
+
+      {/* Needs you: the agent's pending question + an Answer affordance. */}
+      {bucket === "needsYou" && (
+        <>
+          <span aria-hidden className="h-px w-full bg-border-cards" />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-task-status-needs-you text-xs font-medium">
+                <MessageSquareIcon className="size-3.5" />
+                {t("kanban.question")}
+              </span>
+              <span className="text-text-tertiary text-xs tabular-nums">{durationOf(card)}</span>
+            </div>
+            {card.agentQuestion && (
+              <p className="text-text-secondary text-xs leading-relaxed">{card.agentQuestion}</p>
+            )}
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                stop(e);
+                onOpen();
+              }}
+              className="flex items-center justify-center gap-1.5 self-stretch rounded-md border border-border-cards bg-secondary/40 py-1.5 text-text-secondary text-xs transition-colors hover:bg-secondary hover:text-text-primary"
+            >
+              {t("kanban.answer")}
+              <LogInIcon className="size-3.5" />
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* Tags — violet accent, matching the Figma card. The divider above sits
+          between the title (or bucket body) and the tag row. */}
+      {card.tags.length > 0 && (
+        <>
+          <span aria-hidden className="h-px w-full bg-border-cards" />
+          <div className="flex flex-wrap gap-1">
+          {card.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-md border border-task-status-needs-you/40 bg-task-status-needs-you/10 px-2 py-0.5 text-task-status-needs-you text-[11px]"
+            >
+              {tag}
+            </span>
+          ))}
+          </div>
+        </>
+      )}
+    </button>
+  );
 }
 
 /** Comparator for a sortable column (ascending). */

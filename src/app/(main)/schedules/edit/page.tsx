@@ -1,0 +1,1890 @@
+"use client";
+
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
+import {
+  ActivityIcon,
+  CheckCircle2Icon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  FolderIcon,
+  GitBranchIcon,
+  HomeIcon,
+  MessageSquareIcon,
+  PlayIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+  UsersIcon,
+  XCircleIcon,
+  XIcon,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import { HeaderActions } from "@/app/(main)/_components/header-actions";
+import { AgentOptions } from "@/components/agents/agent-options";
+import { RunsHistory } from "@/components/history/runs-history";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useKanban } from "@/hooks/use-kanban";
+import { useSchedules } from "@/hooks/use-schedules";
+import { useSettings } from "@/hooks/use-settings";
+import { loadTestResult } from "@/lib/agent-test-store";
+import { resolveHomeFolder } from "@/lib/home-folder.client";
+import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
+import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
+import { cn } from "@/lib/utils";
+import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
+import type { KanbanCard } from "@/types/kanban";
+import type { ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
+import { defaultScheduleKind, describeSchedule } from "@/types/schedule";
+import type { AgentPreset } from "@/types/settings";
+
+export default function ScheduleEditPage() {
+  // useSearchParams() needs a Suspense boundary in the static export.
+  return (
+    <Suspense fallback={null}>
+      <ScheduleEditScreen />
+    </Suspense>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Editable draft — the subset of a schedule the editor mutates. Compared against
+// its initial snapshot to drive the dirty flag (Save button).
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Draft = {
+  enabled: boolean;
+  agentPrompt: string;
+  // Null while the user has removed the (single) schedule trigger — Save is then
+  // blocked until a trigger is re-added.
+  schedule: ScheduledTask["schedule"] | null;
+  // Repository/folder the run clones into. Empty string = "No Repository".
+  workingDir: string;
+  tags: string[];
+  agentPresetId?: string;
+  agentFlags: string[];
+  useWorktree?: boolean;
+  launchVia?: "direct" | "ollama";
+  ollamaModel?: string;
+};
+
+function draftOf(task: ScheduledTask): Draft {
+  return {
+    enabled: task.enabled,
+    agentPrompt: task.agentPrompt,
+    schedule: task.schedule,
+    workingDir: task.workingDir ?? "",
+    tags: task.tags ?? [],
+    agentPresetId: task.agentPresetId,
+    agentFlags: task.agentFlags ?? [],
+    useWorktree: task.useWorktree,
+    launchVia: task.launchVia,
+    ollamaModel: task.ollamaModel,
+  };
+}
+
+function flagValue(flags: string[], name: string): string | undefined {
+  const prefix = `--${name}=`;
+  return flags.find((f) => f.startsWith(prefix))?.slice(prefix.length);
+}
+
+function withFlagValue(flags: string[], name: string, value: string | undefined): string[] {
+  const prefix = `--${name}=`;
+  const rest = flags.filter((f) => !f.startsWith(prefix));
+  return value ? [...rest, `${prefix}${value}`] : rest;
+}
+
+function ScheduleEditScreen() {
+  const t = useTranslations("scheduleEdit");
+  const router = useRouter();
+  const params = useSearchParams();
+  const id = params.get("id") ?? "";
+
+  const { loading, updateSchedule, toggleEnabled, triggerNow, byId, schedules } = useSchedules();
+  const { cards, trashCard, restoreCard } = useKanban();
+  const { settings } = useSettings();
+
+  const task = byId(id);
+
+  const [tab, setTab] = useState<"settings" | "runs">("settings");
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Confirm dialog shown when cancelling with unsaved edits.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // Base folder the picker browses (Settings → defaults to OS home).
+  const [homeFolder, setHomeFolder] = useState("");
+  useEffect(() => {
+    void resolveHomeFolder().then(setHomeFolder);
+  }, []);
+
+  // Selected folders (mirrored up from FolderSelect) + per-folder branch overrides.
+  // `branchByFolder` is the working copy; `committedBranches` is the last-saved
+  // snapshot — kept separate so Cancel can revert and dirty can detect changes
+  // (these are app-local, persisted to localStorage only on Save).
+  const [folders, setFolders] = useState<string[]>([]);
+  const [branchByFolder, setBranchByFolder] = useState<Record<string, string>>({});
+  const [committedBranches, setCommittedBranches] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!task) return;
+    const saved = readBranchMap(task.id);
+    setBranchByFolder(saved);
+    setCommittedBranches(saved);
+  }, [task?.id, task]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tag colors are global (by tag name, not per-schedule) so the same tag always
+  // renders the same color across all patrols.
+  const [tagColorMap, setTagColorMap] = useState<Record<string, number | string>>(readGlobalTagColorMap);
+  const [committedTagColors, setCommittedTagColors] = useState<Record<string, number | string>>(readGlobalTagColorMap);
+
+  // Global custom color palette (shared across all patrols, app-local).
+  const [customPalette, setCustomPalette] = useState<string[]>(() => readCustomPalette());
+  const [pendingDeleteColor, setPendingDeleteColor] = useState<{
+    hex: string;
+    affectedPatrolNames: string[];
+  } | null>(null);
+
+  const addCustomColor = useCallback((hex: string) => {
+    setCustomPalette((prev) => {
+      if (prev.includes(hex)) return prev;
+      const next = [...prev, hex];
+      writeCustomPalette(next);
+      return next;
+    });
+  }, []);
+
+  const requestDeleteCustomColor = useCallback(
+    (hex: string) => {
+      // Tags in the global map that use this hex.
+      const affectedTags = new Set(
+        Object.entries(tagColorMap)
+          .filter(([, v]) => v === hex)
+          .map(([tag]) => tag),
+      );
+      // Schedules that have any of those tags.
+      const affected = affectedTags.size > 0 ? schedules.filter((s) => s.tags?.some((t) => affectedTags.has(t))) : [];
+      if (affected.length > 0) {
+        setPendingDeleteColor({ hex, affectedPatrolNames: affected.map((s) => s.name) });
+      } else {
+        setCustomPalette((prev) => {
+          const next = prev.filter((c) => c !== hex);
+          writeCustomPalette(next);
+          return next;
+        });
+      }
+    },
+    [schedules, tagColorMap],
+  );
+
+  const confirmDeleteCustomColor = useCallback(() => {
+    if (!pendingDeleteColor) return;
+    const { hex } = pendingDeleteColor;
+    setCustomPalette((prev) => {
+      const next = prev.filter((c) => c !== hex);
+      writeCustomPalette(next);
+      return next;
+    });
+    const filter = (m: Record<string, number | string>) =>
+      Object.fromEntries(Object.entries(m).filter(([, v]) => v !== hex));
+    setTagColorMap((prev) => {
+      const next = filter(prev);
+      writeGlobalTagColorMap(next);
+      return next;
+    });
+    setCommittedTagColors((prev) => filter(prev));
+    setPendingDeleteColor(null);
+  }, [pendingDeleteColor]);
+
+  // Resolve a folder's branch: explicit override → (primary only) the saved
+  // agentFlags branch → "".
+  const branchOf = useCallback(
+    (folder: string, isPrimary: boolean) =>
+      branchByFolder[folder] ?? (isPrimary ? (flagValue(draft?.agentFlags ?? [], "branch") ?? "") : ""),
+    [branchByFolder, draft?.agentFlags],
+  );
+
+  const setBranch = useCallback((folder: string, branch: string, isPrimary: boolean) => {
+    // Working copy only — committed to localStorage on Save, reverted on Cancel.
+    if (folder) setBranchByFolder((prev) => ({ ...prev, [folder]: branch }));
+    // Primary folder's branch is also persisted server-side via agentFlags.
+    if (isPrimary) {
+      setDraft((d) => (d ? { ...d, agentFlags: withFlagValue(d.agentFlags, "branch", branch) } : d));
+    }
+  }, []);
+
+  // Seed the draft once the schedule resolves, re-seeding only when a *different*
+  // schedule id loads — so unrelated background updates to the task object (e.g.
+  // nextRunAt ticks) never clobber in-progress edits.
+  const seededId = useRef<string | null>(null);
+  useEffect(() => {
+    if (task && seededId.current !== task.id) {
+      seededId.current = task.id;
+      setDraft(draftOf(task));
+    }
+  }, [task]);
+
+  // Flag a disabled patrol right in the breadcrumb leaf (uses the live draft state
+  // so it reflects the toggle immediately).
+  const breadcrumbEnabled = draft?.enabled ?? task?.enabled ?? true;
+  useBreadcrumbOverride(
+    task
+      ? {
+          label: breadcrumbEnabled ? task.name : `${task.name} (${t("inactive").toLowerCase()})`,
+          href: `/schedules/edit/?id=${encodeURIComponent(task.id)}`,
+        }
+      : null,
+  );
+
+  const branchesDirty = useMemo(
+    () => JSON.stringify(branchByFolder) !== JSON.stringify(committedBranches),
+    [branchByFolder, committedBranches],
+  );
+
+  const tagColorsDirty = useMemo(
+    () => JSON.stringify(tagColorMap) !== JSON.stringify(committedTagColors),
+    [tagColorMap, committedTagColors],
+  );
+
+  const dirty = useMemo(() => {
+    if (!task || !draft) return false;
+    return JSON.stringify(draft) !== JSON.stringify(draftOf(task)) || branchesDirty || tagColorsDirty;
+  }, [task, draft, branchesDirty, tagColorsDirty]);
+
+  const save = useCallback(async () => {
+    if (!task || !draft || !dirty) return;
+    if (!draft.schedule) {
+      toast.error(t("toast.needTrigger"));
+      return;
+    }
+    setSaving(true);
+    try {
+      const input: UpdateScheduleInput = {
+        id: task.id,
+        name: task.name,
+        cardTitle: task.cardTitle,
+        cardDescription: task.cardDescription,
+        agentPrompt: draft.agentPrompt,
+        tags: draft.tags,
+        schedule: draft.schedule,
+        enabled: draft.enabled,
+        agentPresetId: draft.agentPresetId,
+        agentFlags: draft.agentFlags.length ? draft.agentFlags : undefined,
+        useWorktree: draft.useWorktree,
+        workingDir: draft.workingDir.trim() || undefined,
+        launchVia: draft.launchVia,
+        ollamaModel: draft.ollamaModel,
+      };
+      await updateSchedule(input);
+      // Commit the app-local per-folder branch overrides alongside the save.
+      setLocalStorageValue(branchMapKey(task.id), JSON.stringify(branchByFolder));
+      setCommittedBranches(branchByFolder);
+      writeGlobalTagColorMap(tagColorMap);
+      setCommittedTagColors(tagColorMap);
+      toast.success(t("toast.saved"));
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setSaving(false);
+    }
+  }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, t]);
+
+  // Runs belonging to this schedule: cards it materialized share its card title
+  // (and tags). Newest first.
+  const runs = useMemo(() => {
+    if (!task) return [] as KanbanCard[];
+    const tagSet = new Set(task.tags);
+    return cards
+      .filter((c) => c.status !== "trashed" && c.status !== "draft")
+      .filter((c) => c.title === task.cardTitle || c.tags.some((tg) => tagSet.has(tg)))
+      .sort((a, b) => triggeredAt(b).localeCompare(triggeredAt(a)));
+  }, [cards, task]);
+
+  const runningRuns = useMemo(() => runs.filter((c) => c.status === "in_progress"), [runs]);
+
+  // Tag vocabulary suggested in the editor — every distinct tag used across cards.
+  const tagSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of cards) for (const tg of c.tags) set.add(tg);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [cards]);
+
+  const stopAll = useCallback(() => {
+    const ids = runningRuns.map((c) => c.id);
+    if (!ids.length) return;
+    void Promise.all(ids.map((rid) => trashCard(rid))).then(() =>
+      toast.success(t("toast.stopped", { count: ids.length }), {
+        action: { label: t("toast.undo"), onClick: () => ids.forEach((rid) => void restoreCard(rid)) },
+      }),
+    );
+  }, [runningRuns, trashCard, restoreCard, t]);
+
+  const runNow = useCallback(() => {
+    if (!task) return;
+    void triggerNow(task.id).then(() => toast.success(t("toast.triggered")));
+  }, [task, triggerNow, t]);
+
+  if (loading && !task) {
+    return <div className="flex h-full items-center justify-center text-sm text-text-tertiary">{t("loading")}</div>;
+  }
+  if (!task || !draft) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2">
+        <p className="text-sm text-text-tertiary">{t("notFound")}</p>
+        <button
+          type="button"
+          onClick={() => router.push("/schedules")}
+          className="text-text-secondary text-xs underline"
+        >
+          {t("backToSchedules")}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-[968px] flex-col">
+      {/* Top-bar actions: Stop all runs (when runs are live) + Save (when dirty) +
+          Run now — portalled into the shared header, left of the theme switcher. */}
+      <HeaderActions>
+        {runningRuns.length > 0 && (
+          <button
+            type="button"
+            onClick={stopAll}
+            className="rounded-md border border-destructive bg-card-background px-3 py-1 font-medium text-destructive text-xs transition-colors hover:bg-destructive/10"
+          >
+            {t("stopAllRuns")}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty || saving}
+          className={cn(
+            "rounded-md px-3 py-1 font-medium text-xs transition-colors",
+            dirty ? "bg-foreground text-background hover:bg-foreground/90" : "bg-muted/40 text-text-tertiary",
+          )}
+        >
+          {t("save")}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // With unsaved edits, confirm before discarding; otherwise leave straight away.
+            if (dirty) {
+              setConfirmDiscard(true);
+              return;
+            }
+            router.back();
+          }}
+          disabled={saving}
+          className="rounded-md border border-border px-3 py-1 font-medium text-text-secondary text-xs transition-colors hover:bg-muted/40 hover:text-text-primary"
+        >
+          {t("cancel")}
+        </button>
+        <button
+          type="button"
+          aria-label={t("runNow")}
+          onClick={runNow}
+          className="flex size-7 items-center justify-center rounded-md text-icon-primary transition-colors hover:bg-muted/40 hover:text-foreground"
+        >
+          <PlayIcon className="size-[18px]" />
+        </button>
+      </HeaderActions>
+
+      {/* Discard-confirmation — guards the Cancel button when there are unsaved edits. */}
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("discardTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("discardDescription")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("discardKeepEditing")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setDraft(draftOf(task));
+                setBranchByFolder(committedBranches);
+                setTagColorMap(committedTagColors);
+                router.back();
+              }}
+            >
+              {t("discardConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Title block — name + subtitle. pb-4 / pl-1.5 from the Figma "Title" frame. */}
+      <header className="flex flex-col pr-0 pb-4 pl-1.5">
+        <h1 className="font-medium text-[16px] text-text-primary leading-tight">{task.name}</h1>
+        <p className="font-light text-[12px] text-text-secondary leading-tight">{t("subtitle")}</p>
+      </header>
+
+      {/* Status toggle + repository + branch — divider-separated inline items. */}
+      <div className="flex items-center">
+        <div className="flex items-center gap-2 border-border border-r pr-2">
+          <Switch
+            checked={draft.enabled}
+            onCheckedChange={(v) => {
+              setDraft((d) => (d ? { ...d, enabled: v } : d));
+              void toggleEnabled(task.id, v);
+            }}
+            className="scale-[0.7]"
+          />
+          <span className="text-[12px] text-text-secondary">{draft.enabled ? t("active") : t("inactive")}</span>
+        </div>
+        <div className="flex items-center border-border border-r px-2">
+          <FolderSelect
+            scheduleId={task.id}
+            value={draft.workingDir}
+            homeFolder={homeFolder}
+            onChange={(v) => setDraft((d) => (d ? { ...d, workingDir: v } : d))}
+            onFoldersChange={setFolders}
+            t={t}
+          />
+        </div>
+        <div className="flex items-center border-border border-r px-2">
+          {folders.length >= 2 ? (
+            // One branch per selected folder.
+            <MultiBranchSelect folders={folders} branchOf={branchOf} onChange={setBranch} t={t} />
+          ) : (
+            <BranchSelect
+              value={branchOf(folders[0] ?? draft.workingDir, true)}
+              repoPath={folders[0] ?? draft.workingDir}
+              onChange={(v) => setBranch(folders[0] ?? draft.workingDir, v, true)}
+              t={t}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Tags row. */}
+      <TagsEditor
+        tags={draft.tags}
+        suggestions={tagSuggestions}
+        onChange={(tags) => setDraft((d) => (d ? { ...d, tags } : d))}
+        tagColors={tagColorMap}
+        onColorChange={(tag, value) => {
+          setTagColorMap((m) =>
+            value === null ? Object.fromEntries(Object.entries(m).filter(([k]) => k !== tag)) : { ...m, [tag]: value },
+          );
+        }}
+        customPalette={customPalette}
+        onAddCustomColor={addCustomColor}
+        onDeleteCustomColor={requestDeleteCustomColor}
+        t={t}
+      />
+
+      {/* Settings / Runs & History tabs. */}
+      <div className="flex items-center gap-1.5 pt-4">
+        <SegTab active={tab === "settings"} onClick={() => setTab("settings")}>
+          {t("tabs.settings")}
+        </SegTab>
+        <SegTab active={tab === "runs"} onClick={() => setTab("runs")}>
+          {t("tabs.runs")}
+        </SegTab>
+      </div>
+
+      <div className="pt-2 pb-10">
+        {tab === "settings" ? (
+          <SettingsTab
+            draft={draft}
+            setDraft={setDraft}
+            agents={settings.agents}
+            defaultAgentId={settings.defaultAgentId}
+            t={t}
+          />
+        ) : (
+          <RunsHistory cards={runs} seeAllHref="/history" />
+        )}
+      </div>
+
+      <AlertDialog open={!!pendingDeleteColor} onOpenChange={(open) => !open && setPendingDeleteColor(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("deleteColorTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("deleteColorDescription", {
+                patrols: pendingDeleteColor?.affectedPatrolNames.join(", ") ?? "",
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("deleteColorCancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteCustomColor}>{t("deleteColorConfirm")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared bits
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SegTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-state={active ? "active" : "inactive"}
+      className={cn(
+        "rounded-[10px] px-2 py-[3px] text-[12px] transition-colors",
+        active ? "bg-card-background-secondary text-text-primary" : "text-text-secondary hover:text-text-primary",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function triggeredAt(card: KanbanCard): string {
+  return card.agentRunStartedAt ?? card.createdAt;
+}
+
+/** Sensible default tags offered when the workspace has no tag vocabulary yet. */
+const DEFAULT_TAG_SUGGESTIONS = [
+  "daily",
+  "weekly",
+  "review",
+  "urgent",
+  "summary",
+  "scheduled",
+  "tests",
+  "security",
+  "triage",
+  "cleanup",
+];
+
+/** Editable tag chips + a "+ New tag" inline input with suggestions. */
+function TagsEditor({
+  tags,
+  suggestions,
+  onChange,
+  tagColors,
+  onColorChange,
+  customPalette,
+  onAddCustomColor,
+  onDeleteCustomColor,
+  t,
+}: {
+  tags: string[];
+  suggestions: string[];
+  onChange: (tags: string[]) => void;
+  tagColors: Record<string, number | string>;
+  onColorChange: (tag: string, value: number | string | null) => void;
+  customPalette: string[];
+  onAddCustomColor: (hex: string) => void;
+  onDeleteCustomColor: (hex: string) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [input, setInput] = useState("");
+
+  const addTag = (raw: string) => {
+    const tag = normalizeTag(raw);
+    if (tag && !tags.includes(tag)) onChange([...tags, tag]);
+    setInput("");
+  };
+  const close = () => {
+    setInput("");
+    setAdding(false);
+  };
+
+  const q = input.trim().toLowerCase();
+  const pool = [...new Set([...suggestions, ...DEFAULT_TAG_SUGGESTIONS])];
+  const matches = pool.filter((s) => !tags.includes(s) && (!q || s.toLowerCase().includes(q))).slice(0, 8);
+  const showCreate = q && !pool.some((s) => s.toLowerCase() === q) && !tags.includes(normalizeTag(input));
+
+  const BASE_CHIP = "flex h-6 items-center gap-1 rounded-2xl border px-2 text-[12px]";
+
+  return (
+    <div className="flex items-center gap-2 pt-4">
+      <span className="pr-1 text-[12px] text-text-tertiary">{t("tags")}</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {tags.map((tag) => {
+          const colorOverride = tagColors[tag];
+          const isCustomHex = typeof colorOverride === "string";
+          const paletteOverride = typeof colorOverride === "number" ? colorOverride : undefined;
+
+          const chipClassName = isCustomHex ? BASE_CHIP : tagClassName(tag, BASE_CHIP, paletteOverride);
+          const chipStyle = isCustomHex
+            ? { backgroundColor: `${colorOverride}20`, borderColor: `${colorOverride}40`, color: colorOverride }
+            : undefined;
+
+          return (
+            <Popover key={tag}>
+              <div className={chipClassName} style={chipStyle}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={t("changeColor")}
+                    className="cursor-pointer text-[12px] leading-none"
+                  >
+                    {tag}
+                  </button>
+                </PopoverTrigger>
+                <button
+                  type="button"
+                  aria-label={t("removeTag")}
+                  onClick={() => onChange(tags.filter((x) => x !== tag))}
+                  className="opacity-60 transition-opacity hover:opacity-100"
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </div>
+              <PopoverContent side="top" align="start" className="w-auto p-0">
+                <TagColorPicker
+                  tag={tag}
+                  tagColors={tagColors}
+                  customPalette={customPalette}
+                  onColorChange={onColorChange}
+                  onAddCustomColor={onAddCustomColor}
+                  onDeleteCustomColor={onDeleteCustomColor}
+                  t={t}
+                />
+              </PopoverContent>
+            </Popover>
+          );
+        })}
+        {adding ? (
+          <div className="relative">
+            <input
+              // biome-ignore lint/a11y/noAutofocus: focus the inline tag field the user just opened.
+              autoFocus
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              // Delay close so a suggestion click (mousedown) registers first.
+              onBlur={() => setTimeout(close, 120)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addTag(input);
+                } else if (e.key === "Escape") {
+                  close();
+                }
+              }}
+              placeholder={t("tagPlaceholder")}
+              className="h-6 w-32 rounded-2xl border border-border bg-transparent px-2 text-[12px] text-text-primary outline-none"
+            />
+            {(matches.length > 0 || showCreate) && (
+              <div className="absolute top-7 left-0 z-50 flex max-h-56 w-44 flex-col gap-0.5 overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
+                {matches.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => addTag(s)}
+                    className={tagClassName(
+                      s,
+                      "flex h-6 w-fit items-center rounded-2xl border px-2 text-[12px] transition-opacity hover:opacity-80",
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+                {showCreate && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => addTag(input)}
+                    className="flex items-center gap-1 rounded px-1.5 py-1 text-left text-[12px] text-text-secondary transition-colors hover:bg-muted/40 hover:text-text-primary"
+                  >
+                    <PlusIcon className="size-3" />
+                    {t("createTag", { tag: normalizeTag(input) })}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex h-6 items-center rounded-2xl border border-border-cards bg-muted/30 px-2 text-[12px] text-text-secondary transition-colors hover:text-text-primary"
+          >
+            {t("newTag")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Color picker popover content — predefined swatches + custom palette + add button. */
+function TagColorPicker({
+  tag,
+  tagColors,
+  customPalette,
+  onColorChange,
+  onAddCustomColor,
+  onDeleteCustomColor,
+  t,
+}: {
+  tag: string;
+  tagColors: Record<string, number | string>;
+  customPalette: string[];
+  onColorChange: (tag: string, value: number | string | null) => void;
+  onAddCustomColor: (hex: string) => void;
+  onDeleteCustomColor: (hex: string) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [addingColor, setAddingColor] = useState(false);
+  const [newColorHex, setNewColorHex] = useState("#6366f1");
+
+  const colorOverride = tagColors[tag];
+  const isCustomHex = typeof colorOverride === "string";
+  const paletteOverride = typeof colorOverride === "number" ? colorOverride : undefined;
+  const effectiveIndex = paletteOverride ?? tagHashIndex(tag);
+  const hasOverride = colorOverride !== undefined;
+
+  return (
+    <div className="flex flex-col gap-1.5 p-2">
+      {/* Swatch row: 8 predefined + custom palette + "+" */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {TAG_SWATCH_CLASSES.map((cls, i) => (
+          <button
+            key={cls}
+            type="button"
+            aria-label={`Color ${i + 1}`}
+            onClick={() => onColorChange(tag, i)}
+            className={cn(
+              "size-5 rounded-full border-2 transition-transform hover:scale-110",
+              cls,
+              !isCustomHex && effectiveIndex === i && "ring-2 ring-current ring-offset-1",
+            )}
+          />
+        ))}
+
+        {customPalette.map((hex) => (
+          <div key={hex} className="group relative">
+            <button
+              type="button"
+              aria-label={hex}
+              onClick={() => onColorChange(tag, hex)}
+              className={cn(
+                "size-5 rounded-full border-2 transition-transform hover:scale-110",
+                isCustomHex && colorOverride === hex && "ring-2 ring-offset-1",
+              )}
+              style={{
+                backgroundColor: hex,
+                borderColor: `${hex}cc`,
+                ["--tw-ring-color" as string]: hex,
+              }}
+            />
+            <button
+              type="button"
+              aria-label={t("deleteColor")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteCustomColor(hex);
+              }}
+              className="absolute -top-1 -right-1 hidden size-3.5 items-center justify-center rounded-full border border-border bg-card-background text-text-secondary group-hover:flex"
+            >
+              <XIcon className="size-2" />
+            </button>
+          </div>
+        ))}
+
+        {/* Add custom color */}
+        {addingColor ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="color"
+              value={newColorHex}
+              onChange={(e) => setNewColorHex(e.target.value)}
+              className="size-5 cursor-pointer rounded border-0 bg-transparent p-0"
+            />
+            <button
+              type="button"
+              aria-label={t("addColor")}
+              onClick={() => {
+                onAddCustomColor(newColorHex);
+                onColorChange(tag, newColorHex);
+                setAddingColor(false);
+              }}
+              className="flex size-5 items-center justify-center rounded border border-border text-text-secondary hover:text-text-primary"
+            >
+              <CheckIcon className="size-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddingColor(false)}
+              className="flex size-5 items-center justify-center rounded text-text-tertiary hover:text-text-primary"
+            >
+              <XIcon className="size-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            aria-label={t("addColor")}
+            onClick={() => setAddingColor(true)}
+            className="flex size-5 items-center justify-center rounded-full border-2 border-border border-dashed text-text-tertiary transition-colors hover:border-text-tertiary hover:text-text-primary"
+          >
+            <PlusIcon className="size-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Reset to auto */}
+      {hasOverride && (
+        <div className="border-border border-t pt-1">
+          <button
+            type="button"
+            onClick={() => onColorChange(tag, null)}
+            className="text-[11px] text-text-tertiary transition-colors hover:text-text-primary"
+          >
+            {t("colorReset")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings tab — Triggers card + Agent Instruction card
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SettingsTab({
+  draft,
+  setDraft,
+  agents,
+  defaultAgentId,
+  t,
+}: {
+  draft: Draft;
+  setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
+  agents: AgentPreset[];
+  defaultAgentId?: string;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div className="flex flex-col gap-7">
+      {/* Triggers */}
+      <section className="flex flex-col gap-2.5">
+        <span className="px-2 text-[12px] text-text-secondary">{t("triggers")}</span>
+        <TriggersCard
+          schedule={draft.schedule}
+          onChange={(schedule) => setDraft((d) => (d ? { ...d, schedule } : d))}
+          onRemove={() => setDraft((d) => (d ? { ...d, schedule: null } : d))}
+          t={t}
+        />
+      </section>
+
+      {/* Agent Instruction */}
+      <section className="flex flex-col gap-2.5">
+        <span className="px-2 text-[12px] text-text-secondary">{t("agentInstruction")}</span>
+        <div className="flex flex-col gap-4 rounded-xl border border-border-cards bg-card-background p-4">
+          <Textarea
+            value={draft.agentPrompt}
+            onChange={(e) => setDraft((d) => (d ? { ...d, agentPrompt: e.target.value } : d))}
+            spellCheck={false}
+            className="min-h-[182px] resize-y border-0 bg-transparent p-0 text-[12px] text-text-primary shadow-none focus-visible:ring-0 dark:bg-transparent"
+            placeholder={t("instructionPlaceholder")}
+          />
+          <div className="border-border border-t pt-4">
+            <AgentPresetSection
+              draft={draft}
+              setDraft={setDraft}
+              agents={agents}
+              defaultAgentId={defaultAgentId}
+              t={t}
+            />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * True when the schedule's agent config diverges from the selected preset's
+ * defaults — i.e. a preset *with overrides*. The per-schedule `--branch=` token
+ * isn't a preset setting, so it's excluded from the comparison.
+ */
+function isPresetOverridden(draft: Draft, preset: AgentPreset): boolean {
+  const stripBranch = (f: string[]) => f.filter((tok) => tok !== "--branch" && !tok.startsWith("--branch="));
+  const presetFlags = stripBranch(preset.flags ?? []).sort();
+  // Empty non-branch flags = inherit the preset (the branch token isn't an override).
+  const draftFlags = stripBranch(draft.agentFlags);
+  const effectiveFlags = (draftFlags.length ? draftFlags : presetFlags).slice().sort();
+  const flagsDiff = JSON.stringify(effectiveFlags) !== JSON.stringify(presetFlags);
+  const worktreeDiff = (draft.useWorktree ?? preset.useWorktree ?? false) !== (preset.useWorktree ?? false);
+  const launchDiff = (draft.launchVia ?? preset.launchVia ?? "direct") !== (preset.launchVia ?? "direct");
+  const ollamaDiff = (draft.ollamaModel ?? preset.ollamaModel ?? "") !== (preset.ollamaModel ?? "");
+  return flagsDiff || worktreeDiff || launchDiff || ollamaDiff;
+}
+
+/** Agent preset selector + collapsible per-run override (worktree, skip-permissions,
+ *  model, effort, all options) — same capability as the old schedule modal. */
+function AgentPresetSection({
+  draft,
+  setDraft,
+  agents,
+  defaultAgentId,
+  t,
+}: {
+  draft: Draft;
+  setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
+  agents: AgentPreset[];
+  defaultAgentId?: string;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  if (agents.length === 0) return null;
+  // biome-ignore lint/nursery/useNullishCoalescing: empty string must fall through to the next default.
+  const presetId = draft.agentPresetId || defaultAgentId || agents[0]?.id || "";
+  const selected = agents.find((p) => p.id === presetId);
+  const overridden = selected ? isPresetOverridden(draft, selected) : false;
+
+  // The branch token rides inside agentFlags but isn't a preset override. When the
+  // schedule has no real flag override, feed AgentOptions the preset's defaults (so
+  // they display as inherited) plus the branch chip.
+  const isBranchTok = (tok: string) => tok === "--branch" || tok.startsWith("--branch=");
+  const branchTokens = draft.agentFlags.filter(isBranchTok);
+  const draftNonBranch = draft.agentFlags.filter((tok) => !isBranchTok(tok));
+  const optionFlags = draftNonBranch.length ? draft.agentFlags : [...(selected?.flags ?? []), ...branchTokens];
+
+  // Reset overrides → inherit the preset again (keep the branch selection).
+  const resetOverrides = () =>
+    setDraft((d) =>
+      d
+        ? {
+            ...d,
+            agentFlags: d.agentFlags.filter(isBranchTok),
+            useWorktree: undefined,
+            launchVia: undefined,
+            ollamaModel: undefined,
+          }
+        : d,
+    );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="flex items-center gap-2 text-[12px] text-text-secondary">
+        {t("agentPreset")}
+        {overridden && (
+          <>
+            <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 font-medium text-[9px] text-amber-600">
+              {t("overridden")}
+            </span>
+            <button
+              type="button"
+              onClick={resetOverrides}
+              className="inline-flex items-center gap-1 text-[11px] text-text-tertiary transition-colors hover:text-text-primary"
+            >
+              <RotateCcwIcon className="size-3" />
+              {t("resetOverrides")}
+            </button>
+          </>
+        )}
+      </span>
+      <Select value={presetId} onValueChange={(v) => setDraft((d) => (d ? { ...d, agentPresetId: v } : d))}>
+        <SelectTrigger className="h-9 w-full max-w-xs text-[13px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {agents.map((p) => {
+            const r = loadTestResult(p.id);
+            return (
+              <SelectItem key={p.id} value={p.id} className="text-[13px]">
+                <span className="flex items-center gap-2">
+                  {p.name}
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium text-[9px]",
+                      r?.status === "passed"
+                        ? "bg-green-500/15 text-green-600"
+                        : r?.status === "failed"
+                          ? "bg-red-500/15 text-red-600"
+                          : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {r?.status === "passed" ? (
+                      <CheckCircle2Icon className="size-2.5" />
+                    ) : r?.status === "failed" ? (
+                      <XCircleIcon className="size-2.5" />
+                    ) : null}
+                    {r?.status === "passed" ? t("tested") : r?.status === "failed" ? t("testFailed") : t("untested")}
+                  </span>
+                </span>
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+
+      {selected && (
+        <details className="group rounded-md border border-border-cards bg-card-background-secondary px-2.5 py-2">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-[12px] text-text-secondary hover:text-text-primary">
+            <ChevronRightIcon className="size-3 transition-transform group-open:rotate-90" />
+            {t("override")}
+            {overridden && <span className="size-1.5 rounded-full bg-amber-500" title={t("overridden")} />}
+          </summary>
+          <div className="pt-2">
+            <AgentOptions
+              binary={selected.binary}
+              flags={optionFlags}
+              useWorktree={draft.useWorktree ?? selected.useWorktree ?? false}
+              launchVia={draft.launchVia ?? selected.launchVia ?? "direct"}
+              ollamaModel={draft.ollamaModel ?? selected.ollamaModel ?? ""}
+              onFlagsChange={(flags) => setDraft((d) => (d ? { ...d, agentFlags: flags } : d))}
+              onWorktreeChange={(v) => setDraft((d) => (d ? { ...d, useWorktree: v } : d))}
+              onLaunchViaChange={(v) => setDraft((d) => (d ? { ...d, launchVia: v } : d))}
+              onOllamaModelChange={(v) => setDraft((d) => (d ? { ...d, ollamaModel: v } : d))}
+            />
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+// ── Folder & branch selectors (next to the status toggle) ────────────────────
+
+// No GitHub connection yet → we don't list remote repos. Instead the user picks
+// one or more local folders to work on (OS folder picker). The schedule backend
+// stores a single workingDir, so the *primary* (first) folder is persisted there;
+// the full multi-folder selection is remembered per schedule in localStorage.
+const RECENT_FOLDERS_KEY = "myra:scheduleEdit:recentFolders";
+const folderListKey = (scheduleId: string) => `myra:scheduleEdit:folders:${scheduleId}`;
+// Per-folder branch overrides ({ folderPath → branch }), app-local. The *primary*
+// folder's branch also mirrors to agentFlags `--branch=` (the only one persisted
+// server-side); extra folders' branches live here only.
+const branchMapKey = (scheduleId: string) => `myra:scheduleEdit:branches:${scheduleId}`;
+
+function readBranchMap(scheduleId: string): Record<string, string> {
+  try {
+    const raw = getLocalStorageValue(branchMapKey(scheduleId));
+    const obj = raw ? JSON.parse(raw) : {};
+    return obj && typeof obj === "object" ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+const GLOBAL_TAG_COLOR_KEY = "myra:tagColors:byTag";
+
+function readGlobalTagColorMap(): Record<string, number | string> {
+  try {
+    const raw = getLocalStorageValue(GLOBAL_TAG_COLOR_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return obj && typeof obj === "object" ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeGlobalTagColorMap(map: Record<string, number | string>): void {
+  setLocalStorageValue(GLOBAL_TAG_COLOR_KEY, JSON.stringify(map));
+}
+
+const CUSTOM_PALETTE_KEY = "myra:tagColors:customPalette";
+
+function readCustomPalette(): string[] {
+  try {
+    const raw = getLocalStorageValue(CUSTOM_PALETTE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCustomPalette(palette: string[]): void {
+  setLocalStorageValue(CUSTOM_PALETTE_KEY, JSON.stringify(palette));
+}
+
+/** Last path segment — the short repo/folder name shown on the trigger button. */
+function baseName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
+
+function readRecents(key: string): string[] {
+  try {
+    const raw = getLocalStorageValue(key);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function pushRecent(key: string, value: string) {
+  const v = value.trim();
+  if (!v) return;
+  const next = [v, ...readRecents(key).filter((x) => x !== v)].slice(0, 5);
+  setLocalStorageValue(key, JSON.stringify(next));
+}
+
+/**
+ * Local-folder picker (no GitHub repo listing). The user picks one or more
+ * folders to work on; the primary (first) folder is saved as the schedule's
+ * workingDir, the rest are remembered per schedule. Toggling keeps the menu open.
+ */
+function FolderSelect({
+  scheduleId,
+  value,
+  homeFolder,
+  onChange,
+  onFoldersChange,
+  t,
+}: {
+  scheduleId: string;
+  value: string;
+  /** Configurable base folder (Settings); its subfolders are offered as options. */
+  homeFolder: string;
+  onChange: (primary: string) => void;
+  /** Report the full selected-folder list up (so the branch picker can show one per folder). */
+  onFoldersChange?: (folders: string[]) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [query, setQuery] = useState("");
+  const [folders, setFolders] = useState<string[]>([]);
+  const [recents, setRecents] = useState<string[]>([]);
+  const [subfolders, setSubfolders] = useState<string[]>([]);
+
+  // Seed once on mount: the per-schedule folder list, falling back to the saved
+  // workingDir; plus the global "recently used folders" list.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    const stored = readRecents(folderListKey(scheduleId));
+    const initial = stored.length ? stored : value ? [value] : [];
+    setFolders(initial);
+    onFoldersChange?.(initial);
+    setRecents(readRecents(RECENT_FOLDERS_KEY));
+  }, [scheduleId, value, onFoldersChange]);
+
+  // List the home folder's immediate subdirectories (desktop only) when opened.
+  const loadSubfolders = useCallback(async () => {
+    if (!isTauri() || !homeFolder.trim()) {
+      setSubfolders([]);
+      return;
+    }
+    try {
+      setSubfolders(await tauriInvoke<string[]>("list_subfolders", { path: homeFolder.trim() }));
+    } catch (e) {
+      console.warn("list_subfolders failed", e);
+      setSubfolders([]);
+    }
+  }, [homeFolder]);
+
+  // Persist the selection and surface the primary folder to the schedule.
+  const commit = (next: string[]) => {
+    setFolders(next);
+    setLocalStorageValue(folderListKey(scheduleId), JSON.stringify(next));
+    onChange(next[0] ?? "");
+    onFoldersChange?.(next);
+  };
+
+  const toggle = (path: string) => {
+    if (folders.includes(path)) {
+      commit(folders.filter((f) => f !== path));
+    } else {
+      commit([...folders, path]);
+      pushRecent(RECENT_FOLDERS_KEY, path);
+      setRecents(readRecents(RECENT_FOLDERS_KEY));
+    }
+  };
+
+  const addPicked = (paths: string[]) => {
+    const clean = paths.map((p) => p.trim()).filter(Boolean);
+    if (!clean.length) return;
+    for (const p of clean) pushRecent(RECENT_FOLDERS_KEY, p);
+    setRecents(readRecents(RECENT_FOLDERS_KEY));
+    commit([...new Set([...folders, ...clean])]);
+  };
+
+  const addFolders = async () => {
+    // Desktop app: native OS folder browser (absolute paths, multi-select).
+    if (isTauri()) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({ directory: true, multiple: true, title: t("addFolders") });
+        addPicked(Array.isArray(selected) ? selected : selected ? [selected] : []);
+      } catch {
+        /* dialog unavailable */
+      }
+      return;
+    }
+    // Browser: the File System Access API directory chooser (Chromium). Web pages
+    // only get the folder *name* (the OS hides absolute paths); the desktop build
+    // uses the Tauri picker above for real paths.
+    const pickDir = (
+      window as unknown as {
+        showDirectoryPicker?: (opts?: { mode?: "read" | "readwrite" }) => Promise<{ name: string }>;
+      }
+    ).showDirectoryPicker;
+    if (typeof pickDir === "function") {
+      try {
+        const handle = await pickDir({ mode: "read" });
+        if (handle?.name) addPicked([handle.name]);
+      } catch {
+        /* user dismissed the picker */
+      }
+      return;
+    }
+    // Last resort (browsers without the API, e.g. Firefox): type a path.
+    const typed = window.prompt(t("addFolders"));
+    if (typed) addPicked([typed]);
+  };
+
+  const label =
+    folders.length === 0
+      ? t("selectFolder")
+      : folders.length === 1
+        ? baseName(folders[0])
+        : `${baseName(folders[0])} +${folders.length - 1}`;
+
+  const home = homeFolder.trim();
+  const q = query.trim().toLowerCase();
+  // Subfolders of home + recents + already-selected, minus the home folder itself
+  // (it has its own row), filtered by the query.
+  const known = [...new Set([...subfolders, ...folders, ...recents])]
+    .filter((r) => r !== home)
+    .filter((r) => !q || r.toLowerCase().includes(q));
+
+  return (
+    <DropdownMenu onOpenChange={(open) => open && void loadSubfolders()}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[12px] text-text-secondary hover:text-text-primary"
+          title={folders.join("\n")}
+        >
+          {label}
+          <ChevronDownIcon className="size-3.5 text-icon-tertiary" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("searchFolders")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="max-h-72 overflow-y-auto p-1">
+          {home && (!q || t("home").toLowerCase().includes(q) || baseName(home).toLowerCase().includes(q)) && (
+            <DropdownMenuItem
+              className="gap-2 text-[13px]"
+              title={home}
+              onSelect={(e) => {
+                e.preventDefault();
+                toggle(home);
+              }}
+            >
+              <HomeIcon className="size-4 text-icon-secondary" />
+              <span className="truncate">{t("home")}</span>
+              {folders.includes(home) && <CheckIcon className="ml-auto size-3.5 text-icon-secondary" />}
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("folders")}</DropdownMenuLabel>
+          {known.length === 0 && <p className="px-2 py-1 text-[12px] text-text-tertiary">{t("noFoldersYet")}</p>}
+          {known.map((f) => (
+            <DropdownMenuItem
+              key={f}
+              className="gap-2 text-[13px]"
+              title={f}
+              onSelect={(e) => {
+                e.preventDefault();
+                toggle(f);
+              }}
+            >
+              <FolderIcon className="size-4 text-icon-secondary" />
+              <span className="truncate">{baseName(f)}</span>
+              {folders.includes(f) && <CheckIcon className="ml-auto size-3.5 text-icon-secondary" />}
+            </DropdownMenuItem>
+          ))}
+        </div>
+        <DropdownMenuSeparator className="my-0" />
+        <div className="p-1">
+          <DropdownMenuItem
+            className="gap-2 text-[13px]"
+            onSelect={(e) => {
+              e.preventDefault();
+              void addFolders();
+            }}
+          >
+            <PlusIcon className="size-4 text-icon-secondary" />
+            {t("addFolders")}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="gap-2 text-[13px]"
+            onSelect={(e) => {
+              e.preventDefault();
+              setRecents(readRecents(RECENT_FOLDERS_KEY));
+              void loadSubfolders();
+            }}
+          >
+            <RefreshCwIcon className="size-4 text-icon-secondary" />
+            {t("refresh")}
+          </DropdownMenuItem>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+type GitBranches = { isGit: boolean; current: string | null; local: string[]; remote: string[] };
+
+/**
+ * Branch picker. When the selected folder is a git work tree (desktop only), it
+ * shows the checked-out branch and lets the user pick any local or remote
+ * (origin/…) branch. Otherwise it degrades to "main" + recents + type-to-set.
+ */
+function BranchSelect({
+  value,
+  repoPath,
+  onChange,
+  t,
+}: {
+  value: string;
+  repoPath: string;
+  onChange: (v: string) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [query, setQuery] = useState("");
+  const [git, setGit] = useState<GitBranches | null>(null);
+
+  // Re-read git branches each time the menu opens (folder may have changed).
+  const loadGit = useCallback(async () => {
+    if (!isTauri() || !repoPath.trim()) {
+      setGit(null);
+      return;
+    }
+    try {
+      // Tauri shell command (runs git on the host) — not a sidecar/board command,
+      // so it must go through the core invoke, not the connection transport.
+      const data = await tauriInvoke<GitBranches>("git_branches", { path: repoPath.trim() });
+      setGit(data.isGit ? data : null);
+    } catch (e) {
+      console.warn("git_branches failed", e);
+      setGit(null);
+    }
+  }, [repoPath]);
+
+  const pick = (v: string) => {
+    onChange(v);
+    setQuery("");
+  };
+
+  // git mode: create the typed branch (from HEAD), then select it.
+  const createBranch = async (name: string) => {
+    if (!isTauri() || !repoPath.trim()) return;
+    try {
+      await tauriInvoke("git_create_branch", { path: repoPath.trim(), name });
+      await loadGit();
+      pick(name);
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
+
+  const q = query.trim();
+  const ql = q.toLowerCase();
+  // Effective branch shown on the button: explicit choice → git HEAD → main.
+  const effective = value || git?.current || "main";
+  const match = (b: string) => !ql || b.toLowerCase().includes(ql);
+
+  const local = (git?.local ?? []).filter(match);
+  const remote = (git?.remote ?? []).filter(match);
+  // Non-git fallback: never persist typed branches — only surface the one that is
+  // currently selected (so it shows as picked), nothing more.
+  const selectedExtra = value && value !== "main" && match(value) ? [value] : [];
+  const known = git ? [git.current ?? "", ...local, ...remote] : ["main", ...selectedExtra];
+  const showCustom = q && !known.includes(q);
+
+  return (
+    <DropdownMenu onOpenChange={(open) => open && void loadGit()}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[12px] text-text-secondary hover:text-text-primary"
+        >
+          {effective}
+          <ChevronDownIcon className="size-3.5 text-icon-tertiary" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("searchBranches")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="max-h-72 overflow-y-auto p-1">
+          {git ? (
+            <>
+              {git.current && match(git.current) && (
+                <>
+                  <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("branchCurrent")}</DropdownMenuLabel>
+                  <BranchItem name={git.current} selected={effective === git.current} onPick={pick} />
+                </>
+              )}
+              {local.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("branchLocal")}</DropdownMenuLabel>
+                  {local.map((b) => (
+                    <BranchItem key={`l-${b}`} name={b} selected={value === b} onPick={pick} />
+                  ))}
+                </>
+              )}
+              {remote.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("branchOrigin")}</DropdownMenuLabel>
+                  {remote.map((b) => (
+                    <BranchItem key={`r-${b}`} name={b} selected={value === b} onPick={pick} />
+                  ))}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("branchDefault")}</DropdownMenuLabel>
+              <BranchItem name="main" selected={!value || value === "main"} onPick={pick} />
+              {selectedExtra.length > 0 && (
+                <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("branches")}</DropdownMenuLabel>
+              )}
+              {selectedExtra.map((b) => (
+                <BranchItem key={b} name={b} selected={value === b} onPick={pick} />
+              ))}
+            </>
+          )}
+          {showCustom &&
+            (git ? (
+              // git repo → create the branch for real, then select it.
+              <DropdownMenuItem className="gap-2 text-[13px]" onSelect={() => void createBranch(q)}>
+                <GitBranchIcon className="size-4 text-icon-secondary" />
+                {t("createBranch", { branch: q })}
+              </DropdownMenuItem>
+            ) : (
+              // No git source → just set the typed name.
+              <DropdownMenuItem className="gap-2 text-[13px]" onSelect={() => pick(q)}>
+                {t("useBranch", { branch: q })}
+              </DropdownMenuItem>
+            ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function BranchItem({ name, selected, onPick }: { name: string; selected: boolean; onPick: (v: string) => void }) {
+  return (
+    <DropdownMenuItem className={cn("gap-2 text-[13px]", selected && "bg-muted/40")} onSelect={() => onPick(name)}>
+      <span className="truncate">{name}</span>
+      {selected && <CheckIcon className="ml-auto size-3.5 text-icon-secondary" />}
+    </DropdownMenuItem>
+  );
+}
+
+/** When 2+ folders are selected: a popover with one branch picker per folder. */
+function MultiBranchSelect({
+  folders,
+  branchOf,
+  onChange,
+  t,
+}: {
+  folders: string[];
+  branchOf: (folder: string, isPrimary: boolean) => string;
+  onChange: (folder: string, branch: string, isPrimary: boolean) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[12px] text-text-secondary hover:text-text-primary"
+        >
+          {t("branchesCount", { count: folders.length })}
+          <ChevronDownIcon className="size-3.5 text-icon-tertiary" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="flex w-80 flex-col gap-2 p-2">
+        <p className="px-1 text-[11px] text-text-tertiary">{t("branchPerFolder")}</p>
+        {folders.map((f, i) => (
+          <div
+            key={f}
+            className="flex items-center justify-between gap-3 border-border border-b pb-2 last:border-b-0 last:pb-0"
+          >
+            <span className="truncate text-[12px] text-text-secondary" title={f}>
+              {baseName(f)}
+              {i === 0 && <span className="ml-1 text-[10px] text-text-tertiary">({t("primary")})</span>}
+            </span>
+            <BranchSelect value={branchOf(f, i === 0)} repoPath={f} onChange={(v) => onChange(f, v, i === 0)} t={t} />
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ── Triggers card ────────────────────────────────────────────────────────────
+// A list of trigger rows + an always-present "Add Trigger" row. With no rows the
+// card shows only "Add Trigger" (empty state). The backend models a single
+// cron-style schedule, so today there is exactly one schedule trigger row;
+// clicking a row edits it, "Add Trigger" picks/replaces the schedule kind.
+
+/** Friendlier wording than describeSchedule for the common cadences. */
+function triggerLabel(kind: ScheduledTask["schedule"]): string {
+  if (kind.type === "interval" && kind.minutes % 60 === 0) {
+    const h = kind.minutes / 60;
+    return h === 1 ? "Every hour" : `Every ${h} hours`;
+  }
+  return describeSchedule(kind);
+}
+
+function TriggersCard({
+  schedule,
+  onChange,
+  onRemove,
+  t,
+}: {
+  schedule: ScheduledTask["schedule"] | null;
+  onChange: (s: ScheduledTask["schedule"]) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const triggers = schedule ? [schedule] : [];
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
+      {triggers.map((trig, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: single positional schedule trigger.
+        <TriggerRow key={i} value={trig} onChange={onChange} onRemove={onRemove} t={t} />
+      ))}
+      {/* Only one scheduled trigger is supported → tell the menu to disable it. */}
+      <AddTriggerMenu onPick={onChange} hasScheduled={schedule !== null} t={t} />
+    </div>
+  );
+}
+
+/** One trigger row — click to edit; trash icon on hover removes it. */
+function TriggerRow({
+  value,
+  onChange,
+  onRemove,
+  t,
+}: {
+  value: ScheduledTask["schedule"];
+  onChange: (s: ScheduledTask["schedule"]) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div className="group relative flex items-center">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 py-3.5 pr-12 pl-4 text-left transition-colors hover:bg-muted/20"
+          >
+            <ClockIcon className="size-[18px] shrink-0 text-icon-secondary" />
+            <span className="text-[14px] text-text-primary">{triggerLabel(value)}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-72 flex-col gap-3">
+          <ScheduleKindFields value={value} onChange={onChange} t={t} />
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={t("removeTrigger")}
+        onClick={onRemove}
+        className="absolute right-3 flex size-7 items-center justify-center rounded-md text-icon-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2Icon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+/** "+ Add Trigger" row → dropdown with a search box and trigger categories. */
+function AddTriggerMenu({
+  onPick,
+  hasScheduled,
+  t,
+}: {
+  onPick: (s: ScheduledTask["schedule"]) => void;
+  hasScheduled: boolean;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [query, setQuery] = useState("");
+
+  const scheduled: { key: "hourly" | "daily" | "weekly" | "custom"; make: () => ScheduledTask["schedule"] }[] = [
+    { key: "hourly", make: () => ({ type: "interval", start: "09:00", minutes: 60 }) },
+    { key: "daily", make: () => defaultScheduleKind("daily") },
+    { key: "weekly", make: () => defaultScheduleKind("weekly") },
+    { key: "custom", make: () => defaultScheduleKind("cron") },
+  ];
+
+  // Event-driven connectors aren't in the schedule model yet — surfaced for parity
+  // with the design, flagged as coming soon.
+  const connectors: { key: "github" | "slack" | "teams" | "sentry" | "linear"; icon: React.ReactNode }[] = [
+    { key: "github", icon: <GitBranchIcon className="size-4 text-icon-secondary" /> },
+    { key: "slack", icon: <MessageSquareIcon className="size-4 text-icon-secondary" /> },
+    { key: "teams", icon: <UsersIcon className="size-4 text-icon-secondary" /> },
+    { key: "sentry", icon: <TriangleAlertIcon className="size-4 text-icon-secondary" /> },
+    { key: "linear", icon: <ActivityIcon className="size-4 text-icon-secondary" /> },
+  ];
+
+  const q = query.trim().toLowerCase();
+  const showScheduled = !q || t("categories.scheduled").toLowerCase().includes(q);
+  const visibleConnectors = connectors.filter((c) => !q || t(`categories.${c.key}`).toLowerCase().includes(q));
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-text-secondary transition-colors hover:bg-muted/20 hover:text-text-primary"
+        >
+          <PlusIcon className="size-[18px] shrink-0" />
+          <span className="text-[14px]">{t("addTrigger")}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("searchTriggers")}
+            // Let the dropdown's typeahead ignore keystrokes meant for the box.
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="p-1">
+          {showScheduled &&
+            (hasScheduled ? (
+              // A scheduled trigger already exists — only one is supported, so the
+              // category is disabled with a tooltip explaining why.
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    aria-disabled
+                    className="flex cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-text-tertiary opacity-60"
+                  >
+                    <ClockIcon className="size-4 text-icon-tertiary" />
+                    {t("categories.scheduled")}
+                    <ChevronRightIcon className="ml-auto size-4 text-icon-tertiary" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">{t("oneScheduledOnly")}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                  <ClockIcon className="size-4 text-icon-secondary" />
+                  {t("categories.scheduled")}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {scheduled.map((s) => (
+                    <DropdownMenuItem key={s.key} className="text-[13px]" onSelect={() => onPick(s.make())}>
+                      {t(`scheduledOptions.${s.key}`)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            ))}
+          {visibleConnectors.map((c) => (
+            <DropdownMenuSub key={c.key}>
+              <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                {c.icon}
+                {t(`categories.${c.key}`)}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem disabled className="text-[13px]">
+                  {t("comingSoon")}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ))}
+          {!showScheduled && visibleConnectors.length === 0 && (
+            <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noTriggers")}</p>
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Compact schedule-kind editor (kind select + per-kind fields). */
+function ScheduleKindFields({
+  value,
+  onChange,
+  t,
+}: {
+  value: ScheduledTask["schedule"];
+  onChange: (s: ScheduledTask["schedule"]) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const kinds: ScheduleKindType[] = ["once", "daily", "weekly", "interval", "cron"];
+  return (
+    <>
+      <Select value={value.type} onValueChange={(v) => onChange(defaultScheduleKind(v as ScheduleKindType))}>
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {kinds.map((k) => (
+            <SelectItem key={k} value={k} className="text-xs">
+              {t(`kinds.${k}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {value.type === "daily" && (
+        <LabeledTime label={t("time")} value={value.time} onChange={(time) => onChange({ ...value, time })} />
+      )}
+      {value.type === "weekly" && (
+        <>
+          <DaysPicker
+            label={t("days")}
+            selected={value.days}
+            onToggle={(day) => {
+              const next = value.days.includes(day)
+                ? value.days.filter((d) => d !== day)
+                : [...value.days, day].sort((a, b) => a - b);
+              onChange({ ...value, days: next });
+            }}
+            t={t}
+          />
+          <LabeledTime label={t("time")} value={value.time} onChange={(time) => onChange({ ...value, time })} />
+        </>
+      )}
+      {value.type === "once" && (
+        <input
+          type="datetime-local"
+          value={value.at}
+          onChange={(e) => onChange({ ...value, at: e.target.value })}
+          className="h-8 rounded-md border border-border bg-transparent px-2 text-text-primary text-xs"
+        />
+      )}
+      {value.type === "interval" && (
+        <>
+          <label className="flex items-center justify-between text-text-secondary text-xs">
+            {t("everyMinutes")}
+            <input
+              type="number"
+              min={1}
+              value={value.minutes}
+              onChange={(e) => onChange({ ...value, minutes: Number(e.target.value) || 1 })}
+              className="h-8 w-20 rounded-md border border-border bg-transparent px-2 text-text-primary text-xs"
+            />
+          </label>
+          <LabeledTime label={t("startTime")} value={value.start} onChange={(start) => onChange({ ...value, start })} />
+        </>
+      )}
+      {value.type === "cron" && (
+        <input
+          value={value.expr}
+          onChange={(e) => onChange({ ...value, expr: e.target.value })}
+          placeholder="0 9 * * 1-5"
+          className="h-8 rounded-md border border-border bg-transparent px-2 font-mono text-text-primary text-xs"
+        />
+      )}
+      <p className="text-[11px] text-text-tertiary">{describeSchedule(value)}</p>
+    </>
+  );
+}
+
+/** Mon–Sun day toggles for the weekly schedule. Day numbers are 1=Mon … 7=Sun. */
+function DaysPicker({
+  label,
+  selected,
+  onToggle,
+  t,
+}: {
+  label: string;
+  selected: number[];
+  onToggle: (day: number) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const days = [1, 2, 3, 4, 5, 6, 7];
+  return (
+    <div className="flex items-center justify-between gap-2 text-text-secondary text-xs">
+      {label}
+      <div className="flex items-center gap-1">
+        {days.map((day) => {
+          const on = selected.includes(day);
+          return (
+            <button
+              key={day}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(day)}
+              className={cn(
+                "flex size-6 items-center justify-center rounded-md border text-[11px] transition-colors",
+                on
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-text-secondary hover:border-text-tertiary hover:text-text-primary",
+              )}
+            >
+              {t(`weekdays.${day}`)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LabeledTime({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex items-center justify-between text-text-secondary text-xs">
+      {label}
+      <input
+        type="time"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 w-28 rounded-md border border-border bg-transparent px-2 text-text-primary text-xs"
+      />
+    </label>
+  );
+}
