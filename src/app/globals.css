@@ -286,18 +286,7 @@ These serve as the fallback; there is no separate default.css file. */
   }
   html[data-tauri] [data-slot="sidebar-wrapper"] {
     background: var(--sidebar);
-    border-radius: 18px;
     overflow: hidden;
-  }
-
-  /* Full-viewport overlay backdrops render in a body-level portal, outside the
-     rounded wrapper, so their square corners would poke past the window's
-     rounded corners. Match the window radius so the blur stays inside. */
-  html[data-tauri] [data-slot="dialog-overlay"],
-  html[data-tauri] [data-slot="alert-dialog-overlay"],
-  html[data-tauri] [data-slot="sheet-overlay"],
-  html[data-tauri] [data-slot="drawer-overlay"] {
-    border-radius: 18px;
   }
 }
 
