@@ -267,7 +267,7 @@ function WindowControlsWindows({
   close: () => void;
 }) {
   return (
-    <div className="flex h-full items-stretch">
+    <div className="flex self-stretch items-stretch">
       <button
         aria-label="Minimize window"
         className="flex h-full w-[46px] items-center justify-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -316,7 +316,7 @@ function WindowControlsLinux({
   close: () => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5 pl-2">
+    <div className="flex items-center gap-1.5 pl-2 pr-3">
       <button
         aria-label="Minimize window"
         className="flex h-3.5 w-3.5 items-center justify-center rounded-full transition-opacity hover:opacity-80 active:opacity-60"
@@ -375,7 +375,7 @@ export function WindowControls() {
 
   // Fallback générique (autre OS)
   return (
-    <div className="flex items-center gap-1 border-l pl-2">
+    <div className="flex items-center gap-1 border-l pl-2 pr-3">
       <Button
         aria-label="Minimize window"
         className="text-muted-foreground hover:text-foreground"
