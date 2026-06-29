@@ -383,7 +383,7 @@ export default function RunsPage() {
         <div className="flex flex-wrap items-center gap-0.5">
           <span className="pr-2 text-text-tertiary text-xs">{t("tags")}</span>
           {availableTags.length === 0 && (
-            <span className="text-text-tertiary text-xs italic">{t("noTags")}</span>
+            <span className="shrink-0 text-text-tertiary/70 text-xs">{t("noTags")}</span>
           )}
           {availableTags.map((tag) => {
             const active = tagFilter.includes(tag);

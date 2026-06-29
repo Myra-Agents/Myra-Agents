@@ -536,7 +536,7 @@
     "loading": "Chargement…",
     "empty": "Aucun run actif pour l’instant.",
     "tags": "Tags",
-    "noTags": "Aucun tag",
+    "noTags": "Aucun tag pour l'instant",
     "search": "Rechercher",
     "filter": "Filtrer",
     "showing": "Affichage de {shown} sur {total}",

@@ -536,7 +536,7 @@
     "loading": "Loading…",
     "empty": "No active runs yet.",
     "tags": "Tags",
-    "noTags": "No tags",
+    "noTags": "No tags yet",
     "search": "Search",
     "filter": "Filter",
     "showing": "Showing {shown} of {total}",
