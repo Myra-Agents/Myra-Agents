@@ -354,9 +354,10 @@ export function CardModal({
   //   setTemplateName("");
   // };
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!title.trim() || presetBlocked) return;
+  // Persist the card. `bypassTest` is set by "Save anyway" so a failed preset
+  // test can be overridden — the preset stays marked failed (not "tested").
+  const submitCard = async (bypassTest = false) => {
+    if (!title.trim() || (presetBlocked && !bypassTest)) return;
     setSaving(true);
     try {
       await onSave(
@@ -379,6 +380,11 @@ export function CardModal({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    await submitCard();
   };
 
   const handleRelaunch = async () => {
@@ -614,16 +620,27 @@ export function CardModal({
                         {selectedTest.reason}
                       </p>
                     )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
-                      disabled={testingId !== null}
-                    >
-                      <FlaskConicalIcon className="size-3" />
-                      {t("assist.retry")}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
+                        disabled={testingId !== null}
+                      >
+                        <FlaskConicalIcon className="size-3" />
+                        {t("assist.retry")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => void submitCard(true)}
+                        disabled={!title.trim() || saving || locked}
+                      >
+                        {t("assist.saveAnyway")}
+                      </Button>
+                    </div>
                   </div>
                 )}
 

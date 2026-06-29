@@ -256,28 +256,12 @@ export default function SchedulesPage() {
     [router],
   );
 
-  // Create a fresh, disabled patrol with sensible defaults, then open its editor.
-  const [creating, setCreating] = useState(false);
-  const doCreate = useCallback(async () => {
-    setCreating(true);
-    try {
-      const input: CreateScheduleInput = {
-        name: t("newSchedule"),
-        cardTitle: "",
-        cardDescription: "",
-        agentPrompt: "",
-        tags: [],
-        schedule: { type: "daily", time: "09:00" },
-        enabled: false,
-      };
-      const task = await createSchedule(input);
-      router.push(`/schedules/edit/?id=${encodeURIComponent(task.id)}`);
-    } catch (e) {
-      toast.error(String(e));
-      setCreating(false);
-    }
-  }, [createSchedule, router, t]);
-  const handleCreate = useCallback(() => withHarnessCheck(() => void doCreate()), [withHarnessCheck, doCreate]);
+  // Open the editor on a blank draft. Nothing is persisted until the user hits
+  // "Add", so a cancelled patrol never lingers in the list (the editor creates it).
+  const doCreate = useCallback(() => {
+    router.push("/schedules/edit/?new=1");
+  }, [router]);
+  const handleCreate = useCallback(() => withHarnessCheck(doCreate), [withHarnessCheck, doCreate]);
 
   const handleTrigger = useCallback(
     async (id: string) => {
@@ -568,7 +552,6 @@ export default function SchedulesPage() {
         <button
           type="button"
           onClick={handleCreate}
-          disabled={creating}
           className="flex h-6 items-center gap-1 rounded-md bg-primary px-2 font-medium text-[11px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
         >
           <PlusIcon className="size-3.5 shrink-0" />

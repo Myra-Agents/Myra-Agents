@@ -141,9 +141,15 @@ function ScheduleEditScreen() {
   // Template copy lives under the `schedules.ideas.<id>` namespace (shared with
   // the schedules list); the editor reads it when creating from a template.
   const tIdeas = useTranslations("schedules.ideas");
+  // Default name for a brand-new blank patrol (shared with the schedules list).
+  const tSchedules = useTranslations("schedules");
   const router = useRouter();
   const params = useSearchParams();
   const id = params.get("id") ?? "";
+  // "New Patrol" opens the editor as `/schedules/edit/?new=1` with no real
+  // schedule yet — nothing is persisted until the user hits Add. Mirrors the
+  // template-creation flow below, so a cancelled draft never lingers in the list.
+  const blankMode = params.get("new") === "1" && !id;
 
   const { loading, createSchedule, updateSchedule, toggleEnabled, triggerNow, byId, schedules } = useSchedules();
   const { cards, trashCard, restoreCard } = useKanban();
@@ -176,7 +182,27 @@ function ScheduleEditScreen() {
     };
   }, [idea, tIdeas]);
 
-  const task = realTask ?? templateTask;
+  // Blank-creation mode: synthesize an empty, disabled patrol so the whole editor
+  // renders. Like template mode, nothing is persisted until the user hits Add.
+  const blankTask = useMemo<ScheduledTask | null>(() => {
+    if (!blankMode) return null;
+    return {
+      id: "new:blank",
+      name: tSchedules("newSchedule"),
+      cardTitle: "",
+      cardDescription: "",
+      agentPrompt: "",
+      tags: [],
+      schedule: { type: "daily", time: "09:00" },
+      enabled: false,
+      createdAt: "",
+    };
+  }, [blankMode, tSchedules]);
+
+  const task = realTask ?? templateTask ?? blankTask;
+
+  // Both template and blank modes defer persistence to the Add action.
+  const draftMode = templateMode || blankMode;
 
   const [tab, setTab] = useState<"settings" | "runs">("settings");
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -187,6 +213,8 @@ function ScheduleEditScreen() {
   const [confirmActivate, setConfirmActivate] = useState(false);
   // Surfaced only after the user tries to Save/Add without a folder selected.
   const [folderErrorShown, setFolderErrorShown] = useState(false);
+  // Surfaced only after the user tries to Save/Add with an empty agent instruction.
+  const [promptErrorShown, setPromptErrorShown] = useState(false);
   // Base folder the picker browses (Settings → defaults to OS home).
   const [homeFolder, setHomeFolder] = useState("");
   useEffect(() => {
@@ -308,7 +336,9 @@ function ScheduleEditScreen() {
           label: breadcrumbEnabled ? breadcrumbName : `${breadcrumbName} (${t("inactive").toLowerCase()})`,
           href: templateMode
             ? `/schedules/edit/?template=${encodeURIComponent(templateId)}`
-            : `/schedules/edit/?id=${encodeURIComponent(task.id)}`,
+            : blankMode
+              ? "/schedules/edit/?new=1"
+              : `/schedules/edit/?id=${encodeURIComponent(task.id)}`,
         }
       : null,
   );
@@ -344,10 +374,30 @@ function ScheduleEditScreen() {
   }, []);
   useNavGuard({ block: guardBlock, onBlocked: guardOnBlocked });
 
+  // Flag the empty agent instruction and bring it into view (it sits below the
+  // fold, so the inline error would otherwise be missed). Switches to the
+  // Settings tab first, where the field lives.
+  const flagMissingPrompt = useCallback(() => {
+    setPromptErrorShown(true);
+    setTab("settings");
+    toast.error(t("toast.needPrompt"));
+    // setTimeout (not rAF) so it runs after the Settings tab mounts AND isn't
+    // throttled when the window is briefly unfocused.
+    setTimeout(() => {
+      const el = document.getElementById("agent-instruction-input");
+      el?.scrollIntoView({ block: "center" });
+      el?.focus({ preventScroll: true });
+    }, 0);
+  }, [t]);
+
   const save = useCallback(async () => {
     if (!task || !draft || !dirty) return;
     if (!draft.schedule) {
       toast.error(t("toast.needTrigger"));
+      return;
+    }
+    if (!draft.agentPrompt.trim()) {
+      flagMissingPrompt();
       return;
     }
     if (!draft.workingDir.trim()) {
@@ -385,7 +435,7 @@ function ScheduleEditScreen() {
     } finally {
       setSaving(false);
     }
-  }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, t]);
+  }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, flagMissingPrompt, t]);
 
   // Template mode: create a real schedule from the prefilled draft, then land on
   // its actual edit page (so the user can keep tweaking / see its runs).
@@ -394,6 +444,10 @@ function ScheduleEditScreen() {
       if (!task || !draft) return;
       if (!draft.schedule) {
         toast.error(t("toast.needTrigger"));
+        return;
+      }
+      if (!draft.agentPrompt.trim()) {
+        flagMissingPrompt();
         return;
       }
       if (!draft.workingDir.trim()) {
@@ -425,14 +479,14 @@ function ScheduleEditScreen() {
         }
         writeGlobalTagColorMap(tagColorMap);
         toast.success(t("toast.added"));
-        router.replace(`/schedules/edit/?id=${encodeURIComponent(created.id)}`);
+        router.replace("/schedules/");
       } catch (e) {
         toast.error(String(e));
       } finally {
         setSaving(false);
       }
     },
-    [task, draft, branchByFolder, tagColorMap, createSchedule, router, t],
+    [task, draft, branchByFolder, tagColorMap, createSchedule, router, flagMissingPrompt, t],
   );
 
   // Runs belonging to this schedule: cards it materialized share its card title
@@ -488,7 +542,8 @@ function ScheduleEditScreen() {
     );
   }
 
-  // A working folder is mandatory before a patrol can be saved/added.
+  // A working folder is mandatory before a patrol can be saved/added. The Home
+  // folder is a valid choice but must be picked explicitly — it is not a default.
   const hasFolder = !!draft.workingDir.trim();
 
   return (
@@ -496,7 +551,7 @@ function ScheduleEditScreen() {
       {/* Top-bar actions: Stop all runs (when runs are live) + Save (when dirty) +
           Run now — portalled into the shared header, left of the theme switcher. */}
       <HeaderActions>
-        {!templateMode && runningRuns.length > 0 && (
+        {!draftMode && runningRuns.length > 0 && (
           <button
             type="button"
             onClick={stopAll}
@@ -505,19 +560,28 @@ function ScheduleEditScreen() {
             {t("stopAllRuns")}
           </button>
         )}
-        {/* Template mode: the primary action creates the schedule ("Add"); the
-            regular editor saves edits ("Save", enabled only when dirty). */}
+        {/* Template / blank modes: the primary action creates the schedule ("Add");
+            the regular editor saves edits ("Save", enabled only when dirty). */}
         <button
           type="button"
           onClick={
-            templateMode
+            draftMode
               ? () => {
+                  // Validate before the activate prompt (same order as add()).
+                  if (!draft.schedule) {
+                    toast.error(t("toast.needTrigger"));
+                    return;
+                  }
+                  if (!draft.agentPrompt.trim()) {
+                    flagMissingPrompt();
+                    return;
+                  }
                   if (!hasFolder) {
                     setFolderErrorShown(true);
                     toast.error(t("toast.needFolder"));
                     return;
                   }
-                  // Inactive-by-default template: ask whether to activate first.
+                  // Inactive-by-default draft: ask whether to activate first.
                   if (!draft.enabled) {
                     setConfirmActivate(true);
                     return;
@@ -526,15 +590,15 @@ function ScheduleEditScreen() {
                 }
               : save
           }
-          disabled={saving || (!templateMode && !dirty)}
+          disabled={saving || (!draftMode && !dirty)}
           className={cn(
             "rounded-md px-2 py-0.5 font-medium text-[11px] transition-colors",
-            templateMode || dirty
+            draftMode || dirty
               ? "bg-foreground text-background hover:bg-foreground/90"
               : "bg-muted/40 text-text-tertiary",
           )}
         >
-          {templateMode ? t("add") : t("save")}
+          {draftMode ? t("add") : t("save")}
         </button>
         <button
           type="button"
@@ -552,7 +616,7 @@ function ScheduleEditScreen() {
         >
           {t("cancel")}
         </button>
-        {!templateMode && (
+        {!draftMode && (
           <button
             type="button"
             aria-label={t("runNow")}
@@ -645,9 +709,9 @@ function ScheduleEditScreen() {
             checked={draft.enabled}
             onCheckedChange={(v) => {
               setDraft((d) => (d ? { ...d, enabled: v } : d));
-              // No backend schedule exists yet in template mode — the toggle just
-              // seeds the draft's enabled flag, persisted on "Add".
-              if (!templateMode) void toggleEnabled(task.id, v);
+              // No backend schedule exists yet in template/blank mode — the toggle
+              // just seeds the draft's enabled flag, persisted on "Add".
+              if (!draftMode) void toggleEnabled(task.id, v);
             }}
             className="scale-[0.7]"
           />
@@ -656,6 +720,9 @@ function ScheduleEditScreen() {
         <div className="flex items-center border-border border-r px-2">
           <FolderSelect
             scheduleId={task.id}
+            // Template / blank drafts start fresh every time — don't seed or
+            // persist the per-schedule folder list (it would carry over).
+            ephemeral={draftMode}
             value={draft.workingDir}
             invalid={folderErrorShown && !hasFolder}
             homeFolder={homeFolder}
@@ -709,9 +776,9 @@ function ScheduleEditScreen() {
         t={t}
       />
 
-      {/* Settings / Runs & History tabs. The Runs tab is hidden in template mode —
-          a not-yet-created schedule has no run history. */}
-      {!templateMode && (
+      {/* Settings / Runs & History tabs. The Runs tab is hidden in template/blank
+          mode — a not-yet-created schedule has no run history. */}
+      {!draftMode && (
         <div className="flex items-center gap-1.5 pt-4">
           <SegTab active={tab === "settings"} onClick={() => setTab("settings")}>
             {t("tabs.settings")}
@@ -723,12 +790,14 @@ function ScheduleEditScreen() {
       )}
 
       <div className="pt-2 pb-10">
-        {templateMode || tab === "settings" ? (
+        {draftMode || tab === "settings" ? (
           <SettingsTab
             draft={draft}
             setDraft={setDraft}
             agents={settings.agents}
             defaultAgentId={settings.defaultAgentId}
+            promptError={promptErrorShown && !draft.agentPrompt.trim()}
+            onPromptInput={() => setPromptErrorShown(false)}
             t={t}
           />
         ) : (
@@ -1090,12 +1159,16 @@ function SettingsTab({
   setDraft,
   agents,
   defaultAgentId,
+  promptError,
+  onPromptInput,
   t,
 }: {
   draft: Draft;
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   agents: AgentPreset[];
   defaultAgentId?: string;
+  promptError: boolean;
+  onPromptInput: () => void;
   t: ReturnType<typeof useTranslations>;
 }) {
   return (
@@ -1114,10 +1187,19 @@ function SettingsTab({
       {/* Agent Instruction */}
       <section className="flex flex-col gap-2.5">
         <span className="px-2 text-[12px] text-text-secondary">{t("agentInstruction")}</span>
-        <div className="flex flex-col gap-4 rounded-xl border border-border-cards bg-card-background p-4">
+        <div
+          className={cn(
+            "flex flex-col gap-4 rounded-xl border bg-card-background p-4 transition-colors",
+            promptError ? "border-destructive" : "border-border-cards",
+          )}
+        >
           <Textarea
+            id="agent-instruction-input"
             value={draft.agentPrompt}
-            onChange={(e) => setDraft((d) => (d ? { ...d, agentPrompt: e.target.value } : d))}
+            onChange={(e) => {
+              onPromptInput();
+              setDraft((d) => (d ? { ...d, agentPrompt: e.target.value } : d));
+            }}
             spellCheck={false}
             className="min-h-[182px] resize-y border-0 bg-transparent p-0 text-[12px] text-text-primary shadow-none focus-visible:ring-0 dark:bg-transparent"
             placeholder={t("instructionPlaceholder")}
@@ -1132,6 +1214,7 @@ function SettingsTab({
             />
           </div>
         </div>
+        {promptError && <span className="px-2 text-[11px] text-destructive">{t("toast.needPrompt")}</span>}
       </section>
     </div>
   );
@@ -1363,6 +1446,7 @@ function pushRecent(key: string, value: string) {
  */
 function FolderSelect({
   scheduleId,
+  ephemeral,
   value,
   invalid,
   homeFolder,
@@ -1371,6 +1455,8 @@ function FolderSelect({
   t,
 }: {
   scheduleId: string;
+  /** Template/blank draft: don't seed from or persist the per-schedule list. */
+  ephemeral?: boolean;
   value: string;
   /** Highlight the trigger as a required-but-empty field. */
   invalid?: boolean;
@@ -1392,12 +1478,13 @@ function FolderSelect({
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
-    const stored = readRecents(folderListKey(scheduleId));
+    // Ephemeral drafts ignore any persisted list so each New/Template starts empty.
+    const stored = ephemeral ? [] : readRecents(folderListKey(scheduleId));
     const initial = stored.length ? stored : value ? [value] : [];
     setFolders(initial);
     onFoldersChange?.(initial);
     setRecents(readRecents(RECENT_FOLDERS_KEY));
-  }, [scheduleId, value, onFoldersChange]);
+  }, [scheduleId, ephemeral, value, onFoldersChange]);
 
   // List the home folder's immediate subdirectories (desktop only) when opened.
   const loadSubfolders = useCallback(async () => {
@@ -1416,7 +1503,8 @@ function FolderSelect({
   // Persist the selection and surface the primary folder to the schedule.
   const commit = (next: string[]) => {
     setFolders(next);
-    setLocalStorageValue(folderListKey(scheduleId), JSON.stringify(next));
+    // Don't persist ephemeral (template/blank) selections — they'd carry over.
+    if (!ephemeral) setLocalStorageValue(folderListKey(scheduleId), JSON.stringify(next));
     onChange(next[0] ?? "");
     onFoldersChange?.(next);
   };
@@ -1473,19 +1561,22 @@ function FolderSelect({
     if (typed) addPicked([typed]);
   };
 
+  const home = homeFolder.trim();
+
   const label =
     folders.length === 0
       ? t("selectFolder")
       : folders.length === 1
-        ? baseName(folders[0])
+        ? folders[0] === home
+          ? t("home")
+          : baseName(folders[0])
         : `${baseName(folders[0])} +${folders.length - 1}`;
-
-  const home = homeFolder.trim();
   const q = query.trim().toLowerCase();
   // Subfolders of home + recents + already-selected, minus the home folder itself
   // (it has its own row), filtered by the query.
   const known = [...new Set([...subfolders, ...folders, ...recents])]
     .filter((r) => r !== home)
+    .filter((r) => !folders.includes(r))
     .filter((r) => !q || r.toLowerCase().includes(q));
 
   return (
@@ -1517,20 +1608,46 @@ function FolderSelect({
           />
         </div>
         <div className="max-h-72 overflow-y-auto p-1">
-          {home && (!q || t("home").toLowerCase().includes(q) || baseName(home).toLowerCase().includes(q)) && (
-            <DropdownMenuItem
-              className="gap-2 text-[13px]"
-              title={home}
-              onSelect={(e) => {
-                e.preventDefault();
-                toggle(home);
-              }}
-            >
-              <HomeIcon className="size-4 text-icon-secondary" />
-              <span className="truncate">{t("home")}</span>
-              {folders.includes(home) && <CheckIcon className="ml-auto size-3.5 text-icon-secondary" />}
-            </DropdownMenuItem>
+          {folders.length > 0 && (
+            <>
+              <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("selected")}</DropdownMenuLabel>
+              {folders.map((f) => (
+                <DropdownMenuItem
+                  key={`sel-${f}`}
+                  className="gap-2 text-[13px]"
+                  title={f}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    toggle(f);
+                  }}
+                >
+                  {f === home ? (
+                    <HomeIcon className="size-4 text-icon-secondary" />
+                  ) : (
+                    <FolderIcon className="size-4 text-icon-secondary" />
+                  )}
+                  <span className="truncate">{f === home ? t("home") : baseName(f)}</span>
+                  <CheckIcon className="ml-auto size-3.5 text-icon-secondary" />
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="my-1" />
+            </>
           )}
+          {home &&
+            !folders.includes(home) &&
+            (!q || t("home").toLowerCase().includes(q) || baseName(home).toLowerCase().includes(q)) && (
+              <DropdownMenuItem
+                className="gap-2 text-[13px]"
+                title={home}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  toggle(home);
+                }}
+              >
+                <HomeIcon className="size-4 text-icon-secondary" />
+                <span className="truncate">{t("home")}</span>
+              </DropdownMenuItem>
+            )}
           <DropdownMenuLabel className="text-[11px] text-text-tertiary">{t("folders")}</DropdownMenuLabel>
           {known.length === 0 && <p className="px-2 py-1 text-[12px] text-text-tertiary">{t("noFoldersYet")}</p>}
           {known.map((f) => (

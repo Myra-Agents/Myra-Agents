@@ -207,6 +207,7 @@
         "testFailedToast": "{name} failed its connectivity test",
         "blocked": "This preset failed its test — fix it or pick another before creating.",
         "retry": "Retry test",
+        "saveAnyway": "Save anyway",
         "needPreset": "Select an agent preset first",
         "devOnly": "Only available in the desktop app",
         "generateHint": "Draft from the title and description using this agent",
@@ -535,6 +536,7 @@
     "loading": "Loading…",
     "empty": "No active runs yet.",
     "tags": "Tags",
+    "noTags": "No tags",
     "search": "Search",
     "filter": "Filter",
     "showing": "Showing {shown} of {total}",
@@ -1278,7 +1280,8 @@
       "stopped": "Stopped {count} run(s)",
       "undo": "Undo",
       "needTrigger": "Add a trigger before saving.",
-      "needFolder": "Add a folder before saving."
+      "needFolder": "Add a folder before saving.",
+      "needPrompt": "Add an agent instruction before saving."
     },
     "addTrigger": "Add Trigger",
     "searchTriggers": "Search Triggers...",
@@ -1322,6 +1325,7 @@
     "useBranch": "Use \"{branch}\"",
     "noResults": "No results",
     "noFolder": "No folder",
+    "selected": "Selected",
     "folders": "Folders",
     "noFoldersYet": "No folders yet — add one below",
     "addFolders": "Add folder(s)…",

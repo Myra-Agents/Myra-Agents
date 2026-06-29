@@ -207,6 +207,7 @@
         "testFailedToast": "{name} a échoué au test de connectivité",
         "blocked": "Ce préréglage a échoué au test — corrige-le ou choisis-en un autre avant de créer.",
         "retry": "Relancer le test",
+        "saveAnyway": "Enregistrer quand même",
         "needPreset": "Sélectionne d’abord un préréglage d’agent",
         "devOnly": "Disponible uniquement dans l’application desktop",
         "generateHint": "Rédige à partir du titre et de la description avec cet agent",
@@ -535,6 +536,7 @@
     "loading": "Chargement…",
     "empty": "Aucun run actif pour l’instant.",
     "tags": "Tags",
+    "noTags": "Aucun tag",
     "search": "Rechercher",
     "filter": "Filtrer",
     "showing": "Affichage de {shown} sur {total}",
@@ -1278,7 +1280,8 @@
       "stopped": "{count} exécution(s) arrêtée(s)",
       "undo": "Annuler",
       "needTrigger": "Ajoute un déclencheur avant d’enregistrer.",
-      "needFolder": "Ajoute un dossier avant d’enregistrer."
+      "needFolder": "Ajoute un dossier avant d’enregistrer.",
+      "needPrompt": "Ajoute une instruction pour l’agent avant d’enregistrer."
     },
     "addTrigger": "Ajouter un déclencheur",
     "searchTriggers": "Rechercher des déclencheurs...",
@@ -1322,6 +1325,7 @@
     "useBranch": "Utiliser « {branch} »",
     "noResults": "Aucun résultat",
     "noFolder": "Aucun dossier",
+    "selected": "Sélectionnés",
     "folders": "Dossiers",
     "noFoldersYet": "Aucun dossier — ajoutez-en un ci-dessous",
     "addFolders": "Ajouter un/des dossier(s)…",
