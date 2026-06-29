@@ -66,10 +66,12 @@ import { loadTestResult } from "@/lib/agent-test-store";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
+import { getScheduleIdea } from "@/lib/schedule-ideas";
 import { cn } from "@/lib/utils";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
+import { useNavGuard } from "@/stores/nav-guard-store";
 import type { KanbanCard } from "@/types/kanban";
-import type { ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
+import type { CreateScheduleInput, ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
 import { defaultScheduleKind, describeSchedule } from "@/types/schedule";
 import type { AgentPreset } from "@/types/settings";
 
@@ -89,6 +91,9 @@ export default function ScheduleEditPage() {
 
 type Draft = {
   enabled: boolean;
+  // Patrol title + the descriptive line under it (editable in the header).
+  name: string;
+  cardDescription: string;
   agentPrompt: string;
   // Null while the user has removed the (single) schedule trigger — Save is then
   // blocked until a trigger is re-added.
@@ -106,6 +111,8 @@ type Draft = {
 function draftOf(task: ScheduledTask): Draft {
   return {
     enabled: task.enabled,
+    name: task.name,
+    cardDescription: task.cardDescription,
     agentPrompt: task.agentPrompt,
     schedule: task.schedule,
     workingDir: task.workingDir ?? "",
@@ -131,21 +138,55 @@ function withFlagValue(flags: string[], name: string, value: string | undefined)
 
 function ScheduleEditScreen() {
   const t = useTranslations("scheduleEdit");
+  // Template copy lives under the `schedules.ideas.<id>` namespace (shared with
+  // the schedules list); the editor reads it when creating from a template.
+  const tIdeas = useTranslations("schedules.ideas");
   const router = useRouter();
   const params = useSearchParams();
   const id = params.get("id") ?? "";
 
-  const { loading, updateSchedule, toggleEnabled, triggerNow, byId, schedules } = useSchedules();
+  const { loading, createSchedule, updateSchedule, toggleEnabled, triggerNow, byId, schedules } = useSchedules();
   const { cards, trashCard, restoreCard } = useKanban();
   const { settings } = useSettings();
 
-  const task = byId(id);
+  // "Create from template" mode: opened as `/schedules/edit/?template=<id>` with
+  // no real schedule yet. We synthesize a task from the template definition + its
+  // i18n copy so the whole editor renders, and the primary action becomes "Add"
+  // (creates the schedule, then lands on its real edit page).
+  const templateId = params.get("template") ?? "";
+  const idea = templateId ? getScheduleIdea(templateId) : undefined;
+  const templateMode = !!idea && !id;
+
+  const realTask = byId(id);
+  const templateTask = useMemo<ScheduledTask | null>(() => {
+    if (!idea) return null;
+    // A template "once" trigger ships with an empty `at`; give it a sensible
+    // future default so the trigger editor renders a valid value.
+    const schedule = idea.schedule.type === "once" ? defaultScheduleKind("once") : idea.schedule;
+    return {
+      id: `template:${idea.id}`,
+      name: tIdeas(`${idea.id}.name`),
+      cardTitle: tIdeas(`${idea.id}.cardTitle`),
+      cardDescription: tIdeas(`${idea.id}.description`),
+      agentPrompt: tIdeas(`${idea.id}.prompt`),
+      tags: idea.tags,
+      schedule,
+      enabled: true,
+      createdAt: "",
+    };
+  }, [idea, tIdeas]);
+
+  const task = realTask ?? templateTask;
 
   const [tab, setTab] = useState<"settings" | "runs">("settings");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   // Confirm dialog shown when cancelling with unsaved edits.
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // Activate-prompt shown when adding a template patrol that is still inactive.
+  const [confirmActivate, setConfirmActivate] = useState(false);
+  // Surfaced only after the user tries to Save/Add without a folder selected.
+  const [folderErrorShown, setFolderErrorShown] = useState(false);
   // Base folder the picker browses (Settings → defaults to OS home).
   const [homeFolder, setHomeFolder] = useState("");
   useEffect(() => {
@@ -260,11 +301,14 @@ function ScheduleEditScreen() {
   // Flag a disabled patrol right in the breadcrumb leaf (uses the live draft state
   // so it reflects the toggle immediately).
   const breadcrumbEnabled = draft?.enabled ?? task?.enabled ?? true;
+  const breadcrumbName = (draft?.name?.trim() || task?.name) ?? "";
   useBreadcrumbOverride(
     task
       ? {
-          label: breadcrumbEnabled ? task.name : `${task.name} (${t("inactive").toLowerCase()})`,
-          href: `/schedules/edit/?id=${encodeURIComponent(task.id)}`,
+          label: breadcrumbEnabled ? breadcrumbName : `${breadcrumbName} (${t("inactive").toLowerCase()})`,
+          href: templateMode
+            ? `/schedules/edit/?template=${encodeURIComponent(templateId)}`
+            : `/schedules/edit/?id=${encodeURIComponent(task.id)}`,
         }
       : null,
   );
@@ -284,19 +328,40 @@ function ScheduleEditScreen() {
     return JSON.stringify(draft) !== JSON.stringify(draftOf(task)) || branchesDirty || tagColorsDirty;
   }, [task, draft, branchesDirty, tagColorsDirty]);
 
+  // Pending navigation to run once the user confirms discarding unsaved edits.
+  // The Cancel button sets it to `router.back`; the top-bar chevrons inject their
+  // own back/forward nav via the registered nav guard.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const pendingNavRef = useRef<() => void>(() => router.back());
+
+  // Intercept the top-bar back/forward chevrons while there are unsaved edits,
+  // routing them through the same discard-confirmation dialog as Cancel.
+  const guardBlock = useCallback(() => dirtyRef.current, []);
+  const guardOnBlocked = useCallback((proceed: () => void) => {
+    pendingNavRef.current = proceed;
+    setConfirmDiscard(true);
+  }, []);
+  useNavGuard({ block: guardBlock, onBlocked: guardOnBlocked });
+
   const save = useCallback(async () => {
     if (!task || !draft || !dirty) return;
     if (!draft.schedule) {
       toast.error(t("toast.needTrigger"));
       return;
     }
+    if (!draft.workingDir.trim()) {
+      setFolderErrorShown(true);
+      toast.error(t("toast.needFolder"));
+      return;
+    }
     setSaving(true);
     try {
       const input: UpdateScheduleInput = {
         id: task.id,
-        name: task.name,
+        name: draft.name.trim() || task.name,
         cardTitle: task.cardTitle,
-        cardDescription: task.cardDescription,
+        cardDescription: draft.cardDescription,
         agentPrompt: draft.agentPrompt,
         tags: draft.tags,
         schedule: draft.schedule,
@@ -321,6 +386,54 @@ function ScheduleEditScreen() {
       setSaving(false);
     }
   }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, t]);
+
+  // Template mode: create a real schedule from the prefilled draft, then land on
+  // its actual edit page (so the user can keep tweaking / see its runs).
+  const add = useCallback(
+    async (enabled: boolean) => {
+      if (!task || !draft) return;
+      if (!draft.schedule) {
+        toast.error(t("toast.needTrigger"));
+        return;
+      }
+      if (!draft.workingDir.trim()) {
+        setFolderErrorShown(true);
+        toast.error(t("toast.needFolder"));
+        return;
+      }
+      setSaving(true);
+      try {
+        const input: CreateScheduleInput = {
+          name: draft.name.trim() || task.name,
+          cardTitle: task.cardTitle,
+          cardDescription: draft.cardDescription,
+          agentPrompt: draft.agentPrompt,
+          tags: draft.tags,
+          schedule: draft.schedule,
+          enabled,
+          agentPresetId: draft.agentPresetId,
+          agentFlags: draft.agentFlags.length ? draft.agentFlags : undefined,
+          useWorktree: draft.useWorktree,
+          workingDir: draft.workingDir.trim() || undefined,
+          launchVia: draft.launchVia,
+          ollamaModel: draft.ollamaModel,
+        };
+        const created = await createSchedule(input);
+        // Persist app-local per-folder branch overrides under the new schedule id.
+        if (Object.keys(branchByFolder).length > 0) {
+          setLocalStorageValue(branchMapKey(created.id), JSON.stringify(branchByFolder));
+        }
+        writeGlobalTagColorMap(tagColorMap);
+        toast.success(t("toast.added"));
+        router.replace(`/schedules/edit/?id=${encodeURIComponent(created.id)}`);
+      } catch (e) {
+        toast.error(String(e));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [task, draft, branchByFolder, tagColorMap, createSchedule, router, t],
+  );
 
   // Runs belonging to this schedule: cards it materialized share its card title
   // (and tags). Newest first.
@@ -375,54 +488,80 @@ function ScheduleEditScreen() {
     );
   }
 
+  // A working folder is mandatory before a patrol can be saved/added.
+  const hasFolder = !!draft.workingDir.trim();
+
   return (
     <div className="mx-auto flex w-full max-w-[968px] flex-col">
       {/* Top-bar actions: Stop all runs (when runs are live) + Save (when dirty) +
           Run now — portalled into the shared header, left of the theme switcher. */}
       <HeaderActions>
-        {runningRuns.length > 0 && (
+        {!templateMode && runningRuns.length > 0 && (
           <button
             type="button"
             onClick={stopAll}
-            className="rounded-md border border-destructive bg-card-background px-3 py-1 font-medium text-destructive text-xs transition-colors hover:bg-destructive/10"
+            className="rounded-md border border-destructive bg-card-background px-2 py-0.5 font-medium text-[11px] text-destructive transition-colors hover:bg-destructive/10"
           >
             {t("stopAllRuns")}
           </button>
         )}
+        {/* Template mode: the primary action creates the schedule ("Add"); the
+            regular editor saves edits ("Save", enabled only when dirty). */}
         <button
           type="button"
-          onClick={save}
-          disabled={!dirty || saving}
+          onClick={
+            templateMode
+              ? () => {
+                  if (!hasFolder) {
+                    setFolderErrorShown(true);
+                    toast.error(t("toast.needFolder"));
+                    return;
+                  }
+                  // Inactive-by-default template: ask whether to activate first.
+                  if (!draft.enabled) {
+                    setConfirmActivate(true);
+                    return;
+                  }
+                  void add(true);
+                }
+              : save
+          }
+          disabled={saving || (!templateMode && !dirty)}
           className={cn(
-            "rounded-md px-3 py-1 font-medium text-xs transition-colors",
-            dirty ? "bg-foreground text-background hover:bg-foreground/90" : "bg-muted/40 text-text-tertiary",
+            "rounded-md px-2 py-0.5 font-medium text-[11px] transition-colors",
+            templateMode || dirty
+              ? "bg-foreground text-background hover:bg-foreground/90"
+              : "bg-muted/40 text-text-tertiary",
           )}
         >
-          {t("save")}
+          {templateMode ? t("add") : t("save")}
         </button>
         <button
           type="button"
           onClick={() => {
             // With unsaved edits, confirm before discarding; otherwise leave straight away.
             if (dirty) {
+              pendingNavRef.current = () => router.back();
               setConfirmDiscard(true);
               return;
             }
             router.back();
           }}
           disabled={saving}
-          className="rounded-md border border-border px-3 py-1 font-medium text-text-secondary text-xs transition-colors hover:bg-muted/40 hover:text-text-primary"
+          className="rounded-md border border-border px-2 py-0.5 font-medium text-[11px] text-text-secondary transition-colors hover:bg-muted/40 hover:text-text-primary"
         >
           {t("cancel")}
         </button>
-        <button
-          type="button"
-          aria-label={t("runNow")}
-          onClick={runNow}
-          className="flex size-7 items-center justify-center rounded-md text-icon-primary transition-colors hover:bg-muted/40 hover:text-foreground"
-        >
-          <PlayIcon className="size-[18px]" />
-        </button>
+        {!templateMode && (
+          <button
+            type="button"
+            aria-label={t("runNow")}
+            onClick={runNow}
+            className="flex size-7 items-center justify-center rounded-md text-icon-primary transition-colors hover:bg-muted/40 hover:text-foreground"
+          >
+            <PlayIcon className="size-[18px]" />
+          </button>
+        )}
       </HeaderActions>
 
       {/* Discard-confirmation — guards the Cancel button when there are unsaved edits. */}
@@ -439,7 +578,7 @@ function ScheduleEditScreen() {
                 setDraft(draftOf(task));
                 setBranchByFolder(committedBranches);
                 setTagColorMap(committedTagColors);
-                router.back();
+                pendingNavRef.current();
               }}
             >
               {t("discardConfirm")}
@@ -448,10 +587,55 @@ function ScheduleEditScreen() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Title block — name + subtitle. pb-4 / pl-1.5 from the Figma "Title" frame. */}
-      <header className="flex flex-col pr-0 pb-4 pl-1.5">
-        <h1 className="font-medium text-[16px] text-text-primary leading-tight">{task.name}</h1>
-        <p className="font-light text-[12px] text-text-secondary leading-tight">{t("subtitle")}</p>
+      {/* Activate-prompt — shown when adding a template patrol left inactive. */}
+      <AlertDialog open={confirmActivate} onOpenChange={setConfirmActivate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("activateTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("activateDescription")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("activateCancel")}</AlertDialogCancel>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmActivate(false);
+                void add(false);
+              }}
+              className="rounded-md border border-border px-3 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-muted/40 hover:text-text-primary"
+            >
+              {t("activateKeepInactive")}
+            </button>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmActivate(false);
+                void add(true);
+              }}
+            >
+              {t("activateConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Title block — editable name + description. pb-4 / pl-1.5 from the Figma "Title" frame. */}
+      <header className="flex flex-col gap-0.5 pr-0 pb-4 pl-1.5">
+        <input
+          type="text"
+          value={draft.name}
+          onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
+          placeholder={t("namePlaceholder")}
+          aria-label={t("nameLabel")}
+          className="-ml-1.5 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 font-medium text-[16px] text-text-primary leading-tight outline-none transition-colors placeholder:text-text-tertiary hover:border-border/60 focus:border-border focus:bg-card-background"
+        />
+        <textarea
+          value={draft.cardDescription}
+          onChange={(e) => setDraft((d) => (d ? { ...d, cardDescription: e.target.value } : d))}
+          placeholder={t("subtitle")}
+          aria-label={t("descriptionLabel")}
+          rows={1}
+          className="-ml-1.5 resize-none rounded-md border border-transparent bg-transparent px-1.5 py-0.5 font-light text-[12px] text-text-secondary leading-tight outline-none transition-colors placeholder:text-text-tertiary hover:border-border/60 focus:border-border focus:bg-card-background"
+        />
       </header>
 
       {/* Status toggle + repository + branch — divider-separated inline items. */}
@@ -461,7 +645,9 @@ function ScheduleEditScreen() {
             checked={draft.enabled}
             onCheckedChange={(v) => {
               setDraft((d) => (d ? { ...d, enabled: v } : d));
-              void toggleEnabled(task.id, v);
+              // No backend schedule exists yet in template mode — the toggle just
+              // seeds the draft's enabled flag, persisted on "Add".
+              if (!templateMode) void toggleEnabled(task.id, v);
             }}
             className="scale-[0.7]"
           />
@@ -471,8 +657,14 @@ function ScheduleEditScreen() {
           <FolderSelect
             scheduleId={task.id}
             value={draft.workingDir}
+            invalid={folderErrorShown && !hasFolder}
             homeFolder={homeFolder}
-            onChange={(v) => setDraft((d) => (d ? { ...d, workingDir: v } : d))}
+            onChange={(v) => {
+              setDraft((d) => (d ? { ...d, workingDir: v } : d));
+              // Any folder change clears the post-save warning; it only returns on
+              // the next Save/Add attempt with no folder.
+              setFolderErrorShown(false);
+            }}
             onFoldersChange={setFolders}
             t={t}
           />
@@ -492,6 +684,14 @@ function ScheduleEditScreen() {
         </div>
       </div>
 
+      {/* Folder is mandatory — surfaced only after a Save/Add attempt with none set. */}
+      {folderErrorShown && !hasFolder && (
+        <p className="flex items-center gap-1 pt-1.5 pl-0.5 text-[11px] text-destructive">
+          <TriangleAlertIcon className="size-3" />
+          {t("folderRequired")}
+        </p>
+      )}
+
       {/* Tags row. */}
       <TagsEditor
         tags={draft.tags}
@@ -509,18 +709,21 @@ function ScheduleEditScreen() {
         t={t}
       />
 
-      {/* Settings / Runs & History tabs. */}
-      <div className="flex items-center gap-1.5 pt-4">
-        <SegTab active={tab === "settings"} onClick={() => setTab("settings")}>
-          {t("tabs.settings")}
-        </SegTab>
-        <SegTab active={tab === "runs"} onClick={() => setTab("runs")}>
-          {t("tabs.runs")}
-        </SegTab>
-      </div>
+      {/* Settings / Runs & History tabs. The Runs tab is hidden in template mode —
+          a not-yet-created schedule has no run history. */}
+      {!templateMode && (
+        <div className="flex items-center gap-1.5 pt-4">
+          <SegTab active={tab === "settings"} onClick={() => setTab("settings")}>
+            {t("tabs.settings")}
+          </SegTab>
+          <SegTab active={tab === "runs"} onClick={() => setTab("runs")}>
+            {t("tabs.runs")}
+          </SegTab>
+        </div>
+      )}
 
       <div className="pt-2 pb-10">
-        {tab === "settings" ? (
+        {templateMode || tab === "settings" ? (
           <SettingsTab
             draft={draft}
             setDraft={setDraft}
@@ -1161,6 +1364,7 @@ function pushRecent(key: string, value: string) {
 function FolderSelect({
   scheduleId,
   value,
+  invalid,
   homeFolder,
   onChange,
   onFoldersChange,
@@ -1168,6 +1372,8 @@ function FolderSelect({
 }: {
   scheduleId: string;
   value: string;
+  /** Highlight the trigger as a required-but-empty field. */
+  invalid?: boolean;
   /** Configurable base folder (Settings); its subfolders are offered as options. */
   homeFolder: string;
   onChange: (primary: string) => void;
@@ -1287,9 +1493,15 @@ function FolderSelect({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1 text-[12px] text-text-secondary hover:text-text-primary"
+          className={cn(
+            "flex items-center gap-1 text-[12px]",
+            invalid
+              ? "font-medium text-destructive hover:text-destructive"
+              : "text-text-secondary hover:text-text-primary",
+          )}
           title={folders.join("\n")}
         >
+          {invalid && <TriangleAlertIcon className="size-3" />}
           {label}
           <ChevronDownIcon className="size-3.5 text-icon-tertiary" />
         </button>
@@ -1386,11 +1598,15 @@ function BranchSelect({
 }) {
   const [query, setQuery] = useState("");
   const [git, setGit] = useState<GitBranches | null>(null);
+  // Whether the git probe for the current folder has resolved — lets us grey the
+  // picker out for non-git folders without flashing during the async check.
+  const [checked, setChecked] = useState(false);
 
   // Re-read git branches each time the menu opens (folder may have changed).
   const loadGit = useCallback(async () => {
     if (!isTauri() || !repoPath.trim()) {
       setGit(null);
+      setChecked(true);
       return;
     }
     try {
@@ -1401,8 +1617,18 @@ function BranchSelect({
     } catch (e) {
       console.warn("git_branches failed", e);
       setGit(null);
+    } finally {
+      setChecked(true);
     }
   }, [repoPath]);
+
+  // Probe git-ness up front (and whenever the folder changes) so the picker can
+  // grey out for non-git / unselected folders without being opened first.
+  useEffect(() => {
+    setChecked(false);
+    setGit(null);
+    void loadGit();
+  }, [loadGit]);
 
   const pick = (v: string) => {
     onChange(v);
@@ -1427,6 +1653,11 @@ function BranchSelect({
   const effective = value || git?.current || "main";
   const match = (b: string) => !ql || b.toLowerCase().includes(ql);
 
+  // Grey the picker out when there's no folder yet, or the folder isn't a git
+  // work tree — a branch only makes sense inside a repo.
+  const noFolder = !repoPath.trim();
+  const disabled = noFolder || (checked && !git);
+
   const local = (git?.local ?? []).filter(match);
   const remote = (git?.remote ?? []).filter(match);
   // Non-git fallback: never persist typed branches — only surface the one that is
@@ -1437,11 +1668,19 @@ function BranchSelect({
 
   return (
     <DropdownMenu onOpenChange={(open) => open && void loadGit()}>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger asChild disabled={disabled}>
         <button
           type="button"
-          className="flex items-center gap-1 text-[12px] text-text-secondary hover:text-text-primary"
+          disabled={disabled}
+          title={noFolder ? t("branchNeedsFolder") : disabled ? t("branchNotGit") : undefined}
+          className={cn(
+            "flex items-center gap-1 text-[12px]",
+            disabled
+              ? "cursor-not-allowed text-text-tertiary opacity-60"
+              : "text-text-secondary hover:text-text-primary",
+          )}
         >
+          <GitBranchIcon className="size-3 text-icon-tertiary" />
           {effective}
           <ChevronDownIcon className="size-3.5 text-icon-tertiary" />
         </button>

@@ -168,11 +168,16 @@ export function NavMain({ items }: NavMainProps) {
   // Strip the trailing slash so strict url comparisons still match.
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
 
+  // A nested route keeps its top-level item lit (e.g. "/schedules/edit" → Patrols).
+  // Prefix-match on `url + "/"` so "/schedules" matches "/schedules/edit" but not
+  // an unrelated "/schedules-foo".
+  const matches = (url: string) => path === url || (url !== "/" && path.startsWith(`${url}/`));
+
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
-      return subItems.some((sub) => path.startsWith(sub.url));
+      return subItems.some((sub) => matches(sub.url));
     }
-    return path === url;
+    return matches(url);
   };
 
   const isSubmenuOpen = (subItems?: NavMainItem["subItems"]) => {

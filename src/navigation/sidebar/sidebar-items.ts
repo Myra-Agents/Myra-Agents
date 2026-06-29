@@ -1,4 +1,5 @@
-import { Activity, History, House, Kanban, type LucideIcon, Route, ScrollText } from "lucide-react";
+// House, Kanban, ScrollText icons parked — Home/Kanban/Logs nav entries commented out below.
+import { Activity, History, type LucideIcon, Route } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -34,12 +35,12 @@ export const sidebarItems: NavGroup[] = [
     // Personal section — no label, always visible (Linear's Inbox / My issues row).
     id: 1,
     items: [
-      {
-        title: "Home",
-        url: "/",
-        icon: House,
-        description: "Your overview — recent activity and what needs attention across boards.",
-      },
+      // {
+      //   title: "Home",
+      //   url: "/",
+      //   icon: House,
+      //   description: "Your overview — recent activity and what needs attention across boards.",
+      // },
       // {
       //   title: "Inbox",
       //   url: "/inbox",
@@ -67,12 +68,12 @@ export const sidebarItems: NavGroup[] = [
         description: "Live overview of running tasks — counts by status and the active run list.",
         isNew: true,
       },
-      {
-        title: "Kanban",
-        url: "/kanban",
-        icon: Kanban,
-        description: "Track your agents' tasks across columns — drag cards to move work along.",
-      },
+      // {
+      //   title: "Kanban",
+      //   url: "/kanban",
+      //   icon: Kanban,
+      //   description: "Track your agents' tasks across columns — drag cards to move work along.",
+      // },
       {
         title: "Patrols",
         url: "/schedules",
@@ -95,12 +96,12 @@ export const sidebarItems: NavGroup[] = [
         description: "Past runs of every patrol — stats and per-run agent discussion, succeeded or failed.",
         isNew: true,
       },
-      {
-        title: "Logs",
-        url: "/logs",
-        icon: ScrollText,
-        description: "Inspect run history and detailed execution output for every agent.",
-      },
+      // {
+      //   title: "Logs",
+      //   url: "/logs",
+      //   icon: ScrollText,
+      //   description: "Inspect run history and detailed execution output for every agent.",
+      // },
       // {
       //   title: "Views",
       //   url: "/views",

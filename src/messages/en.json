@@ -387,8 +387,16 @@
         "description": "Run the test suite and report failures.",
         "prompt": "Run the full test suite. If anything fails, summarize the failures and the most likely cause for each."
       },
+      "sortMyComputer": {
+        "label": "Sort out my computer",
+        "name": "Sort out my computer",
+        "cardTitle": "Sort out my computer",
+        "description": "Let the agent tidy up a folder on your computer — rename, reorganize, and clean up files.",
+        "prompt": "Sort out the folder you are in: scan its contents, group files by type and purpose, suggest a clear folder structure, rename files with consistent naming conventions, and move or delete obvious duplicates and junk."
+      },
       "add": "Add",
       "categories": {
+        "personal": "Personal",
         "popular": "Popular",
         "codeReview": "Code Review",
         "security": "Security",
@@ -494,7 +502,15 @@
       "copiedJson": "Patrol JSON copied",
       "copyFailed": "Couldn't copy to clipboard"
     },
-    "templatesShort": "Templates"
+    "templatesShort": "Templates",
+    "harnessGate": {
+      "title": "Install an agent to create a patrol",
+      "description": "OpenCode must be installed before you can create or use a patrol.",
+      "continueAnyway": "Continue without installing",
+      "ollamaTitle": "Run agents locally (optional)",
+      "ollamaDescription": "Ollama lets you run open-source models on your machine instead of cloud APIs. Install it separately to use local models with OpenCode.",
+      "ollamaLearnMore": "Ollama documentation"
+    }
   },
   "planner": {
     "title": "Day Planner",
@@ -585,7 +601,8 @@
     "filterBy": "Filter by",
     "clearColumnFilter": "Clear filter",
     "columnMenu": "{column} options",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "filteredHidden": "{hidden, plural, =0 {Filtered} one {# run hidden} other {# runs hidden}}"
   },
   "history": {
     "title": "History",
@@ -1169,6 +1186,14 @@
     "discardDescription": "Your unsaved changes will be lost and won't be applied.",
     "discardKeepEditing": "Keep editing",
     "discardConfirm": "Discard changes",
+    "nameLabel": "Patrol name",
+    "namePlaceholder": "Patrol name",
+    "descriptionLabel": "Patrol description",
+    "activateTitle": "Activate this patrol?",
+    "activateDescription": "This patrol is inactive. Activate it now so it runs on its trigger, or add it inactive and enable it later.",
+    "activateCancel": "Cancel",
+    "activateKeepInactive": "Add inactive",
+    "activateConfirm": "Activate",
     "notFound": "Patrol not found.",
     "backToSchedules": "Back to patrols",
     "subtitle": "Deploy recurring patrols with AI agents triggered by events.",
@@ -1177,6 +1202,7 @@
     "tags": "Tags",
     "newTag": "+ New tag",
     "save": "Save",
+    "add": "Add",
     "runNow": "Run now",
     "stopAllRuns": "Stop all runs",
     "triggers": "Triggers",
@@ -1241,10 +1267,12 @@
     "footer": "Showing {shown} of {total} - Click to see all patrols",
     "toast": {
       "saved": "Patrol saved",
+      "added": "Patrol added",
       "triggered": "Run triggered",
       "stopped": "Stopped {count} run(s)",
       "undo": "Undo",
-      "needTrigger": "Add a trigger before saving."
+      "needTrigger": "Add a trigger before saving.",
+      "needFolder": "Add a folder before saving."
     },
     "addTrigger": "Add Trigger",
     "searchTriggers": "Search Triggers...",
@@ -1299,6 +1327,9 @@
     "startTime": "Start time",
     "home": "Home folder",
     "selectFolder": "Select folder",
+    "folderRequired": "Add a folder for this patrol to run in.",
+    "branchNotGit": "This folder isn't a git repository.",
+    "branchNeedsFolder": "Select a folder first.",
     "branchesCount": "{count} branches",
     "branchPerFolder": "Branch per folder",
     "primary": "primary",

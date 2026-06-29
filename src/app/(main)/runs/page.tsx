@@ -5,6 +5,18 @@ import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, us
 import { useRouter } from "next/navigation";
 
 import {
+  DndContext,
+  type DragEndEvent,
+  type DragOverEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
   ActivityIcon,
   ArrowDownIcon,
   ArrowUpIcon,
@@ -17,23 +29,10 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   SearchIcon,
-  SparklesIcon,
   TerminalIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import {
-  DndContext,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
-  DragOverlay,
-  PointerSensor,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -52,9 +51,10 @@ import { useKanban } from "@/hooks/use-kanban";
 import { useSettings } from "@/hooks/use-settings";
 import { connIdOf } from "@/lib/aggregate/global-id";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
+import { tagClassName } from "@/lib/kanban-tags";
 import { cn } from "@/lib/utils";
-import { isTransitionAllowed } from "@/types/kanban";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
+import { isTransitionAllowed } from "@/types/kanban";
 import type { AgentPreset } from "@/types/settings";
 
 /**
@@ -385,10 +385,10 @@ export default function RunsPage() {
                 aria-pressed={active}
                 onClick={() => toggleTagFilter(tag)}
                 className={cn(
-                  "rounded-full border px-2 py-0.5 text-xs transition-colors",
-                  active
-                    ? "border-text-tertiary/50 bg-secondary text-text-primary"
-                    : "border-border-cards bg-secondary text-text-secondary hover:text-text-primary",
+                  // Same per-tag palette as Patrols' filter chips.
+                  "rounded-full border px-2 py-0.5 text-xs transition-all",
+                  tagClassName(tag),
+                  active ? "opacity-100 ring-1 ring-current/40" : "opacity-60 hover:opacity-100",
                 )}
               >
                 {tag}
@@ -448,176 +448,180 @@ export default function RunsPage() {
         <>
           {/* Status summary cards — click to filter the table to that bucket. */}
           <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        {BUCKETS.map((b) => {
-          const active = activeBucket === b.key;
-          return (
-            <button
-              type="button"
-              key={b.key}
-              aria-pressed={active}
-              onClick={() => toggleBucket(b.key)}
-              className={cn(
-                "flex items-center justify-between rounded-card border bg-card-background px-4 py-4 text-left transition-colors",
-                active
-                  ? "border-text-tertiary/50 bg-secondary/40"
-                  : "border-border-cards hover:border-text-tertiary/30 hover:bg-secondary/20",
-              )}
-            >
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-1">
-                  <span className={cn("size-2 rounded-full", b.dot)} />
-                  <span className="text-text-secondary text-xs font-medium">{t(`summary.${b.key}.label`)}</span>
-                </div>
-                <span className="text-text-tertiary text-[10px]">{t(`summary.${b.key}.sub`)}</span>
-              </div>
-              <span className="text-text-primary text-base tabular-nums">{counts[b.key]}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* "Needs you" explainer note (4px below the cards) */}
-      <p className="mt-1 text-text-tertiary text-xs leading-relaxed">{t("needsYouHint")}</p>
-
-      {/* Run table (8px below the note; 10px between the count line and table) */}
-      <div className="mt-2 flex flex-col gap-2.5">
-        <div className="flex items-center justify-end gap-2 text-xs">
-          {rows.length === 0 && narrowed && (
-            <button
-              type="button"
-              onClick={clearAll}
-              className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
-            >
-              {t("clearFilters")}
-            </button>
-          )}
-          <span className="text-text-tertiary font-light">
-            {t("showing", { shown: rows.length, total: totalRuns })}
-          </span>
-        </div>
-        <div className="overflow-hidden rounded-card border border-border-cards bg-card-background">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border-cards hover:bg-transparent">
-                <ColHead label={t("columns.task")} sortKey="task" sort={sort} setSort={setSort} />
-                <ColHead
-                  label={t("columns.triggered")}
-                  sortKey="triggered"
-                  sort={sort}
-                  setSort={setSort}
-                  className="w-[170px]"
-                />
-                <ColHead
-                  label={t("columns.status")}
-                  sortKey="status"
-                  sort={sort}
-                  setSort={setSort}
-                  className="w-[140px]"
-                  filter={{
-                    options: BUCKETS.map((b) => ({ value: b.key, label: t(`summary.${b.key}.label`), dot: b.dot })),
-                    selected: statusFilter,
-                    onToggle: (v) => toggleStatusFilter(v as RunBucket),
-                    onClear: () => setStatusFilter([]),
-                  }}
-                />
-                <ColHead
-                  label={t("columns.duration")}
-                  sortKey="duration"
-                  sort={sort}
-                  setSort={setSort}
-                  className="w-[100px]"
-                />
-                <ColHead
-                  label={t("columns.agent")}
-                  sortKey="agent"
-                  sort={sort}
-                  setSort={setSort}
-                  className="w-[130px]"
-                  filter={{
-                    options: agentOptions.map((n) => ({ value: n, label: n })),
-                    selected: agentFilter,
-                    onToggle: toggleAgentFilter,
-                    onClear: () => setAgentFilter([]),
-                  }}
-                />
-                <TableHead className="h-10 w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow className="border-border-cards hover:bg-transparent">
-                  <TableCell colSpan={6} className="h-24 text-center text-sm">
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="text-text-tertiary">
-                        {query
-                          ? t("noResults")
-                          : isFiltering(activeBucket, statusFilter, agentFilter)
-                            ? t("emptyFiltered")
-                            : t("empty")}
-                      </span>
-                      {narrowed && (
-                        <button
-                          type="button"
-                          onClick={clearAll}
-                          className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
-                        >
-                          {t("clearFilters")}
-                        </button>
-                      )}
+            {BUCKETS.map((b) => {
+              const active = activeBucket === b.key;
+              return (
+                <button
+                  type="button"
+                  key={b.key}
+                  aria-pressed={active}
+                  onClick={() => toggleBucket(b.key)}
+                  className={cn(
+                    "flex items-center justify-between rounded-card border bg-card-background px-4 py-4 text-left transition-colors",
+                    active
+                      ? "border-text-tertiary/50 bg-secondary/40"
+                      : "border-border-cards hover:border-text-tertiary/30 hover:bg-secondary/20",
+                  )}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <span className={cn("size-2 rounded-full", b.dot)} />
+                      <span className="text-text-secondary text-xs font-medium">{t(`summary.${b.key}.label`)}</span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((card) => {
-                  const bucket = bucketOf(card);
-                  return (
-                    <TableRow
-                      key={card.id}
-                      className="cursor-pointer border-border-cards hover:bg-secondary/40"
-                      onClick={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
-                    >
-                      <TableCell className="max-w-[280px] truncate text-text-primary text-sm">{card.title}</TableCell>
-                      <TableCell className="whitespace-nowrap text-text-secondary text-xs">
-                        {formatTriggered(triggeredAt(card))}
-                      </TableCell>
-                      <TableCell>
-                        <span className="flex items-center gap-2 text-text-primary text-xs">
-                          <span className={cn("size-2 rounded-full", DOT_OF[bucket])} />
-                          {t(`summary.${bucket}.label`)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
-                        {durationOf(card)}
-                      </TableCell>
-                      <TableCell>
-                        <AgentChip
-                          agent={settings.agents.find((a) => a.id === (card.agentPresetId ?? settings.defaultAgentId))}
-                        />
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <RowMenu
-                          onView={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
-                          onEdit={() => router.push("/kanban")}
-                          labels={{ view: t("rowMenu.view"), edit: t("rowMenu.edit") }}
-                        />
+                    <span className="text-text-tertiary text-[10px]">{t(`summary.${b.key}.sub`)}</span>
+                  </div>
+                  <span className="text-text-primary text-base tabular-nums">{counts[b.key]}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* "Needs you" explainer note (4px below the cards) */}
+          <p className="mt-1 text-text-tertiary text-xs leading-relaxed">{t("needsYouHint")}</p>
+
+          {/* Run table (8px below the note; 10px between the count line and table) */}
+          <div className="mt-2 flex flex-col gap-2.5">
+            <div className="flex items-center justify-end gap-2 text-xs">
+              {rows.length === 0 && narrowed && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
+                >
+                  {t("clearFilters")}
+                </button>
+              )}
+              <span className="text-text-tertiary font-light">
+                {t("showing", { shown: rows.length, total: totalRuns })}
+              </span>
+            </div>
+            <div className="overflow-hidden rounded-card border border-border-cards bg-card-background">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border-cards hover:bg-transparent">
+                    <ColHead label={t("columns.task")} sortKey="task" sort={sort} setSort={setSort} />
+                    <ColHead
+                      label={t("columns.triggered")}
+                      sortKey="triggered"
+                      sort={sort}
+                      setSort={setSort}
+                      className="w-[170px]"
+                    />
+                    <ColHead
+                      label={t("columns.status")}
+                      sortKey="status"
+                      sort={sort}
+                      setSort={setSort}
+                      className="w-[140px]"
+                      filter={{
+                        options: BUCKETS.map((b) => ({ value: b.key, label: t(`summary.${b.key}.label`), dot: b.dot })),
+                        selected: statusFilter,
+                        onToggle: (v) => toggleStatusFilter(v as RunBucket),
+                        onClear: () => setStatusFilter([]),
+                      }}
+                    />
+                    <ColHead
+                      label={t("columns.duration")}
+                      sortKey="duration"
+                      sort={sort}
+                      setSort={setSort}
+                      className="w-[100px]"
+                    />
+                    <ColHead
+                      label={t("columns.agent")}
+                      sortKey="agent"
+                      sort={sort}
+                      setSort={setSort}
+                      className="w-[130px]"
+                      filter={{
+                        options: agentOptions.map((n) => ({ value: n, label: n })),
+                        selected: agentFilter,
+                        onToggle: toggleAgentFilter,
+                        onClear: () => setAgentFilter([]),
+                      }}
+                    />
+                    <TableHead className="h-10 w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow className="border-border-cards hover:bg-transparent">
+                      <TableCell colSpan={6} className="h-24 text-center text-sm">
+                        <div className="flex flex-col items-center gap-2">
+                          <span className="text-text-tertiary">
+                            {query
+                              ? t("noResults")
+                              : isFiltering(activeBucket, statusFilter, agentFilter)
+                                ? t("emptyFiltered")
+                                : t("empty")}
+                          </span>
+                          {narrowed && (
+                            <button
+                              type="button"
+                              onClick={clearAll}
+                              className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
+                            >
+                              {t("clearFilters")}
+                            </button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
-                  );
-                })
+                  ) : (
+                    rows.map((card) => {
+                      const bucket = bucketOf(card);
+                      return (
+                        <TableRow
+                          key={card.id}
+                          className="cursor-pointer border-border-cards hover:bg-secondary/40"
+                          onClick={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
+                        >
+                          <TableCell className="max-w-[280px] truncate text-text-primary text-sm">
+                            {card.title}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-text-secondary text-xs">
+                            {formatTriggered(triggeredAt(card))}
+                          </TableCell>
+                          <TableCell>
+                            <span className="flex items-center gap-2 text-text-primary text-xs">
+                              <span className={cn("size-2 rounded-full", DOT_OF[bucket])} />
+                              {t(`summary.${bucket}.label`)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
+                            {durationOf(card)}
+                          </TableCell>
+                          <TableCell>
+                            <AgentChip
+                              agent={settings.agents.find(
+                                (a) => a.id === (card.agentPresetId ?? settings.defaultAgentId),
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <RowMenu
+                              onView={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
+                              onEdit={() => router.push("/kanban")}
+                              labels={{ view: t("rowMenu.view"), edit: t("rowMenu.edit") }}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+              {rows.length > 0 && rows.length < totalRuns && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="w-full border-border-cards border-t border-dashed py-3 text-center text-text-tertiary text-xs transition-colors hover:text-text-secondary"
+                >
+                  {t("footer", { shown: rows.length, total: totalRuns })}
+                </button>
               )}
-            </TableBody>
-          </Table>
-          {rows.length > 0 && rows.length < totalRuns && (
-            <button
-              type="button"
-              onClick={clearAll}
-              className="w-full border-border-cards border-t border-dashed py-3 text-center text-text-tertiary text-xs transition-colors hover:text-text-secondary"
-            >
-              {t("footer", { shown: rows.length, total: totalRuns })}
-            </button>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
         </>
       ) : (
         <RunsKanbanBoard
@@ -896,15 +900,24 @@ function RunsKanbanBoard({
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
       <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2.5">
-        <div className="flex shrink-0 items-center justify-end gap-2 text-xs">
-          {shown === 0 && narrowed && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
-            >
-              {t("clearFilters")}
-            </button>
+        {/* Fixed height so toggling the filter badge never shifts the board down. */}
+        <div className="flex h-6 shrink-0 items-center justify-end gap-2 text-xs">
+          {narrowed && (
+            <>
+              {/* Active-filter badge: flags that the board is narrowed and how many
+                  runs are hidden, with a one-click clear. */}
+              <span className="flex items-center gap-1 rounded-full bg-muted/40 px-2 py-0.5 text-text-secondary">
+                <ListFilterIcon className="size-3 shrink-0" />
+                {t("filteredHidden", { hidden: total - shown })}
+              </span>
+              <button
+                type="button"
+                onClick={onClear}
+                className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
+              >
+                {t("clearFilters")}
+              </button>
+            </>
           )}
           <span className="text-text-tertiary font-light">{t("showing", { shown, total })}</span>
         </div>
@@ -933,7 +946,14 @@ function RunsKanbanBoard({
 
       <DragOverlay dropAnimation={null}>
         {activeCard && (
-          <KanbanRunCard card={activeCard} bucket={bucketOf(activeCard)} onOpen={noop} onTrash={noop} onEdit={noop} isOverlay />
+          <KanbanRunCard
+            card={activeCard}
+            bucket={bucketOf(activeCard)}
+            onOpen={noop}
+            onTrash={noop}
+            onEdit={noop}
+            isOverlay
+          />
         )}
       </DragOverlay>
     </DndContext>
@@ -995,9 +1015,7 @@ function RunsBucketColumn({
           <p
             className={cn(
               "shrink-0 rounded-md border border-dashed px-2 py-2 text-center text-[11px]",
-              canDrop
-                ? "border-text-tertiary/40 text-text-secondary"
-                : "border-destructive/50 text-destructive",
+              canDrop ? "border-text-tertiary/40 text-text-secondary" : "border-destructive/50 text-destructive",
             )}
           >
             {canDrop ? t("kanban.dropHere") : t("kanban.dropBlocked")}
@@ -1136,9 +1154,7 @@ function KanbanRunCard({
               </span>
               <span className="text-text-tertiary text-xs tabular-nums">{durationOf(card)}</span>
             </div>
-            {card.agentQuestion && (
-              <p className="text-text-secondary text-xs leading-relaxed">{card.agentQuestion}</p>
-            )}
+            {card.agentQuestion && <p className="text-text-secondary text-xs leading-relaxed">{card.agentQuestion}</p>}
             <span
               role="button"
               tabIndex={0}
@@ -1155,20 +1171,20 @@ function KanbanRunCard({
         </>
       )}
 
-      {/* Tags — violet accent, matching the Figma card. The divider above sits
+      {/* Tags — per-tag palette, matching the Patrols page. The divider above sits
           between the title (or bucket body) and the tag row. */}
       {card.tags.length > 0 && (
         <>
           <span aria-hidden className="h-px w-full bg-border-cards" />
           <div className="flex flex-wrap gap-1">
-          {card.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-md border border-task-status-needs-you/40 bg-task-status-needs-you/10 px-2 py-0.5 text-task-status-needs-you text-[11px]"
-            >
-              {tag}
-            </span>
-          ))}
+            {card.tags.map((tag) => (
+              <span
+                key={tag}
+                className={tagClassName(tag, "rounded-md border px-2 py-0.5 text-[11px]")}
+              >
+                {tag}
+              </span>
+            ))}
           </div>
         </>
       )}
@@ -1195,8 +1211,7 @@ function compareBy(key: SortKey, a: KanbanCard, b: KanbanCard, agentName: (c: Ka
 /** Pick a lucide glyph for the agent binary (no brand marks in lucide). */
 function agentIcon(binary: string) {
   const b = binary.toLowerCase();
-  if (b.includes("claude")) return SparklesIcon;
-  if (b.includes("copilot") || b.includes("opencode") || b.includes("codex")) return BotIcon;
+  if (b.includes("opencode")) return BotIcon;
   return TerminalIcon;
 }
 

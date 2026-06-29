@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useNavGuardStore } from "@/stores/nav-guard-store";
 
 // sessionStorage keys. The pointer must persist across full page reloads:
 // the Tauri build is a static export (`output: "export"`), so route changes
@@ -35,6 +36,7 @@ export function NavHistoryControls({ className }: { className?: string }) {
   const t = useTranslations("nav");
 
   const [{ back, forward }, setState] = useState({ back: false, forward: false });
+  const guard = useNavGuardStore((s) => s.guard);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: recompute on every route change.
   useEffect(() => {
@@ -90,22 +92,37 @@ export function NavHistoryControls({ className }: { className?: string }) {
   }, [pathname]);
 
   const goBack = useCallback(() => {
-    try {
-      window.sessionStorage.setItem(K.intent, "back");
-    } catch {
-      // ignore — pointer just won't update, navigation still works
+    const nav = () => {
+      try {
+        window.sessionStorage.setItem(K.intent, "back");
+      } catch {
+        // ignore — pointer just won't update, navigation still works
+      }
+      router.back();
+    };
+    // A route with unsaved state can intercept (e.g. confirm before discarding).
+    if (guard?.block()) {
+      guard.onBlocked(nav);
+      return;
     }
-    router.back();
-  }, [router]);
+    nav();
+  }, [router, guard]);
 
   const goForward = useCallback(() => {
-    try {
-      window.sessionStorage.setItem(K.intent, "forward");
-    } catch {
-      // ignore
+    const nav = () => {
+      try {
+        window.sessionStorage.setItem(K.intent, "forward");
+      } catch {
+        // ignore
+      }
+      router.forward();
+    };
+    if (guard?.block()) {
+      guard.onBlocked(nav);
+      return;
     }
-    router.forward();
-  }, [router]);
+    nav();
+  }, [router, guard]);
 
   return (
     <div className={cn("flex items-center", className)}>

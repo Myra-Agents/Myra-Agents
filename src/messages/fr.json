@@ -387,8 +387,16 @@
         "description": "Lance la suite de tests et signale les échecs.",
         "prompt": "Lance toute la suite de tests. En cas d'échec, résume les échecs et la cause la plus probable pour chacun."
       },
+      "sortMyComputer": {
+        "label": "Ranger mon ordinateur",
+        "name": "Ranger mon ordinateur",
+        "cardTitle": "Ranger mon ordinateur",
+        "description": "Laisse l'agent trier un dossier de ton ordinateur — renommer, réorganiser et nettoyer les fichiers.",
+        "prompt": "Trie le dossier dans lequel tu te trouves : analyse son contenu, regroupe les fichiers par type et usage, propose une structure claire, renomme les fichiers avec une convention cohérente, et déplace ou supprime les doublons évidents et les fichiers inutiles."
+      },
       "add": "Ajouter",
       "categories": {
+        "personal": "Personnel",
         "popular": "Populaires",
         "codeReview": "Revue de code",
         "security": "Sécurité",
@@ -494,7 +502,15 @@
       "copiedJson": "JSON de la patrouille copié",
       "copyFailed": "Impossible de copier dans le presse-papiers"
     },
-    "templatesShort": "Modèles"
+    "templatesShort": "Modèles",
+    "harnessGate": {
+      "title": "Install an agent to create a patrol",
+      "description": "OpenCode must be installed before you can create or use a patrol.",
+      "continueAnyway": "Continue without installing",
+      "ollamaTitle": "Run agents locally (optional)",
+      "ollamaDescription": "Ollama lets you run open-source models on your machine instead of cloud APIs. Install it separately to use local models with OpenCode.",
+      "ollamaLearnMore": "Ollama documentation"
+    }
   },
   "planner": {
     "title": "Planifier la journée",
@@ -585,7 +601,8 @@
     "filterBy": "Filtrer par",
     "clearColumnFilter": "Effacer le filtre",
     "columnMenu": "Options {column}",
-    "clearFilters": "Effacer les filtres"
+    "clearFilters": "Effacer les filtres",
+    "filteredHidden": "{hidden, plural, =0 {Filtré} one {# exécution masquée} other {# exécutions masquées}}"
   },
   "history": {
     "title": "Historique",
@@ -1169,6 +1186,14 @@
     "discardDescription": "Vos modifications non enregistrées seront perdues et ne seront pas prises en compte.",
     "discardKeepEditing": "Continuer l'édition",
     "discardConfirm": "Abandonner les modifications",
+    "nameLabel": "Nom de la patrouille",
+    "namePlaceholder": "Nom de la patrouille",
+    "descriptionLabel": "Description de la patrouille",
+    "activateTitle": "Activer cette patrouille ?",
+    "activateDescription": "Cette patrouille est inactive. Activez-la maintenant pour qu'elle s'exécute selon son déclencheur, ou ajoutez-la inactive et activez-la plus tard.",
+    "activateCancel": "Annuler",
+    "activateKeepInactive": "Ajouter inactive",
+    "activateConfirm": "Activer",
     "notFound": "Patrouille introuvable.",
     "backToSchedules": "Retour aux patrouilles",
     "subtitle": "Déployez des patrouilles récurrentes avec des agents IA déclenchés par des événements.",
@@ -1177,6 +1202,7 @@
     "tags": "Tags",
     "newTag": "+ Nouveau tag",
     "save": "Enregistrer",
+    "add": "Ajouter",
     "runNow": "Lancer maintenant",
     "stopAllRuns": "Tout arrêter",
     "triggers": "Déclencheurs",
@@ -1241,10 +1267,12 @@
     "footer": "Affichage de {shown} sur {total} - Cliquez pour voir toutes les patrouilles",
     "toast": {
       "saved": "Patrouille enregistrée",
+      "added": "Patrouille ajoutée",
       "triggered": "Exécution déclenchée",
       "stopped": "{count} exécution(s) arrêtée(s)",
       "undo": "Annuler",
-      "needTrigger": "Ajoute un déclencheur avant d’enregistrer."
+      "needTrigger": "Ajoute un déclencheur avant d’enregistrer.",
+      "needFolder": "Ajoute un dossier avant d’enregistrer."
     },
     "addTrigger": "Ajouter un déclencheur",
     "searchTriggers": "Rechercher des déclencheurs...",
@@ -1299,6 +1327,9 @@
     "startTime": "Heure de départ",
     "home": "Dossier home",
     "selectFolder": "Choisir un dossier",
+    "folderRequired": "Ajoute un dossier dans lequel cette patrouille s’exécutera.",
+    "branchNotGit": "Ce dossier n’est pas un dépôt git.",
+    "branchNeedsFolder": "Choisis d’abord un dossier.",
     "branchesCount": "{count} branches",
     "branchPerFolder": "Branche par dossier",
     "primary": "principal",

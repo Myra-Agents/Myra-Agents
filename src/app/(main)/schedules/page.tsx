@@ -22,7 +22,6 @@ import {
   PlusIcon,
   SearchIcon,
   ShieldIcon,
-  SparklesIcon,
   TerminalIcon,
   TrashIcon,
   XIcon,
@@ -30,7 +29,18 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { HeaderActions } from "@/app/(main)/_components/header-actions";
+import { AgentInstallGate, useBinaryStatus } from "@/components/agents/binary-status";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -48,114 +58,14 @@ import { useSettings } from "@/hooks/use-settings";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
 import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
+import type { ConnectorKey, IdeaCategory } from "@/lib/schedule-ideas";
+import { IDEA_CATEGORIES, SCHEDULE_IDEAS } from "@/lib/schedule-ideas";
+import { openExternal } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { CreateScheduleInput, ScheduledTask, ScheduleKind } from "@/types/schedule";
+import type { CreateScheduleInput, ScheduledTask } from "@/types/schedule";
 import { describeSchedule, formatHm } from "@/types/schedule";
 import type { AgentPreset } from "@/types/settings";
-
-/** Connector glyphs shown in an idea card's "flow" row (trigger → app → app). */
-type ConnectorKey = "clock" | "github" | "slack" | "mail" | "globe" | "shield";
-
-/** Use-case idea categories — the segmented tabs above the idea grid (Figma). */
-type IdeaCategory = "popular" | "codeReview" | "security" | "incidents" | "dataResearch";
-
-const IDEA_CATEGORIES: IdeaCategory[] = ["popular", "codeReview", "security", "incidents", "dataResearch"];
-
-/** A use-case template surfaced as an idea card. Copy comes from i18n
- *  (`schedules.ideas.<id>.{name,description,cardTitle,prompt}`); clicking "Add"
- *  opens the editor prefilled. */
-interface ScheduleIdea {
-  id: string;
-  category: IdeaCategory;
-  connectors: ConnectorKey[];
-  schedule: ScheduleKind;
-  tags: string[];
-}
-
-const SCHEDULE_IDEAS: ScheduleIdea[] = [
-  // Popular
-  {
-    id: "dailyBrief",
-    category: "popular",
-    connectors: ["clock", "github", "slack"],
-    schedule: { type: "daily", time: "09:00" },
-    tags: ["brief"],
-  },
-  {
-    id: "standupPrep",
-    category: "popular",
-    connectors: ["clock", "slack"],
-    schedule: { type: "weekly", days: [1, 2, 3, 4, 5], time: "08:45" },
-    tags: ["standup"],
-  },
-  {
-    id: "weeklyReview",
-    category: "popular",
-    connectors: ["clock", "github"],
-    schedule: { type: "weekly", days: [1], time: "09:00" },
-    tags: ["review"],
-  },
-  // Code review
-  {
-    id: "prReview",
-    category: "codeReview",
-    connectors: ["clock", "github", "slack"],
-    schedule: { type: "interval", start: "08:00", minutes: 120 },
-    tags: ["review"],
-  },
-  {
-    id: "depUpdates",
-    category: "codeReview",
-    connectors: ["clock", "github"],
-    schedule: { type: "weekly", days: [1], time: "10:00" },
-    tags: ["deps"],
-  },
-  // Security
-  {
-    id: "findVulns",
-    category: "security",
-    connectors: ["clock", "github", "slack"],
-    schedule: { type: "daily", time: "07:00" },
-    tags: ["security"],
-  },
-  {
-    id: "secretScan",
-    category: "security",
-    connectors: ["clock", "github"],
-    schedule: { type: "daily", time: "06:00" },
-    tags: ["security"],
-  },
-  // Incidents & triage
-  {
-    id: "incidentTriage",
-    category: "incidents",
-    connectors: ["clock", "slack", "github"],
-    schedule: { type: "interval", start: "00:00", minutes: 30 },
-    tags: ["triage"],
-  },
-  {
-    id: "errorDigest",
-    category: "incidents",
-    connectors: ["clock", "mail"],
-    schedule: { type: "daily", time: "08:30" },
-    tags: ["errors"],
-  },
-  // Data & research
-  {
-    id: "testSweep",
-    category: "dataResearch",
-    connectors: ["clock", "github"],
-    schedule: { type: "daily", time: "08:00" },
-    tags: ["tests"],
-  },
-  {
-    id: "competitorWatch",
-    category: "dataResearch",
-    connectors: ["clock", "globe", "slack"],
-    schedule: { type: "weekly", days: [1], time: "09:30" },
-    tags: ["research"],
-  },
-];
+import { OLLAMA_INSTALL_INFO } from "@/types/settings";
 
 /** The 4-colour Slack mark — lucide has no brand glyph, so inline it. */
 function SlackMark({ className }: { className?: string }) {
@@ -200,7 +110,7 @@ function ConnectorFlow({ keys }: { keys: ConnectorKey[] }) {
     <div className="flex items-center gap-1.5">
       {keys.map((k, i) => (
         <Fragment key={k}>
-          {i > 0 && <span aria-hidden className="h-px w-3.5 bg-border-cards" />}
+          {i > 0 && <span aria-hidden className="h-px w-3.5 rounded-full bg-icon-tertiary" />}
           {CONNECTOR_ICON[k]}
         </Fragment>
       ))}
@@ -211,8 +121,7 @@ function ConnectorFlow({ keys }: { keys: ConnectorKey[] }) {
 /** Pick a lucide glyph for an agent binary (no brand marks in lucide). */
 function agentIcon(binary: string) {
   const b = binary.toLowerCase();
-  if (b.includes("claude")) return SparklesIcon;
-  if (b.includes("copilot") || b.includes("opencode") || b.includes("codex")) return BotIcon;
+  if (b.includes("opencode")) return BotIcon;
   return TerminalIcon;
 }
 
@@ -244,14 +153,85 @@ function relativeParts(iso?: string): { unit: "now" | "min" | "hours" | "days"; 
 type SortKey = "name" | "source" | "agent" | "nextRun";
 type SortDir = "asc" | "desc";
 
+/** Dialog shown when no harness is installed and the user tries to create a patrol. */
+function HarnessGateDialog({
+  open,
+  onOpenChange,
+  harness,
+  onContinueAnyway,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  harness: ReturnType<typeof useBinaryStatus>;
+  onContinueAnyway: () => void;
+}) {
+  const t = useTranslations("schedules");
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("harnessGate.title")}</DialogTitle>
+          <DialogDescription>{t("harnessGate.description")}</DialogDescription>
+        </DialogHeader>
+
+        <AgentInstallGate state={harness} />
+
+        <div className="rounded-md border border-dashed p-3">
+          <p className="mb-1 font-medium text-xs">{t("harnessGate.ollamaTitle")}</p>
+          <p className="mb-2 text-muted-foreground text-xs">{t("harnessGate.ollamaDescription")}</p>
+          <button
+            type="button"
+            className="text-[11px] text-primary underline-offset-2 hover:underline"
+            onClick={() => openExternal(OLLAMA_INSTALL_INFO.docsUrl)}
+          >
+            {t("harnessGate.ollamaLearnMore")}
+          </button>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="ghost" size="sm" onClick={onContinueAnyway}>
+            {t("harnessGate.continueAnyway")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SchedulesPage() {
   const t = useTranslations("schedules");
   const router = useRouter();
-  const { schedules, loading, error, createSchedule, deleteSchedule, toggleEnabled, triggerNow } =
-    useSchedules();
+  const { schedules, loading, error, createSchedule, deleteSchedule, toggleEnabled, triggerNow } = useSchedules();
   const { settings } = useSettings();
 
   const agentById = useMemo(() => new Map(settings.agents.map((p) => [p.id, p])), [settings.agents]);
+
+  // Harness gate — opencode must be installed before creating a patrol.
+  const harness = useBinaryStatus("opencode");
+  const [gateOpen, setGateOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  // Once the binary transitions to installed while the gate is open, close + proceed.
+  useEffect(() => {
+    if (gateOpen && harness.resolved && !harness.missing) {
+      setGateOpen(false);
+      const action = pendingAction;
+      setPendingAction(null);
+      action?.();
+    }
+  }, [gateOpen, harness.resolved, harness.missing, pendingAction]);
+
+  const withHarnessCheck = useCallback(
+    (action: () => void) => {
+      if (harness.resolved && harness.missing) {
+        setPendingAction(() => action);
+        setGateOpen(true);
+        return;
+      }
+      action();
+    },
+    [harness.resolved, harness.missing],
+  );
 
   const [triggering, setTriggering] = useState<string | null>(null);
 
@@ -259,7 +239,7 @@ export default function SchedulesPage() {
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [activeCategory, setActiveCategory] = useState<IdeaCategory>("popular");
+  const [activeCategory, setActiveCategory] = useState<IdeaCategory>("personal");
 
   // Per-column sort + value filters (mirrors the Runs list view).
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
@@ -275,6 +255,29 @@ export default function SchedulesPage() {
     },
     [router],
   );
+
+  // Create a fresh, disabled patrol with sensible defaults, then open its editor.
+  const [creating, setCreating] = useState(false);
+  const doCreate = useCallback(async () => {
+    setCreating(true);
+    try {
+      const input: CreateScheduleInput = {
+        name: t("newSchedule"),
+        cardTitle: "",
+        cardDescription: "",
+        agentPrompt: "",
+        tags: [],
+        schedule: { type: "daily", time: "09:00" },
+        enabled: false,
+      };
+      const task = await createSchedule(input);
+      router.push(`/schedules/edit/?id=${encodeURIComponent(task.id)}`);
+    } catch (e) {
+      toast.error(String(e));
+      setCreating(false);
+    }
+  }, [createSchedule, router, t]);
+  const handleCreate = useCallback(() => withHarnessCheck(() => void doCreate()), [withHarnessCheck, doCreate]);
 
   const handleTrigger = useCallback(
     async (id: string) => {
@@ -468,6 +471,21 @@ export default function SchedulesPage() {
   return (
     // Figma "App" content width — 968px, centred in the window.
     <div className="mx-auto flex w-full max-w-[968px] flex-col">
+      <HarnessGateDialog
+        open={gateOpen}
+        onOpenChange={(open) => {
+          if (!open) setPendingAction(null);
+          setGateOpen(open);
+        }}
+        harness={harness}
+        onContinueAnyway={() => {
+          setGateOpen(false);
+          const action = pendingAction;
+          setPendingAction(null);
+          action?.();
+        }}
+      />
+
       {/* Title block (Figma: 6px left inset, no inner gap) */}
       <div className="flex flex-col pl-1.5">
         <h1 className="text-text-primary text-base font-medium">{t("title")}</h1>
@@ -476,9 +494,9 @@ export default function SchedulesPage() {
 
       {/* Filter row: tag chips + search / new (24px below the title) */}
       <div className="mt-6 flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-0.5">
-          <span className="pr-2 text-text-tertiary text-xs">{t("tags")}</span>
-          {availableTags.length === 0 && <span className="text-text-tertiary/70 text-xs">{t("noTags")}</span>}
+        <div className="no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto">
+          <span className="shrink-0 pr-2 text-text-tertiary text-xs">{t("tags")}</span>
+          {availableTags.length === 0 && <span className="shrink-0 text-text-tertiary/70 text-xs">{t("noTags")}</span>}
           {availableTags.map((tag) => {
             const active = tagFilter.includes(tag);
             return (
@@ -489,7 +507,7 @@ export default function SchedulesPage() {
                 onClick={() => toggleTagFilter(tag)}
                 className={cn(
                   // Same per-tag palette as the Tools-column badges.
-                  "rounded-full border px-2 py-0.5 text-xs transition-all",
+                  "shrink-0 rounded-full border px-2 py-0.5 text-xs transition-all",
                   tagClassName(tag),
                   active ? "opacity-100 ring-1 ring-current/40" : "opacity-60 hover:opacity-100",
                 )}
@@ -544,6 +562,19 @@ export default function SchedulesPage() {
           )}
         </div>
       </div>
+
+      {/* New Patrol lives in the shared top bar (left of the theme switcher). */}
+      <HeaderActions>
+        <button
+          type="button"
+          onClick={handleCreate}
+          disabled={creating}
+          className="flex h-6 items-center gap-1 rounded-md bg-primary px-2 font-medium text-[11px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+        >
+          <PlusIcon className="size-3.5 shrink-0" />
+          <span className="whitespace-nowrap">{t("newSchedule")}</span>
+        </button>
+      </HeaderActions>
 
       {error && <p className="mt-2 text-destructive text-xs">{error}</p>}
 
@@ -771,26 +802,29 @@ export default function SchedulesPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {ideas.map((idea) => (
-            <div
-              key={idea.id}
-              className="flex flex-col gap-2 rounded-card border border-border-cards bg-card-background p-2.5 pr-10"
-            >
-              <ConnectorFlow keys={idea.connectors} />
-              <div className="flex flex-col gap-1">
-                <h3 className="text-text-primary text-xs font-medium">{t(`ideas.${idea.id}.name`)}</h3>
-                <p className="text-text-secondary text-[11px] font-light leading-relaxed">
-                  {t(`ideas.${idea.id}.description`)}
-                </p>
-              </div>
+          {ideas.map((idea) => {
+            const openTemplate = () =>
+              withHarnessCheck(() => router.push(`/schedules/edit/?template=${encodeURIComponent(idea.id)}`));
+            return (
               <button
                 type="button"
-                className="self-start rounded-card border border-border-cards px-2 py-0.5 text-text-primary text-[11px] font-medium transition-colors hover:bg-secondary"
+                key={idea.id}
+                onClick={openTemplate}
+                className="flex flex-col gap-2 rounded-card border border-border-cards bg-card-background p-2.5 pr-10 text-left transition-colors hover:border-border hover:bg-secondary/40"
               >
-                {t("ideas.add")}
+                <ConnectorFlow keys={idea.connectors} />
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-text-primary text-xs font-medium">{t(`ideas.${idea.id}.name`)}</h3>
+                  <p className="text-text-secondary text-[11px] font-light leading-relaxed">
+                    {t(`ideas.${idea.id}.description`)}
+                  </p>
+                </div>
+                <span className="self-start rounded-card border border-border-cards px-2 py-0.5 text-text-primary text-[11px] font-medium transition-colors hover:bg-secondary">
+                  {t("ideas.add")}
+                </span>
               </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -948,4 +982,3 @@ function AgentChip({ agent }: { agent?: AgentPreset }) {
     </span>
   );
 }
-

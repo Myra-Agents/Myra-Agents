@@ -468,6 +468,106 @@ const I18N_LOG = streamLog([
   },
 ]);
 
+// ── 11. UI showcase: every conversation block type in one run ─────────────────
+// Exercises every renderer: thinking, markdown headings/bold/code/lists, fenced
+// code block, tool calls (Read/Edit/Bash/Grep/WebFetch/TodoWrite), a diff
+// output, an error tool result, and a result footer with cost + tokens.
+const SHOWCASE_LOG = streamLog([
+  { type: "system", subtype: "init", model: "claude-opus-4-8", tools: ["Read", "Edit", "Bash", "Grep", "WebFetch", "TodoWrite"] },
+  asst({
+    type: "thinking",
+    thinking:
+      "The task is to audit the conversation renderer and make sure every block type is exercised. I'll:\n1. Read the types file to confirm the full list\n2. Check the markdown renderer handles headings, bold, inline code, fenced blocks, bullet + numbered lists\n3. Show a tool with a diff output\n4. Show an error tool result\n5. Show a multi-field TodoWrite\n\nLet me start by reading the types so I can enumerate them precisely.",
+  }),
+  asst({
+    type: "text",
+    text: "## Showcase — all conversation block types\n\nThis run exercises **every** renderer in `conversation-view.tsx`. Here's the plan:\n\n1. `thinking` — collapsible reasoning (you're reading it above)\n2. `text` — this block: headings, **bold**, `inline code`, fenced code, lists\n3. `tool_use` — Read, Edit (with diff), Bash, Grep, WebFetch, TodoWrite\n4. `tool_result` with `isError: true`\n5. `result` footer with cost + tokens + duration\n\n### Markdown features\n\n**Bold text**, `inline code`, and mixed: **`bold-code`** isn't supported — that's fine.\n\n#### Fenced code block\n\n```typescript\ntype TranscriptEntry =\n  | { kind: 'user';       text: string }\n  | { kind: 'text';       text: string }\n  | { kind: 'thinking';   text: string }\n  | { kind: 'tool_use';   id: string; name: string; input: Record<string, unknown> }\n  | { kind: 'tool_result'; toolUseId: string; content: string; isError: boolean }\n  | { kind: 'result';     summary: string; tokens?: number; cost?: number };\n```\n\n#### Bullet list\n\n- Item alpha — plain text\n- Item beta — with `inline code`\n- Item gamma — with **bold**\n\n#### Numbered list\n\n1. First step — read the file\n2. Second step — apply the edit\n3. Third step — typecheck",
+  }),
+  asst({ type: "tool_use", id: "sh1", name: "Read", input: { file_path: "src/lib/conversation/types.ts" } }),
+  toolResult(
+    "sh1",
+    "export type TranscriptEntry = UserEntry | TextEntry | ThinkingEntry | ToolUseEntry | ToolResultEntry | ResultEntry;\n\nexport interface ThinkingEntry { kind: 'thinking'; text: string; }\nexport interface ToolUseEntry  { kind: 'tool_use'; id: string; name: string; input: Record<string, unknown>; }\nexport interface ToolResultEntry { kind: 'tool_result'; toolUseId: string; content: string; isError: boolean; }\nexport interface ResultEntry { kind: 'result'; summary: string; tokens?: number; cost?: number; durationMs?: number; numTurns?: number; isError: boolean; }",
+  ),
+  asst({ type: "text", text: "Good — six kinds confirmed. Now let me grep for any rendering path I might miss." }),
+  asst({ type: "tool_use", id: "sh2", name: "Grep", input: { pattern: "case \"", path: "src/components/conversation/conversation-view.tsx" } }),
+  toolResult(
+    "sh2",
+    "conversation-view.tsx:102:    case \"user\":\nconversation-view.tsx:104:    case \"text\":\nconversation-view.tsx:106:    case \"thinking\":\nconversation-view.tsx:108:    case \"tool_use\":\nconversation-view.tsx:110:    case \"tool_result\":\nconversation-view.tsx:112:    case \"result\":",
+  ),
+  asst({
+    type: "thinking",
+    thinking: "All six cases are present. The diff renderer is triggered by `looksLikeDiff` on the tool result content — I need to show a result that starts with `@@` so it renders as a diff view rather than a plain pre block.",
+  }),
+  asst({ type: "text", text: "All six `case` branches found. Now applying the Edit so the diff view triggers." }),
+  asst({
+    type: "tool_use",
+    id: "sh3",
+    name: "Edit",
+    input: {
+      file_path: "src/lib/conversation/demo.ts",
+      old_string: "// placeholder",
+      new_string: "// SHOWCASE_LOG added",
+    },
+  }),
+  toolResult(
+    "sh3",
+    "@@ -471,6 +471,7 @@\n export const DEMO_RUN_LOGS: Record<string, string> = {\n   \"run-darkmode\": DARKMODE_LOG,\n+  \"run-showcase\": SHOWCASE_LOG,\n   \"run-flaky\": FLAKY_LOG,\n };",
+  ),
+  asst({ type: "text", text: "Diff rendered above. Running a typecheck to confirm nothing is broken." }),
+  asst({
+    type: "tool_use",
+    id: "sh4",
+    name: "Bash",
+    input: { command: "npx tsc --noEmit", description: "Typecheck" },
+  }),
+  toolResult("sh4", "✓ No type errors (2.1s)"),
+  asst({ type: "text", text: "Clean. Let me also fetch the MDN page for `@@` hunk format to document it." }),
+  asst({
+    type: "tool_use",
+    id: "sh5",
+    name: "WebFetch",
+    input: { url: "https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html", description: "Unified diff format" },
+  }),
+  toolResult(
+    "sh5",
+    "GNU Diffutils: Detailed Description of Unified Format\n\nA unified diff hunk header looks like:\n  @@ -l,s +l,s @@\nwhere l is the starting line number and s is the number of lines in the hunk.\nLines beginning with '+' are additions; '-' are deletions; ' ' is context.",
+  ),
+  asst({ type: "text", text: "Now writing the remaining items to the to-do list." }),
+  asst({
+    type: "tool_use",
+    id: "sh6",
+    name: "TodoWrite",
+    input: {
+      todos: [
+        { id: "1", content: "Add SHOWCASE_LOG to DEMO_RUN_LOGS map", status: "completed", priority: "high" },
+        { id: "2", content: "Add matching demo card in demoCards()", status: "in_progress", priority: "high" },
+        { id: "3", content: "Verify in bun run dev that all blocks render", status: "pending", priority: "medium" },
+        { id: "4", content: "Screenshot for PR description", status: "pending", priority: "low" },
+      ],
+    },
+  }),
+  toolResult("sh6", "4 todos written."),
+  asst({ type: "text", text: "Attempting a step that will fail — reading a non-existent file — to show the error state." }),
+  asst({
+    type: "tool_use",
+    id: "sh7",
+    name: "Read",
+    input: { file_path: "src/lib/conversation/does-not-exist.ts" },
+  }),
+  toolResult("sh7", "Error: ENOENT: no such file or directory 'src/lib/conversation/does-not-exist.ts'", true),
+  asst({ type: "text", text: "Error state rendered in red above — expected. Showcase complete." }),
+  {
+    type: "result",
+    subtype: "success",
+    result:
+      "All six conversation block types exercised in one run:\n\n- **thinking** — collapsible reasoning (×2)\n- **text** — markdown with headings, bold, inline code, fenced block, bullet + numbered lists\n- **tool_use** — Read ×2, Grep, Edit (→ diff), Bash, WebFetch, TodoWrite\n- **tool_result** with `isError: true` (error state)\n- **result** footer — summary, cost, tokens, duration, turns\n\nTypecheck passes.",
+    total_cost_usd: 0.0871,
+    num_turns: 8,
+    duration_ms: 34560,
+    usage: { input_tokens: 21400, output_tokens: 1840 },
+  },
+]);
+
 export const DEMO_RUN_LOGS: Record<string, string> = {
   "run-darkmode": DARKMODE_LOG,
   "run-flaky": FLAKY_LOG,
@@ -479,6 +579,7 @@ export const DEMO_RUN_LOGS: Record<string, string> = {
   "run-eslint": FAILED_LOG,
   "run-deps": DEPS_LOG,
   "run-i18n": I18N_LOG,
+  "run-showcase": SHOWCASE_LOG,
 };
 
 const run = (id: string, status: AgentRun["status"], prompt: string, extra: Partial<AgentRun>): AgentRun => ({
@@ -730,6 +831,31 @@ export function demoCards(): KanbanCard[] {
           tokens: 4200,
           cost: 0.0102,
           result: "README badges updated; version corrected to v0.6.1.",
+        }),
+      ],
+    },
+    {
+      ...base,
+      id: "demo-showcase",
+      title: "UI Showcase — tous les blocs de conversation",
+      description: "Run de démonstration : thinking, markdown complet, diff, erreur, result footer.",
+      status: "done",
+      position: 6000,
+      createdAt: at(1 * HOUR),
+      updatedAt: at(1 * HOUR - 34560),
+      tags: ["✨ demo", "showcase"],
+      agentRunId: "run-showcase",
+      agentRunStartedAt: at(1 * HOUR),
+      agentRunEndedAt: at(1 * HOUR - 34560),
+      agentResult: "Tous les types de blocs exercés. Typecheck passe.",
+      runHistory: [
+        run("run-showcase", "completed", "Exercer chaque type de bloc dans la vue conversation (thinking, markdown, diff, erreur, result).", {
+          startedAt: at(1 * HOUR),
+          endedAt: at(1 * HOUR - 34560),
+          exitCode: 0,
+          tokens: 23240,
+          cost: 0.0871,
+          result: "Tous les types de blocs exercés. Typecheck passe.",
         }),
       ],
     },
