@@ -7,13 +7,16 @@ import { useRouter } from "next/navigation";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  BotIcon,
   CheckIcon,
   ListFilterIcon,
   MoreHorizontalIcon,
   SearchIcon,
+  TerminalIcon,
   XIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import {
   DropdownMenu,
@@ -25,6 +28,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useSchedules } from "@/hooks/use-schedules";
+import { useSettings } from "@/hooks/use-settings";
 import {
   durationSeconds,
   formatDuration,
@@ -37,6 +42,7 @@ import {
 } from "@/lib/history/past-runs";
 import { cn } from "@/lib/utils";
 import type { KanbanCard } from "@/types/kanban";
+import type { AgentPreset } from "@/types/settings";
 
 /**
  * The shared "History" view (Figma `history`): time-range selector → stat cards →
@@ -49,6 +55,12 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
   const t = useTranslations("history");
   const router = useRouter();
   const now = useNow();
+  const { settings } = useSettings();
+  const { schedules, triggerNow } = useSchedules();
+
+  // Resolve the agent preset a run used (falls back to the default agent).
+  const agentOf = (r: PastRun): AgentPreset | undefined =>
+    settings.agents.find((a) => a.id === (r.agentPresetId ?? settings.defaultAgentId));
 
   const [range, setRange] = useState<TimeRange>("today");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -75,10 +87,14 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
     if (resultFilter.length) r = r.filter((run) => resultFilter.includes(run.ok ? "success" : "failed"));
     if (sort) {
       const dir = sort.dir === "asc" ? 1 : -1;
-      r = [...r].sort((a, b) => dir * compareRuns(sort.key, a, b));
+      const nameOf = (run: PastRun) =>
+        settings.agents.find((a) => a.id === (run.agentPresetId ?? settings.defaultAgentId))?.name ?? "";
+      r = [...r].sort((a, b) =>
+        sort.key === "agent" ? dir * nameOf(a).localeCompare(nameOf(b)) : dir * compareRuns(sort.key, a, b),
+      );
     }
     return r;
-  }, [inRange, query, resultFilter, sort]);
+  }, [inRange, query, resultFilter, sort, settings]);
 
   const narrowed = query.trim().length > 0 || resultFilter.length > 0;
   const toggleResultFilter = (v: ResultValue) =>
@@ -90,6 +106,23 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
 
   const openRun = (r: PastRun) =>
     router.push(`/history/run/?card=${encodeURIComponent(r.cardId)}&run=${encodeURIComponent(r.runId)}`);
+  const editPatrol = (r: PastRun) => {
+    if (r.linkedTaskId) router.push(`/schedules/edit/?id=${encodeURIComponent(r.linkedTaskId)}`);
+  };
+  // Re-fire the owning patrol now. Schedule ids are connection-scoped while the
+  // run stores the raw task id — match on suffix too (mirrors the session view).
+  const rerun = async (r: PastRun) => {
+    const linked = r.linkedTaskId;
+    if (!linked) return;
+    const schedule = schedules.find((s) => s.id === linked || s.id.endsWith(`:${linked}`) || s.id.endsWith(linked));
+    if (!schedule) return;
+    try {
+      await triggerNow(schedule.id);
+      toast.success(t("rowMenu.rerunStarted"));
+    } catch (e) {
+      toast.error(String(e));
+    }
+  };
 
   return (
     <div className="flex w-full flex-col">
@@ -203,6 +236,7 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
                 setSort={setSort}
                 className="w-[120px]"
               />
+              <ColHead label={t("columns.agent")} sortKey="agent" sort={sort} setSort={setSort} className="w-[150px]" />
               <ColHead
                 label={t("columns.result")}
                 sortKey="result"
@@ -226,7 +260,7 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
           <TableBody>
             {visibleRows.length === 0 ? (
               <TableRow className="border-border-cards hover:bg-transparent">
-                <TableCell colSpan={6} className="h-24 text-center text-sm">
+                <TableCell colSpan={7} className="h-24 text-center text-sm">
                   <div className="flex flex-col items-center gap-2">
                     <span className="text-text-tertiary">{narrowed ? t("noResults") : t("empty")}</span>
                     {narrowed && (
@@ -262,6 +296,9 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
                   <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
                     {formatDuration(r)}
                   </TableCell>
+                  <TableCell>
+                    <AgentChip agent={agentOf(r)} />
+                  </TableCell>
                   <TableCell
                     className={cn("whitespace-nowrap text-xs", r.ok ? "text-task-status-done" : "text-destructive")}
                   >
@@ -282,16 +319,25 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onClick={() => openRun(r)}>{t("rowMenu.open")}</DropdownMenuItem>
-                        {r.linkedTaskId && (
-                          <DropdownMenuItem
-                            onClick={() =>
-                              router.push(`/schedules/edit/?id=${encodeURIComponent(r.linkedTaskId as string)}`)
-                            }
-                          >
-                            {t("rowMenu.schedule")}
-                          </DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem onClick={() => openRun(r)} className="whitespace-nowrap">
+                          {t("rowMenu.viewOperation")}
+                        </DropdownMenuItem>
+                        {/* Patrol actions need an owning schedule — disable when the run
+                            isn't linked to one (e.g. a one-off / manual card). */}
+                        <DropdownMenuItem
+                          disabled={!r.linkedTaskId}
+                          onClick={() => editPatrol(r)}
+                          className="whitespace-nowrap"
+                        >
+                          {t("rowMenu.editPatrol")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={!r.linkedTaskId}
+                          onClick={() => void rerun(r)}
+                          className="whitespace-nowrap"
+                        >
+                          {t("rowMenu.rerun")}
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -447,7 +493,7 @@ function SuccessRateChart({ data }: { data: Bucket[] }) {
   );
 }
 
-type SortKey = "task" | "triggered" | "duration" | "result" | "usage";
+type SortKey = "task" | "triggered" | "duration" | "agent" | "result" | "usage";
 type SortDir = "asc" | "desc";
 type ResultValue = "success" | "failed";
 
@@ -463,6 +509,9 @@ function compareRuns(key: SortKey, a: PastRun, b: PastRun): number {
       return Number(a.ok) - Number(b.ok);
     case "usage":
       return (a.tokens ?? -1) - (b.tokens ?? -1);
+    case "agent":
+      // Resolved name needs settings; handled at the call site. Keep stable here.
+      return 0;
   }
 }
 
@@ -582,6 +631,23 @@ function StatCard({ title, value, accent }: { title: string; value: string; acce
         {value}
       </span>
     </div>
+  );
+}
+
+/** Pick a lucide glyph for the agent binary (no brand marks in lucide). */
+function agentIcon(binary: string) {
+  return binary.toLowerCase().includes("opencode") ? BotIcon : TerminalIcon;
+}
+
+/** A bordered chip with the agent's icon + name, mirroring the Operations Agent cell. */
+function AgentChip({ agent }: { agent?: AgentPreset }) {
+  if (!agent) return <span className="text-text-tertiary text-xs">—</span>;
+  const Icon = agentIcon(agent.binary);
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-border-cards px-2 py-1 text-text-secondary text-xs">
+      <Icon className="size-3.5 text-icon-primary" />
+      {agent.name}
+    </span>
   );
 }
 

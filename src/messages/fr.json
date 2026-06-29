@@ -587,7 +587,9 @@
       "openKanban": "Ouvrir dans le Kanban",
       "clearSearch": "Effacer la recherche",
       "view": "Voir",
-      "edit": "Modifier"
+      "edit": "Modifier",
+      "viewOperation": "Voir l'opération",
+      "editPatrol": "Modifier la patrouille"
     },
     "emptyFiltered": "Aucun run dans ce statut.",
     "searchPlaceholder": "Rechercher tâche, agent, statut…",
@@ -634,6 +636,7 @@
       "task": "Nom de la tâche",
       "triggered": "Déclenchée",
       "duration": "Durée",
+      "agent": "Agent",
       "result": "Résultat",
       "usage": "Usage"
     },
@@ -645,7 +648,11 @@
     "usage": "{tokens} Token",
     "rowMenu": {
       "open": "Ouvrir la session",
-      "schedule": "Modifier la patrouille"
+      "schedule": "Modifier la patrouille",
+      "viewOperation": "Voir l'opération",
+      "editPatrol": "Modifier la patrouille",
+      "rerun": "Relancer l'opération",
+      "rerunStarted": "Relance de l'opération démarrée"
     },
     "sort": {
       "label": "Trier",
@@ -1050,10 +1057,9 @@
         "french": "Français"
       },
       "pageOptions": {
-        "kanban": "Kanban",
-        "schedules": "Patrouilles",
-        "planner": "Planificateur",
-        "logs": "Journaux"
+        "operations": "Opérations",
+        "patrols": "Patrouilles",
+        "history": "Historique"
       },
       "homeFolder": "Dossier home",
       "homeFolderHint": "Dossier de base parcouru par le sélecteur de dossiers des patrouilles. Par défaut, votre dossier utilisateur."

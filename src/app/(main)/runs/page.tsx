@@ -28,6 +28,7 @@ import {
   MessageSquareIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PlayIcon,
   SearchIcon,
   TerminalIcon,
   Trash2Icon,
@@ -48,10 +49,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useKanban } from "@/hooks/use-kanban";
+import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { connIdOf } from "@/lib/aggregate/global-id";
-import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
 import { tagClassName } from "@/lib/kanban-tags";
+import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
 import { cn } from "@/lib/utils";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
 import { isTransitionAllowed } from "@/types/kanban";
@@ -299,6 +301,10 @@ export default function RunsPage() {
   };
 
   const openLogs = (id: string) => router.push(`/logs?card=${encodeURIComponent(id)}`);
+  // "Edit Patrol" → the owning schedule's settings (the patrol editor). Falls
+  // back to the Patrols list when the run isn't linked to a schedule.
+  const editPatrol = (card: KanbanCard) =>
+    router.push(card.linkedTaskId ? `/schedules/edit/?id=${encodeURIComponent(card.linkedTaskId)}` : "/schedules");
   const trashRun = (id: string) =>
     void trashCard(id).then(() =>
       toast.success(t("kanban.trashed"), {
@@ -600,9 +606,10 @@ export default function RunsPage() {
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <RowMenu
-                              onView={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
-                              onEdit={() => router.push("/kanban")}
-                              labels={{ view: t("rowMenu.view"), edit: t("rowMenu.edit") }}
+                              onView={() => openLogs(card.id)}
+                              onEdit={() => editPatrol(card)}
+                              editDisabled={!card.linkedTaskId}
+                              labels={{ view: t("rowMenu.viewOperation"), edit: t("rowMenu.editPatrol") }}
                             />
                           </TableCell>
                         </TableRow>
@@ -633,7 +640,7 @@ export default function RunsPage() {
           onClear={clearAll}
           onOpenLogs={openLogs}
           onTrash={trashRun}
-          onEdit={() => router.push("/kanban")}
+          onEdit={editPatrol}
           onMove={moveCard}
           onReorder={reorderCard}
         />
@@ -763,10 +770,14 @@ function AgentChip({ agent }: { agent?: AgentPreset }) {
 function RowMenu({
   onView,
   onEdit,
+  editDisabled = false,
   labels,
 }: {
   onView: () => void;
   onEdit: () => void;
+  // "Edit Patrol" needs an owning schedule — grey it out when the run isn't
+  // linked to one (mirrors the History row menu).
+  editDisabled?: boolean;
   labels: { view: string; edit: string };
 }) {
   return (
@@ -779,12 +790,12 @@ function RowMenu({
           <MoreHorizontalIcon className="size-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={onView}>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onClick={onView} className="whitespace-nowrap">
           <EyeIcon className="size-3.5" />
           {labels.view}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onEdit}>
+        <DropdownMenuItem onClick={onEdit} disabled={editDisabled} className="whitespace-nowrap">
           <PencilIcon className="size-3.5" />
           {labels.edit}
         </DropdownMenuItem>
@@ -824,7 +835,7 @@ function RunsKanbanBoard({
   onClear: () => void;
   onOpenLogs: (id: string) => void;
   onTrash: (id: string) => void;
-  onEdit: () => void;
+  onEdit: (card: KanbanCard) => void;
   onMove: (id: string, status: KanbanStatus) => void | Promise<unknown>;
   onReorder: (id: string, newPosition: number, status?: KanbanStatus) => void;
 }) {
@@ -979,7 +990,7 @@ function RunsBucketColumn({
   isTarget: boolean;
   onOpenLogs: (id: string) => void;
   onTrash: (id: string) => void;
-  onEdit: () => void;
+  onEdit: (card: KanbanCard) => void;
   invalidDropId: string | null;
 }) {
   const t = useTranslations("runs");
@@ -1035,7 +1046,7 @@ function RunsBucketColumn({
                 bucket={bucket}
                 onOpen={() => onOpenLogs(card.id)}
                 onTrash={() => onTrash(card.id)}
-                onEdit={onEdit}
+                onEdit={() => onEdit(card)}
                 isShaking={invalidDropId === card.id}
               />
             ))}
@@ -1178,10 +1189,7 @@ function KanbanRunCard({
           <span aria-hidden className="h-px w-full bg-border-cards" />
           <div className="flex flex-wrap gap-1">
             {card.tags.map((tag) => (
-              <span
-                key={tag}
-                className={tagClassName(tag, "rounded-md border px-2 py-0.5 text-[11px]")}
-              >
+              <span key={tag} className={tagClassName(tag, "rounded-md border px-2 py-0.5 text-[11px]")}>
                 {tag}
               </span>
             ))}

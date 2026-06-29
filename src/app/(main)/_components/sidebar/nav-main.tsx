@@ -59,7 +59,7 @@ const NavItemExpanded = ({
   isSubmenuOpen,
 }: {
   item: NavMainItem;
-  isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
+  isActive: (url: string, subItems?: NavMainItem["subItems"], matchPaths?: string[]) => boolean;
   isSubmenuOpen: (subItems?: NavMainItem["subItems"]) => boolean;
 }) => {
   return (
@@ -69,7 +69,7 @@ const NavItemExpanded = ({
           {item.subItems ? (
             <SidebarMenuButton
               disabled={item.comingSoon}
-              isActive={isActive(item.url, item.subItems)}
+              isActive={isActive(item.url, item.subItems, item.matchPaths)}
               tooltip={itemTooltip(item)}
             >
               {item.icon && <item.icon />}
@@ -81,7 +81,7 @@ const NavItemExpanded = ({
             <SidebarMenuButton
               asChild
               aria-disabled={item.comingSoon}
-              isActive={isActive(item.url)}
+              isActive={isActive(item.url, undefined, item.matchPaths)}
               tooltip={itemTooltip(item)}
             >
               <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
@@ -119,7 +119,7 @@ const NavItemCollapsed = ({
   isActive,
 }: {
   item: NavMainItem;
-  isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
+  isActive: (url: string, subItems?: NavMainItem["subItems"], matchPaths?: string[]) => boolean;
 }) => {
   return (
     <SidebarMenuItem key={item.title}>
@@ -128,7 +128,7 @@ const NavItemCollapsed = ({
           <SidebarMenuButton
             disabled={item.comingSoon}
             tooltip={itemTooltip(item)}
-            isActive={isActive(item.url, item.subItems)}
+            isActive={isActive(item.url, item.subItems, item.matchPaths)}
             className={collapsedIconClass}
           >
             {item.icon && <item.icon />}
@@ -173,11 +173,11 @@ export function NavMain({ items }: NavMainProps) {
   // an unrelated "/schedules-foo".
   const matches = (url: string) => path === url || (url !== "/" && path.startsWith(`${url}/`));
 
-  const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
+  const isItemActive = (url: string, subItems?: NavMainItem["subItems"], matchPaths?: string[]) => {
     if (subItems?.length) {
       return subItems.some((sub) => matches(sub.url));
     }
-    return matches(url);
+    return matches(url) || (matchPaths?.some(matches) ?? false);
   };
 
   const isSubmenuOpen = (subItems?: NavMainItem["subItems"]) => {
@@ -201,7 +201,7 @@ export function NavMain({ items }: NavMainProps) {
                           asChild
                           aria-disabled={item.comingSoon}
                           tooltip={itemTooltip(item)}
-                          isActive={isItemActive(item.url)}
+                          isActive={isItemActive(item.url, undefined, item.matchPaths)}
                           className={collapsedIconClass}
                         >
                           <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>

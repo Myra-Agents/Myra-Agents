@@ -2,9 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
-import { ChevronLeftIcon, ExternalLinkIcon, FileIcon, FolderIcon, ListFilterIcon, SearchIcon } from "lucide-react";
+import { ExternalLinkIcon, FileIcon, FolderIcon, ListFilterIcon, SearchIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -32,6 +32,7 @@ import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
 import { parseTranscript } from "@/lib/conversation/parse";
 import { invokeOn } from "@/lib/tauri";
+import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import type { AgentRun, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 interface RunArtifact {
@@ -44,7 +45,6 @@ interface RunArtifact {
 function LogsPageInner() {
   const t = useTranslations("logs");
   const { cards, loading, moveCard, addRevisionNote, answerFeedback } = useKanban();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkCardId = searchParams.get("card");
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
@@ -58,6 +58,12 @@ function LogsPageInner() {
   const transcript = useMemo(
     () => (selectedRun ? parseTranscript(logContent, selectedRun.run) : { entries: [], structured: false }),
     [logContent, selectedRun],
+  );
+
+  // The run detail is reached from the Operations list — surface it as
+  // "Operations › {run title}" in the top bar (the path is `/logs`).
+  useBreadcrumbOverride(
+    selectedRun ? { label: selectedRun.card.title, parent: { label: "Operations", href: "/runs" } } : null,
   );
 
   const allRuns = useMemo(
@@ -202,19 +208,6 @@ function LogsPageInner() {
     return (
       <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              // Arrived via a card deep-link (?card=…): return to the previous
-              // page (the board). Otherwise just clear back to the runs list.
-              if (deepLinkCardId) router.back();
-              else setSelectedRun(null);
-            }}
-          >
-            <ChevronLeftIcon className="size-4" />
-            {t("back")}
-          </Button>
           <h2 className="truncate font-semibold text-sm">{selectedRun.card.title}</h2>
           <RunStatusBadge status={displayStatus} />
         </div>

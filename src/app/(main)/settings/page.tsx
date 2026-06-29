@@ -8,7 +8,6 @@ import {
   DownloadIcon,
   FlaskConicalIcon,
   Loader2Icon,
-  PaletteIcon,
   PlusIcon,
   SaveIcon,
   SettingsIcon,
@@ -56,6 +55,12 @@ import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
 import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
+import {
+  DEFAULT_PAGE,
+  type DefaultPage,
+  getDefaultPageSetting,
+  setDefaultPageSetting,
+} from "@/lib/default-page.client";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke } from "@/lib/tauri";
@@ -358,6 +363,17 @@ export default function SettingsPage() {
     setHomeFolderSetting(v);
   }, []);
 
+  // Default landing page is stored app-locally too (pure client navigation
+  // preference; the sidecar AppSettings round-trip would drop/reject it).
+  const [defaultPage, setDefaultPageState] = useState<DefaultPage>(DEFAULT_PAGE);
+  useEffect(() => {
+    setDefaultPageState(getDefaultPageSetting());
+  }, []);
+  const updateDefaultPage = useCallback((v: DefaultPage) => {
+    setDefaultPageState(v);
+    setDefaultPageSetting(v);
+  }, []);
+
   const current = draft ?? settings;
 
   const update = useCallback(
@@ -601,20 +617,14 @@ export default function SettingsPage() {
 
                 <div className="space-y-2">
                   <Label>{t("preferences.defaultPage")}</Label>
-                  <Select
-                    value={current.defaultHomePage}
-                    onValueChange={(value) => update({ defaultHomePage: value as AppSettings["defaultHomePage"] })}
-                  >
+                  <Select value={defaultPage} onValueChange={(value) => updateDefaultPage(value as DefaultPage)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="kanban">{t("preferences.pageOptions.kanban")}</SelectItem>
-                      <SelectItem value="schedules">{t("preferences.pageOptions.schedules")}</SelectItem>
-                      {/* Day Planner is parked for now.
-                      <SelectItem value="planner">{t("preferences.pageOptions.planner")}</SelectItem>
-                      */}
-                      <SelectItem value="logs">{t("preferences.pageOptions.logs")}</SelectItem>
+                      <SelectItem value="operations">{t("preferences.pageOptions.operations")}</SelectItem>
+                      <SelectItem value="patrols">{t("preferences.pageOptions.patrols")}</SelectItem>
+                      <SelectItem value="history">{t("preferences.pageOptions.history")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -638,13 +648,6 @@ export default function SettingsPage() {
                 <Label>{t("preferences.homeFolder")}</Label>
                 <WorkingDirField value={homeFolder} onChange={updateHomeFolder} placeholder={osHome || "~"} />
                 <p className="text-muted-foreground text-xs">{t("preferences.homeFolderHint")}</p>
-              </div>
-
-              <div className="rounded-lg border border-dashed px-4 py-3 text-muted-foreground text-sm">
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <PaletteIcon className="size-4 text-muted-foreground" />
-                  {t("preferences.themeDescription")}
-                </div>
               </div>
             </CardContent>
           </Card>

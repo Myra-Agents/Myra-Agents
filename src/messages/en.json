@@ -587,7 +587,9 @@
       "openKanban": "Open in Kanban",
       "clearSearch": "Clear search",
       "view": "View",
-      "edit": "Edit"
+      "edit": "Edit",
+      "viewOperation": "View Operation",
+      "editPatrol": "Edit Patrol"
     },
     "emptyFiltered": "No runs in this status.",
     "searchPlaceholder": "Search task, agent, status…",
@@ -634,6 +636,7 @@
       "task": "Task name",
       "triggered": "Triggered",
       "duration": "Duration",
+      "agent": "Agent",
       "result": "Result",
       "usage": "Usage"
     },
@@ -645,7 +648,11 @@
     "usage": "{tokens} Token",
     "rowMenu": {
       "open": "Open session",
-      "schedule": "Edit patrol"
+      "schedule": "Edit patrol",
+      "viewOperation": "View Operation",
+      "editPatrol": "Edit Patrol",
+      "rerun": "Rerun Operation",
+      "rerunStarted": "Operation re-run started"
     },
     "sort": {
       "label": "Sort",
@@ -1050,10 +1057,9 @@
         "french": "French"
       },
       "pageOptions": {
-        "kanban": "Kanban",
-        "schedules": "Patrols",
-        "planner": "Planner",
-        "logs": "Logs"
+        "operations": "Operations",
+        "patrols": "Patrols",
+        "history": "History"
       },
       "homeFolder": "Home folder",
       "homeFolderHint": "Base folder the patrol folder picker browses. Defaults to your user home folder."

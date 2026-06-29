@@ -57,9 +57,18 @@ export function HeaderBreadcrumb() {
   // A route may override the trailing crumb with a dynamic label/href the path
   // can't express (e.g. a schedule's name on the editor route).
   if (override && crumbs.length > 0) {
-    const leaf = crumbs[crumbs.length - 1];
-    leaf.label = override.label;
-    if (override.href) leaf.url = override.href;
+    // An explicit parent rebuilds the whole trail (parent › leaf) so a detail
+    // view can claim a different section than its path implies — e.g. the run
+    // detail at `/logs` showing "Operations › {title}".
+    if (override.parent) {
+      crumbs.length = 0;
+      crumbs.push({ url: override.parent.href, label: override.parent.label });
+      crumbs.push({ url: override.href ?? path, label: override.label });
+    } else {
+      const leaf = crumbs[crumbs.length - 1];
+      leaf.label = override.label;
+      if (override.href) leaf.url = override.href;
+    }
   }
 
   return (
@@ -71,7 +80,10 @@ export function HeaderBreadcrumb() {
           // BreadcrumbItem <li> (inside the <ol>), never nested within it — a
           // nested <li> is invalid HTML and triggers a hydration error.
           return (
-            <Fragment key={crumb.url}>
+            // Key by position, not url: during a route transition the override
+            // can briefly produce two crumbs sharing a url (e.g. parent + leaf
+            // both "/runs"), which would collide on a url-based key.
+            <Fragment key={`${i}-${crumb.url}`}>
               <BreadcrumbItem>
                 {isLast ? (
                   <BreadcrumbPage className="text-text-primary">{crumb.label}</BreadcrumbPage>

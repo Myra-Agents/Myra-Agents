@@ -16,6 +16,12 @@ export interface NavMainItem {
   icon?: LucideIcon;
   /** Longer hover hint shown in the sidebar tooltip. */
   description?: string;
+  /**
+   * Extra path prefixes that should also light this item — for detail routes
+   * that live outside the item's own `url` (e.g. the run detail at `/logs`
+   * belongs to "Operations"/`/runs`).
+   */
+  matchPaths?: string[];
   subItems?: NavSubItem[];
   comingSoon?: boolean;
   newTab?: boolean;
@@ -56,7 +62,6 @@ export const sidebarItems: NavGroup[] = [
   {
     // Workspace scope — everything org/app-wide.
     id: 2,
-    label: "Workspace",
     items: [
       {
         // Temporary "Runs" view from the new UI refactor (Figma) — live overview
@@ -66,6 +71,8 @@ export const sidebarItems: NavGroup[] = [
         url: "/runs",
         icon: Activity,
         description: "Live overview of running tasks — counts by status and the active run list.",
+        // The run detail opens on `/logs`; keep Operations lit while it's shown.
+        matchPaths: ["/logs"],
         isNew: true,
       },
       // {
