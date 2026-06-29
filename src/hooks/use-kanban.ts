@@ -24,6 +24,10 @@ export function useKanban(presets: AgentPreset[] = []) {
   const [cards, setCards] = useState<KanbanCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Cards whose Stop was clicked but whose backend lifecycle event hasn't landed
+  // yet. Drives an instant "Stopping…" state on the board; pruned automatically
+  // once a card leaves the running/queued state (the event is the source of truth).
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(() => new Set());
 
   const loadCards = useCallback(async () => {
     try {
@@ -240,6 +244,54 @@ export function useKanban(presets: AgentPreset[] = []) {
     [loadCards, cards, presets],
   );
 
+  // Stop a running (or queued) agent run. The backend kills the child and emits
+  // the lifecycle events that flip the card back out of `in_progress` — the event
+  // reload stays the source of truth — but we flag the card as "cancelling" right
+  // away so the board reflects the click instantly (see `cancellingIds`).
+  const cancelAgent = useCallback(async (cardId: string) => {
+    setCancellingIds((prev) => new Set(prev).add(cardId));
+    try {
+      const { connId, entityId } = parseGlobalId(cardId);
+      const stopped = await connectionManager.invokeOne<boolean>(connId, "cancel_agent", { cardId: entityId });
+      track("agent_cancel", { card_id: cardId, stopped });
+      // Nothing was actually running — drop the optimistic flag so the card
+      // doesn't stay stuck on "Stopping…".
+      if (!stopped) {
+        setCancellingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(cardId);
+          return next;
+        });
+      }
+      return stopped;
+    } catch (e) {
+      setCancellingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(cardId);
+        return next;
+      });
+      throw e;
+    }
+  }, []);
+
+  // Reconcile the optimistic "cancelling" flags with backend truth: once a card
+  // is no longer running/queued, the stop has landed — drop its flag.
+  useEffect(() => {
+    setCancellingIds((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of prev) {
+        const card = cards.find((c) => c.id === id);
+        if (!card || (card.status !== "in_progress" && !card.agentQueued)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [cards]);
+
   return {
     cards,
     loading,
@@ -254,6 +306,8 @@ export function useKanban(presets: AgentPreset[] = []) {
     addRevisionNote,
     answerFeedback,
     launchAgent,
+    cancelAgent,
+    cancellingIds,
     upsertCard,
     reload: loadCards,
   };

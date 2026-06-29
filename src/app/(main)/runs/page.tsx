@@ -22,6 +22,7 @@ import {
   ArrowUpIcon,
   BotIcon,
   CheckIcon,
+  CircleStopIcon,
   EyeIcon,
   ListFilterIcon,
   LogInIcon,
@@ -31,6 +32,7 @@ import {
   PlayIcon,
   SearchIcon,
   TerminalIcon,
+  ArchiveIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
@@ -167,7 +169,7 @@ function insertPosition(column: KanbanCard[], movingId: string, targetId: string
 export default function RunsPage() {
   const t = useTranslations("runs");
   const router = useRouter();
-  const { cards, loading, error, trashCard, restoreCard, moveCard, reorderCard } = useKanban();
+  const { cards, loading, error, trashCard, restoreCard, moveCard, reorderCard, cancelAgent } = useKanban();
   const { settings } = useSettings();
 
   // List (table) ↔ Kanban (board) layout — toggled from the top-bar tabs and
@@ -305,12 +307,20 @@ export default function RunsPage() {
   // back to the Patrols list when the run isn't linked to a schedule.
   const editPatrol = (card: KanbanCard) =>
     router.push(card.linkedTaskId ? `/schedules/edit/?id=${encodeURIComponent(card.linkedTaskId)}` : "/schedules");
-  const trashRun = (id: string) =>
+  const trashRun = (id: string) => {
+    const bucket = bucketOf(cards.find((c) => c.id === id) ?? ({ status: "todo" } as KanbanCard));
     void trashCard(id).then(() =>
-      toast.success(t("kanban.trashed"), {
+      toast.success(t(bucket === "done" ? "kanban.archived" : "kanban.trashed"), {
         action: { label: t("kanban.undo"), onClick: () => void restoreCard(id) },
       }),
     );
+  };
+  // Stop a live run from the row/card menu. The backend aborts the child and
+  // moves the card out of `in_progress`; the emitted event refreshes the list.
+  const stopRun = (id: string) =>
+    void cancelAgent(id)
+      .then(() => toast.success(t("kanban.stopped")))
+      .catch((e) => toast.error(String(e)));
 
   // True when a card/column/tag/search filter is narrowing the list (sort excluded —
   // it never empties results). Drives the "Clear filters" affordance.
@@ -324,7 +334,7 @@ export default function RunsPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-text-tertiary text-sm">{t("loading")}</p>
+        <p className="text-sm text-text-tertiary">{t("loading")}</p>
       </div>
     );
   }
@@ -374,17 +384,15 @@ export default function RunsPage() {
 
       {/* Title block (Figma: 6px left inset, no inner gap) */}
       <div className="flex flex-col pl-1.5">
-        <h1 className="text-text-primary text-base font-medium">{t("title")}</h1>
-        <p className="text-text-secondary text-xs font-light">{t("subtitle")}</p>
+        <h1 className="font-medium text-base text-text-primary">{t("title")}</h1>
+        <p className="font-light text-text-secondary text-xs">{t("subtitle")}</p>
       </div>
 
       {/* Filter row: tag chips + search affordance (24px below the title) */}
       <div className="mt-6 flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-0.5">
           <span className="pr-2 text-text-tertiary text-xs">{t("tags")}</span>
-          {availableTags.length === 0 && (
-            <span className="shrink-0 text-text-tertiary/70 text-xs">{t("noTags")}</span>
-          )}
+          {availableTags.length === 0 && <span className="shrink-0 text-text-tertiary/70 text-xs">{t("noTags")}</span>}
           {availableTags.map((tag) => {
             const active = tagFilter.includes(tag);
             return (
@@ -475,11 +483,11 @@ export default function RunsPage() {
                   <div className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-1">
                       <span className={cn("size-2 rounded-full", b.dot)} />
-                      <span className="text-text-secondary text-xs font-medium">{t(`summary.${b.key}.label`)}</span>
+                      <span className="font-medium text-text-secondary text-xs">{t(`summary.${b.key}.label`)}</span>
                     </div>
-                    <span className="text-text-tertiary text-[10px]">{t(`summary.${b.key}.sub`)}</span>
+                    <span className="text-[10px] text-text-tertiary">{t(`summary.${b.key}.sub`)}</span>
                   </div>
-                  <span className="text-text-primary text-base tabular-nums">{counts[b.key]}</span>
+                  <span className="text-base text-text-primary tabular-nums">{counts[b.key]}</span>
                 </button>
               );
             })}
@@ -487,6 +495,10 @@ export default function RunsPage() {
 
           {/* "Needs you" explainer note (4px below the cards) */}
           <p className="mt-1 text-text-tertiary text-xs leading-relaxed">{t("needsYouHint")}</p>
+          {/* Nightly auto-archive notice — mirrors the server scheduler. */}
+          <p className="mt-1 text-text-tertiary text-xs leading-relaxed">
+            {t("archiveHint", { timezone: settings.timezone ?? "Europe/Paris" })}
+          </p>
 
           {/* Run table (8px below the note; 10px between the count line and table) */}
           <div className="mt-2 flex flex-col gap-2.5">
@@ -500,7 +512,7 @@ export default function RunsPage() {
                   {t("clearFilters")}
                 </button>
               )}
-              <span className="text-text-tertiary font-light">
+              <span className="font-light text-text-tertiary">
                 {t("showing", { shown: rows.length, total: totalRuns })}
               </span>
             </div>
@@ -585,7 +597,7 @@ export default function RunsPage() {
                           className="cursor-pointer border-border-cards hover:bg-secondary/40"
                           onClick={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
                         >
-                          <TableCell className="max-w-[280px] truncate text-text-primary text-sm">
+                          <TableCell className="max-w-[280px] truncate text-sm text-text-primary">
                             {card.title}
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-text-secondary text-xs">
@@ -610,9 +622,15 @@ export default function RunsPage() {
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               onView={() => openLogs(card.id)}
-                              onEdit={() => editPatrol(card)}
+                              onEdit={bucket !== "done" ? () => editPatrol(card) : undefined}
                               editDisabled={!card.linkedTaskId}
-                              labels={{ view: t("rowMenu.viewOperation"), edit: t("rowMenu.editPatrol") }}
+                              // Stop only for genuinely running rows.
+                              onStop={bucket === "running" ? () => stopRun(card.id) : undefined}
+                              labels={{
+                                view: t("rowMenu.viewOperation"),
+                                edit: t("rowMenu.editPatrol"),
+                                stop: t("rowMenu.stop"),
+                              }}
                             />
                           </TableCell>
                         </TableRow>
@@ -644,6 +662,7 @@ export default function RunsPage() {
           onOpenLogs={openLogs}
           onTrash={trashRun}
           onEdit={editPatrol}
+          onStop={stopRun}
           onMove={moveCard}
           onReorder={reorderCard}
         />
@@ -681,7 +700,7 @@ function ColHead({
   const applySort = (dir: SortDir) => setSort(sorted && sort?.dir === dir ? null : { key: sortKey, dir });
 
   return (
-    <TableHead className={cn("group/col h-10 text-text-tertiary text-xs font-normal", className)}>
+    <TableHead className={cn("group/col h-10 font-normal text-text-tertiary text-xs", className)}>
       <div className="flex items-center gap-1">
         <span>{label}</span>
         <div className="ml-auto flex items-center gap-0.5">
@@ -773,15 +792,18 @@ function AgentChip({ agent }: { agent?: AgentPreset }) {
 function RowMenu({
   onView,
   onEdit,
+  onStop,
   editDisabled = false,
   labels,
 }: {
   onView: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
+  // Present only for running rows — stops the live run.
+  onStop?: () => void;
   // "Edit Patrol" needs an owning schedule — grey it out when the run isn't
   // linked to one (mirrors the History row menu).
   editDisabled?: boolean;
-  labels: { view: string; edit: string };
+  labels: { view: string; edit: string; stop: string };
 }) {
   return (
     <DropdownMenu>
@@ -798,10 +820,18 @@ function RowMenu({
           <EyeIcon className="size-3.5" />
           {labels.view}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onEdit} disabled={editDisabled} className="whitespace-nowrap">
-          <PencilIcon className="size-3.5" />
-          {labels.edit}
-        </DropdownMenuItem>
+        {onStop && (
+          <DropdownMenuItem onClick={onStop} className="whitespace-nowrap">
+            <CircleStopIcon className="size-3.5" />
+            {labels.stop}
+          </DropdownMenuItem>
+        )}
+        {onEdit && (
+          <DropdownMenuItem onClick={onEdit} disabled={editDisabled} className="whitespace-nowrap">
+            <PencilIcon className="size-3.5" />
+            {labels.edit}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -827,6 +857,7 @@ function RunsKanbanBoard({
   onOpenLogs,
   onTrash,
   onEdit,
+  onStop,
   onMove,
   onReorder,
 }: {
@@ -839,6 +870,7 @@ function RunsKanbanBoard({
   onOpenLogs: (id: string) => void;
   onTrash: (id: string) => void;
   onEdit: (card: KanbanCard) => void;
+  onStop: (id: string) => void;
   onMove: (id: string, status: KanbanStatus) => void | Promise<unknown>;
   onReorder: (id: string, newPosition: number, status?: KanbanStatus) => void;
 }) {
@@ -933,7 +965,7 @@ function RunsKanbanBoard({
               </button>
             </>
           )}
-          <span className="text-text-tertiary font-light">{t("showing", { shown, total })}</span>
+          <span className="font-light text-text-tertiary">{t("showing", { shown, total })}</span>
         </div>
         {/* Four buckets filling the content width (like the List table); columns are
             fixed to the viewport height and scroll internally, so the page never
@@ -951,6 +983,7 @@ function RunsKanbanBoard({
                 onOpenLogs={onOpenLogs}
                 onTrash={onTrash}
                 onEdit={onEdit}
+                onStop={onStop}
                 invalidDropId={invalidDropId}
               />
             ))}
@@ -984,6 +1017,7 @@ function RunsBucketColumn({
   onOpenLogs,
   onTrash,
   onEdit,
+  onStop,
   invalidDropId,
 }: {
   bucket: RunBucket;
@@ -994,6 +1028,7 @@ function RunsBucketColumn({
   onOpenLogs: (id: string) => void;
   onTrash: (id: string) => void;
   onEdit: (card: KanbanCard) => void;
+  onStop: (id: string) => void;
   invalidDropId: string | null;
 }) {
   const t = useTranslations("runs");
@@ -1007,12 +1042,12 @@ function RunsBucketColumn({
     <div className="flex h-full min-h-0 min-w-[200px] flex-1 flex-col">
       {/* Column header — its own top-rounded card, inset over the list (Figma
           "Total Schedules"): dot + label + sub on the card surface. */}
-      <div className="mx-2 flex shrink-0 flex-col gap-0.5 rounded-t-card border-x border-t border-border-cards bg-card-background px-[18px] py-2">
+      <div className="mx-2 flex shrink-0 flex-col gap-0.5 rounded-t-card border-border-cards border-x border-t bg-card-background px-[18px] py-2">
         <div className="flex items-center gap-1">
           <span className={cn("size-2 rounded-full", dot)} />
-          <span className="text-text-secondary text-xs font-medium">{t(`summary.${bucket}.label`)}</span>
+          <span className="font-medium text-text-secondary text-xs">{t(`summary.${bucket}.label`)}</span>
         </div>
-        <span className="text-text-tertiary text-[10px]">{t(`summary.${bucket}.sub`)}</span>
+        <span className="text-[10px] text-text-tertiary">{t(`summary.${bucket}.sub`)}</span>
       </div>
       {/* Task list — secondary surface, droppable; fills the column and scrolls
           internally. Outline brightens while a card hovers over it. */}
@@ -1037,7 +1072,7 @@ function RunsBucketColumn({
         )}
         {cards.length === 0
           ? !showHint && (
-              <p className="px-2 py-6 text-center text-text-tertiary text-[11px]">{t("kanban.emptyColumn")}</p>
+              <p className="px-2 py-6 text-center text-[11px] text-text-tertiary">{t("kanban.emptyColumn")}</p>
             )
           : null}
         {cards.length > 0 && (
@@ -1050,6 +1085,7 @@ function RunsBucketColumn({
                 onOpen={() => onOpenLogs(card.id)}
                 onTrash={() => onTrash(card.id)}
                 onEdit={() => onEdit(card)}
+                onStop={() => onStop(card.id)}
                 isShaking={invalidDropId === card.id}
               />
             ))}
@@ -1068,6 +1104,7 @@ function KanbanRunCard({
   onOpen,
   onTrash,
   onEdit,
+  onStop,
   isOverlay = false,
   isShaking = false,
 }: {
@@ -1076,6 +1113,7 @@ function KanbanRunCard({
   onOpen: () => void;
   onTrash: () => void;
   onEdit: () => void;
+  onStop?: () => void;
   isOverlay?: boolean;
   isShaking?: boolean;
 }) {
@@ -1110,18 +1148,20 @@ function KanbanRunCard({
       <div className="flex items-start justify-between">
         <span className={cn("mt-0.5 size-2 shrink-0 rounded-full", DOT_OF[bucket])} />
         <div className="flex items-center gap-1 text-icon-tertiary opacity-0 transition group-hover/card:opacity-100">
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              stop(e);
-              onEdit();
-            }}
-            aria-label={t("kanban.edit")}
-            className="rounded p-0.5 transition-colors hover:text-icon-primary"
-          >
-            <PencilIcon className="size-3.5" />
-          </span>
+          {bucket !== "done" && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                stop(e);
+                onEdit();
+              }}
+              aria-label={t("kanban.edit")}
+              className="rounded p-0.5 transition-colors hover:text-icon-primary"
+            >
+              <PencilIcon className="size-3.5" />
+            </span>
+          )}
           <span
             role="button"
             tabIndex={0}
@@ -1129,15 +1169,19 @@ function KanbanRunCard({
               stop(e);
               onTrash();
             }}
-            aria-label={t("kanban.trash")}
+            aria-label={bucket === "done" ? t("kanban.archive") : t("kanban.trash")}
             className="rounded p-0.5 transition-colors hover:text-destructive"
           >
-            <Trash2Icon className="size-3.5" />
+            {bucket === "done" ? (
+              <ArchiveIcon className="size-3.5" />
+            ) : (
+              <Trash2Icon className="size-3.5" />
+            )}
           </span>
         </div>
       </div>
 
-      <h3 className="text-text-primary text-sm leading-snug">{card.title}</h3>
+      <h3 className="text-sm text-text-primary leading-snug">{card.title}</h3>
 
       {/* Running: live status line + output hint. */}
       {bucket === "running" && (
@@ -1145,13 +1189,27 @@ function KanbanRunCard({
           <span aria-hidden className="h-px w-full bg-border-cards" />
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-task-status-running text-xs font-medium">
+              <span className="flex items-center gap-1.5 font-medium text-task-status-running text-xs">
                 <ActivityIcon className="size-3.5" />
                 {t("kanban.running")}
               </span>
               <span className="text-text-tertiary text-xs tabular-nums">{durationOf(card)}</span>
             </div>
             <span className="truncate text-text-tertiary text-xs">{t("kanban.waitingOutput")}</span>
+            {onStop && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  stop(e);
+                  onStop();
+                }}
+                className="flex items-center justify-center gap-1.5 self-stretch rounded-md border border-border-cards bg-secondary/40 py-1.5 text-text-secondary text-xs transition-colors hover:bg-secondary hover:text-destructive"
+              >
+                <CircleStopIcon className="size-3.5" />
+                {t("kanban.stop")}
+              </span>
+            )}
           </div>
         </>
       )}
@@ -1162,7 +1220,7 @@ function KanbanRunCard({
           <span aria-hidden className="h-px w-full bg-border-cards" />
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-task-status-needs-you text-xs font-medium">
+              <span className="flex items-center gap-1.5 font-medium text-task-status-needs-you text-xs">
                 <MessageSquareIcon className="size-3.5" />
                 {t("kanban.question")}
               </span>

@@ -267,7 +267,13 @@ fn start_local_backend(app: &AppHandle) -> u16 {
         // configured externalBin path, or spawn fails with ENOENT on launch.
         .sidecar("myra-server")
         .expect("sidecar myra-server should resolve")
-        .env("PORT", port.to_string());
+        .env("PORT", port.to_string())
+        // Tie the ephemeral sidecar's lifetime to ours: it watches this PID and
+        // self-exits when we die. `RunEvent::Exit` only fires on a clean Quit —
+        // a SIGKILL/Ctrl-C (esp. a `tauri:dev` restart) would otherwise orphan it
+        // (reparented to init), leaking a sidecar per restart. The persistent
+        // service is started without this var, so it's never touched.
+        .env("MYRA_PARENT_PID", std::process::id().to_string());
     if let Ok(demo) = std::env::var("DEMO") {
         command = command.env("DEMO", demo);
     }

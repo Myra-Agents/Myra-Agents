@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  ArchiveIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   BotIcon,
@@ -288,7 +289,12 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
                   onClick={() => openRun(r)}
                 >
                   <TableCell className="max-w-[280px] truncate pl-[9px] text-text-secondary text-xs">
-                    {r.cardTitle}
+                    <span className="flex items-center gap-1.5">
+                      {r.archived && (
+                        <ArchiveIcon className="size-3 shrink-0 text-text-tertiary" aria-label={t("archived")} />
+                      )}
+                      <span className="truncate">{r.cardTitle}</span>
+                    </span>
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-text-secondary text-xs">
                     {formatTriggered(r.startedAt)}

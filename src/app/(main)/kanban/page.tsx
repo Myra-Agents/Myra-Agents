@@ -43,6 +43,8 @@ export default function KanbanPage() {
     addRevisionNote,
     answerFeedback,
     launchAgent,
+    cancelAgent,
+    cancellingIds,
     upsertCard,
   } = useKanban(settings.agents);
 
@@ -201,6 +203,21 @@ export default function KanbanPage() {
     [router],
   );
 
+  // Stop a running/queued agent run (context menu "Stop"). The backend kills the
+  // child and emits the lifecycle events that flip the card out of in_progress.
+  const handleStopCard = useCallback(
+    async (card: KanbanCard) => {
+      if (!card.agentRunId && !card.agentQueued && card.status !== "in_progress") return;
+      try {
+        await cancelAgent(card.id);
+        toast.success(t("toast.canceled"));
+      } catch (e) {
+        toast.error(String(e));
+      }
+    },
+    [cancelAgent, t],
+  );
+
   const handleReviewCard = useCallback((card: KanbanCard) => {
     if (card.status === "waiting_feedback") {
       setFeedbackCard(card);
@@ -252,11 +269,8 @@ export default function KanbanPage() {
     if (!cardModalOpen || !editingCard) return;
     const card = cards.find((c) => c.id === editingCard.id);
     if (!card || (!card.agentRunId && !card.agentQueued)) return;
-    const { connId, entityId } = parseGlobalId(card.id);
-    void invokeOn(connId, "cancel_agent", { cardId: entityId })
-      .then(() => toast.success(t("toast.canceled")))
-      .catch((e) => toast.error(String(e)));
-  }, [cancelNonce, cardModalOpen, editingCard, cards, t]);
+    void handleStopCard(card);
+  }, [cancelNonce, cardModalOpen, editingCard, cards, handleStopCard]);
 
   // Adaptive log cadence (P6): only the card whose modal is open has a live
   // viewer, so tell its backend to stream that card's log lines and let every
@@ -298,6 +312,8 @@ export default function KanbanPage() {
         onOpenConversation={handleOpenConversation}
         onBulkAddTag={handleBulkAddTag}
         onBulkLaunch={handleBulkLaunch}
+        onStopCard={handleStopCard}
+        cancellingIds={cancellingIds}
         logsByCard={logs}
         getSchedule={byId}
         agentPresets={settings.agents}

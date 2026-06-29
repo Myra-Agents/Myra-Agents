@@ -215,7 +215,10 @@ export function CardModal({
         await invoke("test_agent", {
           binary: preset.binary,
           argsTemplate: preset.argsTemplate,
-          workingDir: preset.workingDir ?? null,
+          flags: preset.flags ?? [],
+          launchVia: preset.launchVia ?? "direct",
+          ollamaModel: preset.ollamaModel ?? "",
+          workingDir: null,
         });
         const result = persistTestResult(preset.id, "passed");
         setTestResults((cur) => ({ ...cur, [preset.id]: result }));
@@ -270,7 +273,7 @@ export function CardModal({
         argsTemplate: selectedPreset.argsTemplate,
         prompt: metaPrompt,
         flags: agentFlags ?? selectedPreset.flags ?? [],
-        workingDir: workingDir.trim() ? workingDir.trim() : (selectedPreset.workingDir ?? null),
+        workingDir: workingDir.trim() || null,
         launchVia: launchVia ?? selectedPreset.launchVia ?? "direct",
         ollamaModel: ollamaModel ?? selectedPreset.ollamaModel ?? null,
       });

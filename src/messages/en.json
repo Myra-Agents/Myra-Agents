@@ -111,6 +111,7 @@
       "moveToTrash": "Move to trash",
       "launchAgent": "Launch agent",
       "cancelAgent": "Cancel agent",
+      "stop": "Stop",
       "viewLogs": "View logs",
       "answerFeedback": "Answer feedback",
       "approveReview": "Approve",
@@ -119,6 +120,7 @@
       "question": "Question",
       "review": "Review",
       "running": "Running",
+      "stopping": "Stopping…",
       "waitingForOutput": "Waiting for output…",
       "agent": "Agent",
       "queued": "Queued",
@@ -471,7 +473,7 @@
     },
     "subtitle": "Deploy recurring patrols with AI agents triggered by events.",
     "tags": "Tags",
-    "noTags": "No tags yet",
+    "noTags": "No tags",
     "search": "Search patrols",
     "searchPlaceholder": "Search patrols…",
     "clearSearch": "Clear search",
@@ -536,11 +538,12 @@
     "loading": "Loading…",
     "empty": "No active runs yet.",
     "tags": "Tags",
-    "noTags": "No tags yet",
+    "noTags": "No tags",
     "search": "Search",
     "filter": "Filter",
     "showing": "Showing {shown} of {total}",
     "needsYouHint": "“Needs you” lists the tasks where you need to steer the Agent. The idea is to reduce the “Needs you” tasks so the Agents can run without you.",
+    "archiveHint": "“Done” operations are archived automatically every night at midnight ({timezone}).",
     "view": {
       "list": "List",
       "kanban": "Kanban"
@@ -555,8 +558,12 @@
       "dropBlocked": "Can't move here",
       "edit": "Edit",
       "trash": "Move to trash",
+      "archive": "Archive",
       "trashed": "Moved to trash",
-      "undo": "Undo"
+      "archived": "Archived",
+      "undo": "Undo",
+      "stop": "Stop",
+      "stopped": "Operation stopped."
     },
     "summary": {
       "backlog": {
@@ -578,7 +585,7 @@
     },
     "footer": "Showing {shown} of {total} — click to see all",
     "columns": {
-      "task": "Task name",
+      "task": "Operation name",
       "triggered": "Triggered",
       "status": "Status",
       "duration": "Duration",
@@ -591,7 +598,8 @@
       "view": "View",
       "edit": "Edit",
       "viewOperation": "View Operation",
-      "editPatrol": "Edit Patrol"
+      "editPatrol": "Edit Patrol",
+      "stop": "Stop"
     },
     "emptyFiltered": "No runs in this status.",
     "searchPlaceholder": "Search task, agent, status…",
@@ -635,7 +643,7 @@
     "graph1": "Runs over time",
     "graph2": "Success rate",
     "columns": {
-      "task": "Task name",
+      "task": "Operation name",
       "triggered": "Triggered",
       "duration": "Duration",
       "agent": "Agent",
@@ -647,6 +655,7 @@
       "failed": "Failed",
       "running": "Running"
     },
+    "archived": "Archived",
     "usage": "{tokens} Token",
     "rowMenu": {
       "open": "Open session",
@@ -675,7 +684,8 @@
     "result": {
       "failed": "Failed",
       "success": "Success",
-      "running": "Running"
+      "running": "Running",
+      "stopping": "Stopping…"
     },
     "agentInstruction": "Agent Instruction",
     "model": "Model:",
@@ -692,7 +702,10 @@
     "cost": "Cost",
     "openWorkingDir": "Open working dir",
     "loadingLog": "Loading log…",
-    "approved": "Run approved"
+    "approved": "Run approved",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "stopped": "Operation stopped."
   },
   "logs": {
     "title": "Logs & History",
@@ -744,7 +757,10 @@
       "tokens": "Tokens",
       "cost": "Cost",
       "openWorkingDir": "Open working dir",
-      "logs": "Logs"
+      "logs": "Logs",
+      "editPatrol": "Edit patrol",
+      "stop": "Stop",
+      "stopped": "Operation stopped."
     },
     "loading": "Loading…",
     "back": "Back",
@@ -1064,7 +1080,9 @@
         "history": "History"
       },
       "homeFolder": "Home folder",
-      "homeFolderHint": "Base folder the patrol folder picker browses. Defaults to your user home folder."
+      "homeFolderHint": "Base folder the patrol folder picker browses. Defaults to your user home folder.",
+      "timezone": "Timezone",
+      "timezoneHint": "Used for nightly automation — Done operations are archived at midnight in this timezone."
     },
     "data": {
       "title": "Data Management",
@@ -1072,6 +1090,12 @@
       "exportDescription": "Download the current board as a JSON backup.",
       "importBoard": "Import board",
       "importDescription": "Restore tasks from a previously exported JSON file.",
+      "clearHistory": "Clear run history",
+      "clearHistoryDescription": "Remove all past agent run records from every task.",
+      "clearHistoryConfirmTitle": "Clear run history?",
+      "clearHistoryConfirmDescription": "All run records will be permanently deleted. This action cannot be undone.",
+      "clearHistoryConfirm": "Clear history",
+      "clearHistoryCancel": "Cancel",
       "clearLogs": "Clear logs",
       "clearLogsDescription": "Remove stored execution logs after confirmation.",
       "clearLogsConfirm": "Clear all logs? This action cannot be undone."
@@ -1091,8 +1115,9 @@
       "exportFailed": "Failed to export board.",
       "imported": "Board imported.",
       "importFailed": "Failed to import board.",
+      "historyCleared": "Run history cleared.",
       "logsCleared": "Logs cleared.",
-      "clearFailed": "Failed to clear logs."
+      "clearFailed": "Failed to clear."
     }
   },
   "upsell": {
@@ -1258,7 +1283,7 @@
     "showing": "Showing {shown} of {total}",
     "rowMenu": "Row actions",
     "cols": {
-      "taskName": "Task name",
+      "taskName": "Operation name",
       "triggered": "Triggered",
       "status": "Status",
       "duration": "Duration",
@@ -1281,7 +1306,13 @@
       "undo": "Undo",
       "needTrigger": "Add a trigger before saving.",
       "needFolder": "Add a folder before saving.",
-      "needPrompt": "Add an agent instruction before saving."
+      "needPrompt": "Add an agent instruction before saving.",
+      "needFields": "Add {fields} before saving."
+    },
+    "fields": {
+      "trigger": "a trigger",
+      "instruction": "an agent instruction",
+      "folder": "a folder"
     },
     "addTrigger": "Add Trigger",
     "searchTriggers": "Search Triggers...",
@@ -1361,6 +1392,7 @@
     "overridden": "overridden",
     "resetOverrides": "Reset",
     "cancel": "Cancel",
-    "createTag": "Create \"{tag}\""
+    "createTag": "Create \"{tag}\"",
+    "createTagHint": "Type a name to create a new tag"
   }
 }

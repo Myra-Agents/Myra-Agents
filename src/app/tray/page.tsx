@@ -92,15 +92,16 @@ export default function TrayPopover() {
 
   const openMain = (path: string, newTask = false) => cmd("open_main", { path, newTask });
 
-  // Keyboard parity with the app: ⌘N new task, ⌘O open, Esc dismiss. Calls the
-  // module-level `cmd` directly so the listener has no render-scoped deps.
+  // Keyboard parity with the app: ⌘N new patrol, ⌘O open, Esc dismiss. Calls the
+  // module-level `cmd` directly so the listener has no render-scoped deps. The
+  // `?new=1` path opens a blank patrol editor (mirrors the tray's native menu).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         void cmd("hide_tray_popover");
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
         e.preventDefault();
-        void cmd("open_main", { path: "/kanban", newTask: true });
+        void cmd("open_main", { path: "/schedules/edit/?new=1", newTask: false });
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
         e.preventDefault();
         void cmd("open_main", { path: "/", newTask: false });
@@ -193,7 +194,7 @@ export default function TrayPopover() {
 
       {/* Primary actions */}
       <div className="border-border border-t p-2">
-        <ActionRow icon={PlusIcon} label="New task" shortcut="⌘N" onClick={() => openMain("/kanban", true)} />
+        <ActionRow icon={PlusIcon} label="New Patrol" shortcut="⌘N" onClick={() => openMain("/schedules/edit/?new=1")} />
         <ActionRow icon={AppWindowIcon} label="Open Myra Agents" shortcut="⌘O" onClick={() => openMain("/")} />
       </div>
 

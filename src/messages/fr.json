@@ -111,6 +111,7 @@
       "moveToTrash": "Mettre à la corbeille",
       "launchAgent": "Lancer l'agent",
       "cancelAgent": "Annuler l'agent",
+      "stop": "Arrêter",
       "viewLogs": "Voir les logs",
       "answerFeedback": "Répondre au retour",
       "approveReview": "Approuver",
@@ -119,6 +120,7 @@
       "question": "Question",
       "review": "Vérifier",
       "running": "En cours",
+      "stopping": "Arrêt…",
       "waitingForOutput": "En attente de sortie…",
       "agent": "Agent",
       "queued": "En file",
@@ -471,7 +473,7 @@
     },
     "subtitle": "Déployez des patrouilles récurrentes avec des agents IA déclenchés par des événements.",
     "tags": "Tags",
-    "noTags": "Aucun tag pour l'instant",
+    "noTags": "Aucun tag",
     "search": "Rechercher des patrouilles",
     "searchPlaceholder": "Rechercher des patrouilles…",
     "clearSearch": "Effacer la recherche",
@@ -536,11 +538,12 @@
     "loading": "Chargement…",
     "empty": "Aucun run actif pour l’instant.",
     "tags": "Tags",
-    "noTags": "Aucun tag pour l'instant",
+    "noTags": "Aucun tag",
     "search": "Rechercher",
     "filter": "Filtrer",
     "showing": "Affichage de {shown} sur {total}",
     "needsYouHint": "« Needs you » liste les tâches où vous devez guider l’Agent. L’idée est de réduire les tâches « Needs you » pour que les Agents puissent tourner sans vous.",
+    "archiveHint": "Les opérations « Done » sont archivées automatiquement chaque nuit à minuit ({timezone}).",
     "view": {
       "list": "Liste",
       "kanban": "Kanban"
@@ -555,8 +558,12 @@
       "dropBlocked": "Déplacement impossible",
       "edit": "Modifier",
       "trash": "Mettre à la corbeille",
+      "archive": "Archiver",
       "trashed": "Déplacé vers la corbeille",
-      "undo": "Annuler"
+      "archived": "Archivé",
+      "undo": "Annuler",
+      "stop": "Arrêter",
+      "stopped": "Opération arrêtée."
     },
     "summary": {
       "backlog": {
@@ -591,7 +598,8 @@
       "view": "Voir",
       "edit": "Modifier",
       "viewOperation": "Voir l'opération",
-      "editPatrol": "Modifier la patrouille"
+      "editPatrol": "Modifier la patrouille",
+      "stop": "Arrêter"
     },
     "emptyFiltered": "Aucun run dans ce statut.",
     "searchPlaceholder": "Rechercher tâche, agent, statut…",
@@ -647,6 +655,7 @@
       "failed": "Échouée",
       "running": "En cours"
     },
+    "archived": "Archivée",
     "usage": "{tokens} Token",
     "rowMenu": {
       "open": "Ouvrir la session",
@@ -675,7 +684,8 @@
     "result": {
       "failed": "Échouée",
       "success": "Réussie",
-      "running": "En cours"
+      "running": "En cours",
+      "stopping": "Arrêt…"
     },
     "agentInstruction": "Instruction de l'agent",
     "model": "Modèle :",
@@ -692,7 +702,10 @@
     "cost": "Coût",
     "openWorkingDir": "Ouvrir le dossier de travail",
     "loadingLog": "Chargement du journal…",
-    "approved": "Exécution approuvée"
+    "approved": "Exécution approuvée",
+    "stop": "Arrêter",
+    "stopping": "Arrêt…",
+    "stopped": "Opération arrêtée."
   },
   "logs": {
     "title": "Journaux et historique",
@@ -744,7 +757,10 @@
       "tokens": "Jetons",
       "cost": "Coût",
       "openWorkingDir": "Ouvrir le répertoire",
-      "logs": "Logs"
+      "logs": "Logs",
+      "editPatrol": "Modifier la patrouille",
+      "stop": "Arrêter",
+      "stopped": "Opération arrêtée."
     },
     "loading": "Chargement…",
     "back": "Retour",
@@ -1064,7 +1080,9 @@
         "history": "Historique"
       },
       "homeFolder": "Dossier home",
-      "homeFolderHint": "Dossier de base parcouru par le sélecteur de dossiers des patrouilles. Par défaut, votre dossier utilisateur."
+      "homeFolderHint": "Dossier de base parcouru par le sélecteur de dossiers des patrouilles. Par défaut, votre dossier utilisateur.",
+      "timezone": "Fuseau horaire",
+      "timezoneHint": "Utilisé pour l'automatisation nocturne — les opérations Done sont archivées à minuit dans ce fuseau."
     },
     "data": {
       "title": "Gestion des données",
@@ -1072,6 +1090,12 @@
       "exportDescription": "Télécharger le tableau actuel au format JSON.",
       "importBoard": "Importer un tableau",
       "importDescription": "Restaurer des tâches depuis un fichier JSON exporté précédemment.",
+      "clearHistory": "Effacer l'historique",
+      "clearHistoryDescription": "Supprimer tous les enregistrements d'exécution de chaque tâche.",
+      "clearHistoryConfirmTitle": "Effacer l'historique ?",
+      "clearHistoryConfirmDescription": "Tous les enregistrements seront définitivement supprimés. Cette action est irréversible.",
+      "clearHistoryConfirm": "Effacer",
+      "clearHistoryCancel": "Annuler",
       "clearLogs": "Effacer les logs",
       "clearLogsDescription": "Supprimer les journaux d'exécution après confirmation.",
       "clearLogsConfirm": "Effacer tous les logs ? Cette action est irréversible."
@@ -1091,8 +1115,9 @@
       "exportFailed": "Impossible d'exporter le tableau.",
       "imported": "Tableau importé.",
       "importFailed": "Impossible d'importer le tableau.",
+      "historyCleared": "Historique effacé.",
       "logsCleared": "Logs supprimés.",
-      "clearFailed": "Impossible d'effacer les logs."
+      "clearFailed": "Impossible d'effacer."
     }
   },
   "upsell": {
@@ -1281,7 +1306,13 @@
       "undo": "Annuler",
       "needTrigger": "Ajoute un déclencheur avant d’enregistrer.",
       "needFolder": "Ajoute un dossier avant d’enregistrer.",
-      "needPrompt": "Ajoute une instruction pour l’agent avant d’enregistrer."
+      "needPrompt": "Ajoute une instruction pour l’agent avant d’enregistrer.",
+      "needFields": "Ajoute {fields} avant d’enregistrer."
+    },
+    "fields": {
+      "trigger": "un déclencheur",
+      "instruction": "une instruction d’agent",
+      "folder": "un dossier"
     },
     "addTrigger": "Ajouter un déclencheur",
     "searchTriggers": "Rechercher des déclencheurs...",
@@ -1361,6 +1392,7 @@
     "overridden": "modifié",
     "resetOverrides": "Réinitialiser",
     "cancel": "Annuler",
-    "createTag": "Créer « {tag} »"
+    "createTag": "Créer « {tag} »",
+    "createTagHint": "Tape un nom pour créer un nouveau tag"
   }
 }

@@ -19,6 +19,8 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { buildAgentCommand } from "@myra/shared";
+
 import { AgentOptions } from "@/components/agents/agent-options";
 import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
@@ -68,7 +70,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import type { AgentPreset, AppSettings } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
 
-type DataAction = "export" | "import" | "clear";
+type DataAction = "export" | "import" | "clear" | "clearHistory";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -82,6 +84,22 @@ const EXEC_FIELDS = new Set<keyof AgentPreset>([
   "ollamaModel",
   "useWorktree",
 ]);
+
+/**
+ * Every IANA timezone the runtime knows, for the preferences picker (drives the
+ * nightly archive's "midnight"). Falls back to a small common set on the rare
+ * runtime without `Intl.supportedValuesOf`.
+ */
+const TIMEZONES: string[] = (() => {
+  try {
+    const fn = (Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+    const zones = fn?.("timeZone");
+    if (zones?.length) return zones;
+  } catch {
+    // fall through to the static fallback
+  }
+  return ["UTC", "Europe/Paris", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo"];
+})();
 
 interface AgentPresetCardProps {
   preset: AgentPreset;
@@ -130,7 +148,10 @@ function AgentPresetCard({
       await invoke("test_agent", {
         binary: preset.binary,
         argsTemplate: preset.argsTemplate,
-        workingDir: preset.workingDir ?? null,
+        flags: preset.flags ?? [],
+        launchVia: preset.launchVia ?? "direct",
+        ollamaModel: preset.ollamaModel ?? "",
+        workingDir: null,
       });
       const result: StoredTestResult = { status: "passed", ts: Date.now() };
       persistTestResult(preset.id, "passed");
@@ -145,7 +166,7 @@ function AgentPresetCard({
       setTestState("failed");
     }
     setTimeout(() => setTestState("idle"), 3000);
-  }, [preset.id, preset.binary, preset.argsTemplate, preset.workingDir, onSave]);
+  }, [preset.id, preset.binary, preset.argsTemplate, preset.flags, preset.launchVia, preset.ollamaModel, onSave]);
   // Gate only when we *can* install it (known binary) and a check confirmed it's missing.
   const gated = !configureAnyway && bin.missing && Boolean(bin.installInfo);
   // Until the first check resolves we don't know fields-or-gate — show a loading
@@ -246,16 +267,6 @@ function AgentPresetCard({
             )}
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">{t("agents.workingDir")}</Label>
-            <WorkingDirField
-              value={preset.workingDir ?? ""}
-              onChange={(value) => onUpdate(idx, { workingDir: value || undefined })}
-              placeholder={t("agents.workingDirPlaceholder")}
-              inputClassName="h-7"
-              compact
-            />
-          </div>
-          <div className="space-y-1">
             <Label className="text-xs">{t("agents.options")}</Label>
             <AgentOptions
               binary={preset.binary}
@@ -277,13 +288,27 @@ function AgentPresetCard({
               </span>
             </summary>
             <p className="mt-1 break-all rounded-md bg-muted px-2 py-1.5 font-mono text-[11px]">
-              {[
-                preset.binary,
-                (preset.argsTemplate ?? "{prompt}").replace("{prompt}", '"hello"'),
-                ...(preset.flags ?? []),
-              ]
-                .filter(Boolean)
-                .join(" ")}
+              {(() => {
+                // Mirror exactly what `test_agent` runs: flags appended + the
+                // `ollama launch` wrapping for local presets. Falls back to a
+                // best-effort string if the template is mid-edit (no {prompt}).
+                try {
+                  const { binary, args } = buildAgentCommand(preset.binary, preset.argsTemplate ?? "{prompt}", "hello", {
+                    flags: preset.flags ?? [],
+                    launchVia: preset.launchVia ?? "direct",
+                    ollamaModel: preset.ollamaModel ?? "",
+                  });
+                  return [binary, ...args].filter(Boolean).join(" ");
+                } catch {
+                  return [
+                    preset.binary,
+                    (preset.argsTemplate ?? "{prompt}").replace("{prompt}", "hello"),
+                    ...(preset.flags ?? []),
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                }
+              })()}
             </p>
           </details>
           {storedResult?.status === "failed" && storedResult.reason && testState === "idle" && (
@@ -435,6 +460,10 @@ export default function SettingsPage() {
     void persistPreference("theme_mode", nextTheme);
   };
 
+  const handleTimezoneChange = (timezone: string) => {
+    update({ timezone });
+  };
+
   const handleExportBoard = useCallback(async () => {
     setDataAction("export");
 
@@ -478,6 +507,20 @@ export default function SettingsPage() {
     },
     [t],
   );
+
+  const handleClearRunHistory = useCallback(async () => {
+    setDataAction("clearHistory");
+
+    try {
+      await invoke("clear_run_history");
+      toast.success(t("feedback.historyCleared"));
+    } catch (clearError) {
+      console.error("Failed to clear run history:", clearError);
+      toast.error(getErrorMessage(clearError, t("feedback.clearFailed")));
+    } finally {
+      setDataAction(null);
+    }
+  }, [t]);
 
   const handleClearLogs = useCallback(async () => {
     if (!window.confirm(t("data.clearLogsConfirm"))) {
@@ -641,6 +684,23 @@ export default function SettingsPage() {
                       <SelectItem value="system">{t("preferences.themeOptions.system")}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("preferences.timezone")}</Label>
+                  <Select value={current.timezone ?? "Europe/Paris"} onValueChange={handleTimezoneChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {TIMEZONES.map((tz) => (
+                        <SelectItem key={tz} value={tz}>
+                          {tz}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">{t("preferences.timezoneHint")}</p>
                 </div>
               </div>
 
@@ -812,6 +872,33 @@ export default function SettingsPage() {
                   <UploadIcon className="size-4" />
                   {dataAction === "import" ? t("actions.importing") : t("data.importBoard")}
                 </Button>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="font-medium">{t("data.clearHistory")}</p>
+                  <p className="text-muted-foreground text-sm">{t("data.clearHistoryDescription")}</p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={dataAction !== null}>
+                      <Trash2Icon className="size-4" />
+                      {dataAction === "clearHistory" ? t("actions.clearing") : t("data.clearHistory")}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("data.clearHistoryConfirmTitle")}</AlertDialogTitle>
+                      <AlertDialogDescription>{t("data.clearHistoryConfirmDescription")}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("data.clearHistoryCancel")}</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => void handleClearRunHistory()}>
+                        {t("data.clearHistoryConfirm")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
 
               <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">

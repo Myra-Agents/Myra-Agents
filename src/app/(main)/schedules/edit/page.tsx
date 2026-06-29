@@ -59,10 +59,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAgentEvents } from "@/hooks/use-agent-events";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { loadTestResult } from "@/lib/agent-test-store";
+import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
@@ -152,7 +154,10 @@ function ScheduleEditScreen() {
   const blankMode = params.get("new") === "1" && !id;
 
   const { loading, createSchedule, updateSchedule, toggleEnabled, triggerNow, byId, schedules } = useSchedules();
-  const { cards, trashCard, restoreCard } = useKanban();
+  const { cards, trashCard, restoreCard, upsertCard } = useKanban();
+  // Live-refresh the "Operations & History" tab: a run finishing on any
+  // connection pushes its card in without a manual reload (same as the board).
+  useAgentEvents(upsertCard);
   const { settings } = useSettings();
 
   // "Create from template" mode: opened as `/schedules/edit/?template=<id>` with
@@ -163,7 +168,17 @@ function ScheduleEditScreen() {
   const idea = templateId ? getScheduleIdea(templateId) : undefined;
   const templateMode = !!idea && !id;
 
-  const realTask = byId(id);
+  // The "Edit Patrol" entry points (runs / logs / history) pass the card's raw,
+  // connection-local task id, while schedule ids here are connection-scoped
+  // GlobalIds (`connId::entityId`). Match on the entity-id suffix too so either
+  // form resolves — otherwise the strict `byId` misses and shows "not found".
+  const realTask = useMemo(() => {
+    if (!id) return undefined;
+    const exact = byId(id);
+    if (exact) return exact;
+    const entity = entityIdOf(id);
+    return schedules.find((s) => entityIdOf(s.id) === entity);
+  }, [id, byId, schedules]);
   const templateTask = useMemo<ScheduledTask | null>(() => {
     if (!idea) return null;
     // A template "once" trigger ships with an empty `at`; give it a sensible
@@ -376,11 +391,11 @@ function ScheduleEditScreen() {
 
   // Flag the empty agent instruction and bring it into view (it sits below the
   // fold, so the inline error would otherwise be missed). Switches to the
-  // Settings tab first, where the field lives.
+  // Settings tab first, where the field lives. (No toast — the combined one is
+  // emitted by validateRequired.)
   const flagMissingPrompt = useCallback(() => {
     setPromptErrorShown(true);
     setTab("settings");
-    toast.error(t("toast.needPrompt"));
     // setTimeout (not rAF) so it runs after the Settings tab mounts AND isn't
     // throttled when the window is briefly unfocused.
     setTimeout(() => {
@@ -388,29 +403,43 @@ function ScheduleEditScreen() {
       el?.scrollIntoView({ block: "center" });
       el?.focus({ preventScroll: true });
     }, 0);
-  }, [t]);
+  }, []);
+
+  // Surface *every* missing required field at once (trigger / instruction /
+  // folder) — inline state per field plus a single combined toast — and return
+  // true when the draft is complete enough to save/add.
+  const validateRequired = useCallback(
+    (d: Draft) => {
+      const missing: string[] = [];
+      if (!d.schedule) missing.push(t("fields.trigger"));
+      if (!d.agentPrompt.trim()) {
+        missing.push(t("fields.instruction"));
+        flagMissingPrompt();
+      }
+      if (!d.workingDir.trim()) {
+        missing.push(t("fields.folder"));
+        setFolderErrorShown(true);
+      }
+      if (missing.length) {
+        const list = new Intl.ListFormat(undefined, { style: "long", type: "conjunction" }).format(missing);
+        toast.error(t("toast.needFields", { fields: list }));
+        return false;
+      }
+      return true;
+    },
+    [t, flagMissingPrompt],
+  );
 
   const save = useCallback(async () => {
     if (!task || !draft || !dirty) return;
-    if (!draft.schedule) {
-      toast.error(t("toast.needTrigger"));
-      return;
-    }
-    if (!draft.agentPrompt.trim()) {
-      flagMissingPrompt();
-      return;
-    }
-    if (!draft.workingDir.trim()) {
-      setFolderErrorShown(true);
-      toast.error(t("toast.needFolder"));
-      return;
-    }
+    if (!validateRequired(draft) || !draft.schedule) return;
     setSaving(true);
     try {
       const input: UpdateScheduleInput = {
         id: task.id,
         name: draft.name.trim() || task.name,
-        cardTitle: task.cardTitle,
+        // The form edits only `name`; the materialized card's title mirrors it.
+        cardTitle: draft.name.trim() || task.name,
         cardDescription: draft.cardDescription,
         agentPrompt: draft.agentPrompt,
         tags: draft.tags,
@@ -435,31 +464,20 @@ function ScheduleEditScreen() {
     } finally {
       setSaving(false);
     }
-  }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, flagMissingPrompt, t]);
+  }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, validateRequired, t]);
 
   // Template mode: create a real schedule from the prefilled draft, then land on
   // its actual edit page (so the user can keep tweaking / see its runs).
   const add = useCallback(
     async (enabled: boolean) => {
       if (!task || !draft) return;
-      if (!draft.schedule) {
-        toast.error(t("toast.needTrigger"));
-        return;
-      }
-      if (!draft.agentPrompt.trim()) {
-        flagMissingPrompt();
-        return;
-      }
-      if (!draft.workingDir.trim()) {
-        setFolderErrorShown(true);
-        toast.error(t("toast.needFolder"));
-        return;
-      }
+      if (!validateRequired(draft) || !draft.schedule) return;
       setSaving(true);
       try {
         const input: CreateScheduleInput = {
           name: draft.name.trim() || task.name,
-          cardTitle: task.cardTitle,
+          // The form edits only `name`; the materialized card's title mirrors it.
+          cardTitle: draft.name.trim() || task.name,
           cardDescription: draft.cardDescription,
           agentPrompt: draft.agentPrompt,
           tags: draft.tags,
@@ -486,7 +504,7 @@ function ScheduleEditScreen() {
         setSaving(false);
       }
     },
-    [task, draft, branchByFolder, tagColorMap, createSchedule, router, flagMissingPrompt, t],
+    [task, draft, branchByFolder, tagColorMap, createSchedule, router, validateRequired, t],
   );
 
   // Runs belonging to this schedule: cards it materialized share its card title
@@ -494,10 +512,23 @@ function ScheduleEditScreen() {
   const runs = useMemo(() => {
     if (!task) return [] as KanbanCard[];
     const tagSet = new Set(task.tags);
-    return cards
-      .filter((c) => c.status !== "trashed" && c.status !== "draft")
-      .filter((c) => c.title === task.cardTitle || c.tags.some((tg) => tagSet.has(tg)))
-      .sort((a, b) => triggeredAt(b).localeCompare(triggeredAt(a)));
+    // `linkedTaskId` isn't globalized on the card (only `id` is), so compare on
+    // the entity id within the card's own connection rather than the GlobalId.
+    const { connId: taskConn, entityId: taskEntity } = parseGlobalId(task.id);
+    const linkedToTask = (c: KanbanCard) =>
+      !!c.linkedTaskId && connIdOf(c.id) === taskConn && entityIdOf(c.linkedTaskId) === taskEntity;
+    return (
+      cards
+        // Keep auto-archived cards (status "trashed" + `archivedAt`) so History
+        // still lists them; only drop manually-deleted (trashed, no `archivedAt`)
+        // and drafts.
+        .filter((c) => (c.status !== "trashed" || !!c.archivedAt) && c.status !== "draft")
+        // Primary match: the card's direct link to this schedule (set when it was
+        // materialized / launched). Title + shared-tag matching is a legacy
+        // fallback for cards that predate `linkedTaskId`.
+        .filter((c) => linkedToTask(c) || c.title === task.cardTitle || c.tags.some((tg) => tagSet.has(tg)))
+        .sort((a, b) => triggeredAt(b).localeCompare(triggeredAt(a)))
+    );
   }, [cards, task]);
 
   const runningRuns = useMemo(() => runs.filter((c) => c.status === "in_progress"), [runs]);
@@ -567,20 +598,8 @@ function ScheduleEditScreen() {
           onClick={
             draftMode
               ? () => {
-                  // Validate before the activate prompt (same order as add()).
-                  if (!draft.schedule) {
-                    toast.error(t("toast.needTrigger"));
-                    return;
-                  }
-                  if (!draft.agentPrompt.trim()) {
-                    flagMissingPrompt();
-                    return;
-                  }
-                  if (!hasFolder) {
-                    setFolderErrorShown(true);
-                    toast.error(t("toast.needFolder"));
-                    return;
-                  }
+                  // Surface all missing fields before the activate prompt.
+                  if (!validateRequired(draft)) return;
                   // Inactive-by-default draft: ask whether to activate first.
                   if (!draft.enabled) {
                     setConfirmActivate(true);
@@ -642,7 +661,12 @@ function ScheduleEditScreen() {
                 setDraft(draftOf(task));
                 setBranchByFolder(committedBranches);
                 setTagColorMap(committedTagColors);
-                pendingNavRef.current();
+                // A discarded draft (new/template) must not be reachable again via
+                // the forward chevron. A plain router.back() (no nav-history "back"
+                // intent) is treated as a fresh navigation, dropping the forward
+                // entry — same as Cancel. Real patrols keep normal back/forward.
+                if (draftMode) router.back();
+                else pendingNavRef.current();
               }}
             >
               {t("discardConfirm")}
@@ -1000,6 +1024,13 @@ function TagsEditor({
                     <PlusIcon className="size-3" />
                     {t("createTag", { tag: normalizeTag(input) })}
                   </button>
+                )}
+                {/* Hint that typing a new name creates a tag (the create button
+                    already covers the case where a name is being typed). */}
+                {!showCreate && (
+                  <div className="mt-0.5 border-border border-t px-1.5 pt-1 text-[11px] text-text-tertiary">
+                    {t("createTagHint")}
+                  </div>
                 )}
               </div>
             )}

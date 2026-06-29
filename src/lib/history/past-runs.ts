@@ -22,6 +22,9 @@ export interface PastRun {
   status: PastRunStatus;
   /** True when the run completed successfully. */
   ok: boolean;
+  /** The owning card was auto-archived (Done → Trash at midnight). Drives the
+   *  archive icon so History shows it's archived rather than just trashed. */
+  archived: boolean;
   tokens?: number;
   cost?: number;
   agentPresetId?: string;
@@ -47,6 +50,7 @@ export function pastRunsFromCards(cards: KanbanCard[]): PastRun[] {
         endedAt: run.endedAt,
         status: run.status as PastRunStatus,
         ok: run.status === "completed",
+        archived: Boolean(card.archivedAt),
         tokens: run.tokens,
         cost: run.cost,
         agentPresetId: card.agentPresetId,

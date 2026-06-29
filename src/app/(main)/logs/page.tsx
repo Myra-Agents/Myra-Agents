@@ -2,9 +2,17 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-import { ExternalLinkIcon, FileIcon, FolderIcon, ListFilterIcon, SearchIcon } from "lucide-react";
+import {
+  CircleStopIcon,
+  ExternalLinkIcon,
+  FileIcon,
+  FolderIcon,
+  ListFilterIcon,
+  SearchIcon,
+  SquarePenIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -44,7 +52,8 @@ interface RunArtifact {
 
 function LogsPageInner() {
   const t = useTranslations("logs");
-  const { cards, loading, moveCard, addRevisionNote, answerFeedback } = useKanban();
+  const router = useRouter();
+  const { cards, loading, moveCard, addRevisionNote, answerFeedback, cancelAgent } = useKanban();
   const searchParams = useSearchParams();
   const deepLinkCardId = searchParams.get("card");
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
@@ -241,13 +250,48 @@ function LogsPageInner() {
               {t("details.cost")}: ${selectedRun.run.cost.toFixed(2)}
             </span>
           )}
+          {selectedRun.card.workingDir && (
+            <span className="inline-flex items-center gap-1" title={selectedRun.card.workingDir}>
+              <FolderIcon className="size-3" />
+              <span className="max-w-[22ch] truncate font-mono align-bottom">{selectedRun.card.workingDir}</span>
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Stop the live run (only while it's actually running). */}
+          {displayStatus === "running" && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await cancelAgent(liveCard.id);
+                  toast.success(t("details.stopped"));
+                } catch (e) {
+                  toast.error(String(e));
+                }
+              }}
+            >
+              <CircleStopIcon className="size-3.5" />
+              {t("details.stop")}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => openWorkingDir(selectedRun.card.id)}>
             <FolderIcon className="size-3.5" />
             {t("details.openWorkingDir")}
           </Button>
+          {selectedRun.card.linkedTaskId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => router.push(`/schedules/edit/?id=${encodeURIComponent(selectedRun.card.linkedTaskId!)}`)}
+            >
+              <SquarePenIcon className="size-3" />
+              {t("details.editPatrol")}
+            </Button>
+          )}
           {logArtifact && (
             <Button
               variant="ghost"

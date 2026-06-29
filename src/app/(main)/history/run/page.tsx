@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { FolderIcon, PlayIcon } from "lucide-react";
+import { CircleStopIcon, FolderIcon, PlayIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -49,7 +49,7 @@ function AgentSessionScreen() {
   const cardId = params.get("card") ?? "";
   const runId = params.get("run") ?? "";
 
-  const { cards, moveCard, addRevisionNote, answerFeedback } = useKanban();
+  const { cards, moveCard, addRevisionNote, answerFeedback, cancelAgent } = useKanban();
   const { schedules, triggerNow } = useSchedules();
   const { settings } = useSettings();
 
@@ -75,6 +75,14 @@ function AgentSessionScreen() {
   // loaded (e.g. browser dev backend) so the prompt + summary still render.
   const [logContent, setLogContent] = useState<string | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
+
+  // Optimistic "stopping" flag: flips the badge + button the instant Stop is
+  // clicked, before the backend's status push (agent-result-changed) arrives.
+  // Cleared automatically once the real run status leaves "running".
+  const [stopping, setStopping] = useState(false);
+  useEffect(() => {
+    if (run && run.status !== "running") setStopping(false);
+  }, [run]);
   useEffect(() => {
     if (!card || !run) return;
     let cancelled = false;
@@ -168,7 +176,7 @@ function AgentSessionScreen() {
         {/* Title + status badge */}
         <div className="flex items-center gap-2">
           <h1 className="truncate font-medium text-base text-text-primary">{card.title}</h1>
-          <RunStatusBadge status={run.status} />
+          <RunStatusBadge status={run.status} stopping={stopping} />
         </div>
 
         {/* Meta line (Logs style) */}
@@ -209,9 +217,36 @@ function AgentSessionScreen() {
               {t("effort")} {effort}
             </span>
           )}
+          <span className="inline-flex items-center gap-1" title={card.workingDir}>
+            <FolderIcon className="size-3" />
+            <span className="max-w-[22ch] truncate font-mono">{card.workingDir}</span>
+          </span>
         </div>
 
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Stop only this run while it's genuinely live. `run.status` is the
+              snapshot for this specific run (a finished/failed run in History has
+              already exited); the card-status guard avoids stopping a relaunch. */}
+          {run.status === "running" && card.status === "in_progress" && (
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={stopping}
+              onClick={async () => {
+                setStopping(true); // flip the UI now, before the backend confirms
+                try {
+                  await cancelAgent(card.id);
+                  toast.success(t("stopped"));
+                } catch (e) {
+                  setStopping(false); // revert so the user can retry
+                  toast.error(String(e));
+                }
+              }}
+            >
+              <CircleStopIcon className="size-3.5" />
+              {stopping ? t("stopping") : t("stop")}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={openWorkingDir}>
             <FolderIcon className="size-3.5" />
             {t("openWorkingDir")}
@@ -253,7 +288,7 @@ function AgentSessionScreen() {
 }
 
 /** Run status pill, colored like the History "Result" accents. */
-function RunStatusBadge({ status }: { status: AgentRun["status"] }) {
+function RunStatusBadge({ status, stopping }: { status: AgentRun["status"]; stopping?: boolean }) {
   const t = useTranslations("agentSession");
   const map: Record<
     AgentRun["status"],
@@ -265,7 +300,12 @@ function RunStatusBadge({ status }: { status: AgentRun["status"] }) {
     completed: { label: t("result.success"), variant: "default" },
     failed: { label: t("result.failed"), variant: "destructive" },
   };
-  const v = map[status] ?? { label: status, variant: "outline" as const };
+  // Optimistic override: as soon as Stop is clicked, show "Stopping…" instead of
+  // the stale "Running" until the backend confirms the new status.
+  const v =
+    stopping && status === "running"
+      ? { label: t("result.stopping"), variant: "secondary" as const }
+      : (map[status] ?? { label: status, variant: "outline" as const });
   return (
     <Badge variant={v.variant} className={cn("text-[10px]", status === "completed" && "bg-task-status-done")}>
       {v.label}
