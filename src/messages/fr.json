@@ -653,7 +653,9 @@
     "result": {
       "success": "Réussie",
       "failed": "Échouée",
-      "running": "En cours"
+      "running": "En cours",
+      "awaitingReview": "À vérifier",
+      "needsYou": "Votre attention"
     },
     "archived": "Archivée",
     "usage": "{tokens} Token",
@@ -768,6 +770,7 @@
       "tab": "Conversation",
       "rawTab": "Log brut",
       "thinking": "Raisonnement",
+      "working": "L'agent réfléchit…",
       "input": "Entrée",
       "output": "Sortie",
       "changes": "Modifications",
@@ -1091,9 +1094,9 @@
       "importBoard": "Importer un tableau",
       "importDescription": "Restaurer des tâches depuis un fichier JSON exporté précédemment.",
       "clearHistory": "Effacer l'historique",
-      "clearHistoryDescription": "Supprimer tous les enregistrements d'exécution de chaque tâche.",
+      "clearHistoryDescription": "Supprimer tous les enregistrements d'exécution et retirer les cartes terminées du tableau Opérations.",
       "clearHistoryConfirmTitle": "Effacer l'historique ?",
-      "clearHistoryConfirmDescription": "Tous les enregistrements seront définitivement supprimés. Cette action est irréversible.",
+      "clearHistoryConfirmDescription": "Tous les enregistrements seront définitivement supprimés et chaque carte « Terminé » retirée du tableau Opérations. Cette action est irréversible.",
       "clearHistoryConfirm": "Effacer",
       "clearHistoryCancel": "Annuler",
       "clearLogs": "Effacer les logs",

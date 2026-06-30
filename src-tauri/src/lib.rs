@@ -257,7 +257,13 @@ fn start_local_backend(app: &AppHandle) -> u16 {
     // 3. Ephemeral fallback: spawn the bundled sidecar on a free port. Keeps the
     //    board working before the user opts into the persistent local server, and
     //    on boxes that can't host a login service.
-    let port = pick_free_port();
+    //    Dev override: `MYRA_DEV_PORT` pins this to a known port so a plain
+    //    browser (./dev.sh app bakes NEXT_PUBLIC_MYRA_SERVER_URL at it) reaches
+    //    the very sidecar the webview uses — no second server. Unset → free port.
+    let port = std::env::var("MYRA_DEV_PORT")
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
+        .unwrap_or_else(pick_free_port);
     let mut command = app
         .shell()
         // The shell plugin resolves a sidecar relative to the executable's own
@@ -759,7 +765,7 @@ fn build_app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry
     Ok(menu)
 }
 
-fn navigate_main(app: &AppHandle, path: &str, new_task: bool, new_schedule: bool) {
+fn navigate_main(app: &AppHandle, path: &str, new_schedule: bool) {
     if let Some(win) = app.get_webview_window("main") {
         let _ = win.show();
         let _ = win.unminimize();
@@ -767,7 +773,7 @@ fn navigate_main(app: &AppHandle, path: &str, new_task: bool, new_schedule: bool
     }
     let _ = app.emit(
         "tray-navigate",
-        TrayNavigate { path: path.to_string(), new_task, new_schedule },
+        TrayNavigate { path: path.to_string(), new_schedule },
     );
 }
 
@@ -795,8 +801,8 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .menu(build_app_menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
-            "new_schedule" => navigate_main(app, "/schedules", false, true),
-            "settings" => navigate_main(app, "/settings", false, false),
+            "new_schedule" => navigate_main(app, "/schedules", true),
+            "settings" => navigate_main(app, "/settings", false),
             _ => {}
         })
         .manage(TrayState::default())

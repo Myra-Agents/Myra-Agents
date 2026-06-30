@@ -90,7 +90,7 @@ export default function TrayPopover() {
   const hasStats = daily.some((d) => d.completed + d.failed > 0);
   const online = mounted && connections.some((c) => c.status === "connected");
 
-  const openMain = (path: string, newTask = false) => cmd("open_main", { path, newTask });
+  const openMain = (path: string) => cmd("open_main", { path });
 
   // Keyboard parity with the app: ⌘N new patrol, ⌘O open, Esc dismiss. Calls the
   // module-level `cmd` directly so the listener has no render-scoped deps. The
@@ -101,10 +101,10 @@ export default function TrayPopover() {
         void cmd("hide_tray_popover");
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
         e.preventDefault();
-        void cmd("open_main", { path: "/schedules/edit/?new=1", newTask: false });
+        void cmd("open_main", { path: "/schedules/edit/?new=1" });
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
         e.preventDefault();
-        void cmd("open_main", { path: "/", newTask: false });
+        void cmd("open_main", { path: "/" });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -132,7 +132,7 @@ export default function TrayPopover() {
       {attention.length > 0 && (
         <button
           type="button"
-          onClick={() => openMain("/kanban")}
+          onClick={() => openMain(`/logs?card=${encodeURIComponent(attention[0]?.id ?? "")}`)}
           className="mx-3 mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2 text-left transition-colors hover:bg-amber-500/15"
         >
           <span className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
@@ -157,7 +157,7 @@ export default function TrayPopover() {
             <button
               type="button"
               key={card.id}
-              onClick={() => openMain("/kanban")}
+              onClick={() => openMain(`/logs?card=${encodeURIComponent(card.id)}`)}
               className="hover:bg-accent flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors"
             >
               <LoaderIcon className="text-primary size-4 shrink-0 animate-spin [animation-duration:2s]" />
@@ -175,7 +175,7 @@ export default function TrayPopover() {
         <div className="border-border border-t px-4 py-3">
           <div className="text-muted-foreground mb-2 flex items-center justify-between text-xs">
             <span>Last {KPI_DAYS} days</span>
-            <button type="button" onClick={() => openMain("/")} className="hover:text-foreground transition-colors">
+            <button type="button" onClick={() => openMain("/history")} className="hover:text-foreground transition-colors">
               View all ›
             </button>
           </div>

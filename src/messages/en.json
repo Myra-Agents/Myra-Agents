@@ -653,7 +653,9 @@
     "result": {
       "success": "Success",
       "failed": "Failed",
-      "running": "Running"
+      "running": "Running",
+      "awaitingReview": "Awaiting review",
+      "needsYou": "Needs you"
     },
     "archived": "Archived",
     "usage": "{tokens} Token",
@@ -768,6 +770,7 @@
       "tab": "Conversation",
       "rawTab": "Raw log",
       "thinking": "Thought process",
+      "working": "Agent is working…",
       "input": "Input",
       "output": "Output",
       "changes": "Changes",
@@ -1091,9 +1094,9 @@
       "importBoard": "Import board",
       "importDescription": "Restore tasks from a previously exported JSON file.",
       "clearHistory": "Clear run history",
-      "clearHistoryDescription": "Remove all past agent run records from every task.",
+      "clearHistoryDescription": "Remove all past agent run records, and clear Done cards off the Operations board.",
       "clearHistoryConfirmTitle": "Clear run history?",
-      "clearHistoryConfirmDescription": "All run records will be permanently deleted. This action cannot be undone.",
+      "clearHistoryConfirmDescription": "All run records will be permanently deleted and every Done card removed from the Operations board. This action cannot be undone.",
       "clearHistoryConfirm": "Clear history",
       "clearHistoryCancel": "Cancel",
       "clearLogs": "Clear logs",

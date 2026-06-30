@@ -219,7 +219,25 @@ function ScheduleEditScreen() {
   // Both template and blank modes defer persistence to the Add action.
   const draftMode = templateMode || blankMode;
 
-  const [tab, setTab] = useState<"settings" | "runs">("settings");
+  // Active tab is mirrored in the URL (`?tab=runs`) so that opening an operation
+  // then hitting the top-bar back chevron — a hard browser navigation in the
+  // static export, which remounts this page — restores the Operations & History
+  // tab instead of snapping back to Settings.
+  const [tab, setTab] = useState<"settings" | "runs">(() => (params.get("tab") === "runs" ? "runs" : "settings"));
+  // Switch tab + sync the URL in place. `history.replaceState` (not router.replace)
+  // updates the address without a navigation/remount — so unsaved edits survive —
+  // and reuses the current `history.state` to keep NavHistoryControls' nav key intact.
+  const selectTab = useCallback((next: "settings" | "runs") => {
+    setTab(next);
+    try {
+      const url = new URL(window.location.href);
+      if (next === "runs") url.searchParams.set("tab", "runs");
+      else url.searchParams.delete("tab");
+      window.history.replaceState(window.history.state, "", url);
+    } catch {
+      // ignore — URL just won't reflect the tab; in-page state still switches
+    }
+  }, []);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   // Confirm dialog shown when cancelling with unsaved edits.
@@ -395,7 +413,7 @@ function ScheduleEditScreen() {
   // emitted by validateRequired.)
   const flagMissingPrompt = useCallback(() => {
     setPromptErrorShown(true);
-    setTab("settings");
+    selectTab("settings");
     // setTimeout (not rAF) so it runs after the Settings tab mounts AND isn't
     // throttled when the window is briefly unfocused.
     setTimeout(() => {
@@ -403,7 +421,7 @@ function ScheduleEditScreen() {
       el?.scrollIntoView({ block: "center" });
       el?.focus({ preventScroll: true });
     }, 0);
-  }, []);
+  }, [selectTab]);
 
   // Surface *every* missing required field at once (trigger / instruction /
   // folder) — inline state per field plus a single combined toast — and return
@@ -804,10 +822,10 @@ function ScheduleEditScreen() {
           mode — a not-yet-created schedule has no run history. */}
       {!draftMode && (
         <div className="flex items-center gap-1.5 pt-4">
-          <SegTab active={tab === "settings"} onClick={() => setTab("settings")}>
+          <SegTab active={tab === "settings"} onClick={() => selectTab("settings")}>
             {t("tabs.settings")}
           </SegTab>
-          <SegTab active={tab === "runs"} onClick={() => setTab("runs")}>
+          <SegTab active={tab === "runs"} onClick={() => selectTab("runs")}>
             {t("tabs.runs")}
           </SegTab>
         </div>
@@ -825,7 +843,7 @@ function ScheduleEditScreen() {
             t={t}
           />
         ) : (
-          <RunsHistory cards={runs} seeAllHref="/history" />
+          <RunsHistory cards={runs} seeAllHref="/history" includeLive />
         )}
       </div>
 

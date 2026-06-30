@@ -41,12 +41,11 @@ impl TrayState {
 }
 
 /// Payload for `tray-navigate`, consumed by the main window's listener to route
-/// and (optionally) trigger the new-task flow.
+/// and (optionally) trigger the new-patrol flow.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayNavigate {
     pub path: String,
-    pub new_task: bool,
     pub new_schedule: bool,
 }
 
@@ -109,7 +108,7 @@ fn open_patrol_editor(app: &AppHandle) {
     show_window(app);
     let _ = app.emit(
         "tray-navigate",
-        TrayNavigate { path: "/schedules/edit/?new=1".into(), new_task: false, new_schedule: false },
+        TrayNavigate { path: "/schedules/edit/?new=1".into(), new_schedule: false },
     );
 }
 
@@ -247,13 +246,12 @@ pub fn hide_tray_popover(app: AppHandle) {
     }
 }
 
-/// Reveal the main window, route it to `path`, and (optionally) trigger the
-/// new-task flow. The popover dismisses itself. Navigation + the zustand
-/// new-task request happen in the main webview via the `tray-navigate` event.
+/// Reveal the main window and route it to `path`. The popover dismisses itself.
+/// Navigation happens in the main webview via the `tray-navigate` event.
 #[tauri::command]
-pub fn open_main(app: AppHandle, path: String, new_task: bool) {
+pub fn open_main(app: AppHandle, path: String) {
     show_window(&app);
-    let _ = app.emit("tray-navigate", TrayNavigate { path, new_task, new_schedule: false });
+    let _ = app.emit("tray-navigate", TrayNavigate { path, new_schedule: false });
     if let Some(w) = app.get_webview_window(POPOVER_LABEL) {
         let _ = w.hide();
     }

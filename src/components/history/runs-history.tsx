@@ -34,6 +34,7 @@ import { useSettings } from "@/hooks/use-settings";
 import {
   durationSeconds,
   formatDuration,
+  formatElapsed,
   formatTriggered,
   type PastRun,
   pastRunsFromCards,
@@ -52,7 +53,18 @@ import type { AgentPreset } from "@/types/settings";
  * editor's "Runs & History" tab passes only that schedule's cards. All copy comes
  * from the `history` i18n namespace.
  */
-export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: KanbanCard[]; seeAllHref?: string }) {
+export function RunsHistory({
+  cards,
+  seeAllHref = "/schedules",
+  includeLive = false,
+}: {
+  cards: KanbanCard[];
+  seeAllHref?: string;
+  /** Surface in-flight runs (running / needs_feedback / awaiting_review) as live
+   *  rows. The standalone History page stays terminal-only; the Patrol editor's
+   *  Operations & History tab opts in so a just-launched run shows immediately. */
+  includeLive?: boolean;
+}) {
   const t = useTranslations("history");
   const router = useRouter();
   const now = useNow();
@@ -69,14 +81,23 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
   const [resultFilter, setResultFilter] = useState<ResultValue[]>([]);
 
-  const allRuns = useMemo(() => pastRunsFromCards(cards), [cards]);
+  const allRuns = useMemo(() => {
+    const all = pastRunsFromCards(cards);
+    // Patrol "Operations & History" tab shows every run — live, awaiting-human,
+    // and finished. The standalone History page shows only runs with a final
+    // verdict (completed / failed); anything not yet "Done" is filtered out.
+    return includeLive ? all : all.filter((r) => r.status === "completed" || r.status === "failed");
+  }, [cards, includeLive]);
   const inRange = useMemo(() => allRuns.filter((r) => withinRange(r, range, now)), [allRuns, range, now]);
 
   const stats = useMemo(() => {
     const total = inRange.length;
     const success = inRange.filter((r) => r.ok).length;
+    // Failures are explicit failures only — live, awaiting_review and
+    // needs_feedback runs are neither success nor failure.
+    const failed = inRange.filter((r) => r.status === "failed").length;
     const tokens = inRange.reduce((sum, r) => sum + (r.tokens ?? 0), 0);
-    return { total, success, failed: total - success, tokens };
+    return { total, success, failed, tokens };
   }, [inRange]);
 
   const buckets = useMemo(() => buildBuckets(inRange, range, now), [inRange, range, now]);
@@ -85,7 +106,7 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
     let r = inRange;
     const q = query.trim().toLowerCase();
     if (q) r = r.filter((run) => run.cardTitle.toLowerCase().includes(q));
-    if (resultFilter.length) r = r.filter((run) => resultFilter.includes(run.ok ? "success" : "failed"));
+    if (resultFilter.length) r = r.filter((run) => resultFilter.includes(resultValueOf(run)));
     if (sort) {
       const dir = sort.dir === "asc" ? 1 : -1;
       const nameOf = (run: PastRun) =>
@@ -105,8 +126,13 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
   const visibleRows = rows.slice(0, VISIBLE);
   const rangeLabel = t(`ranges.${range}`);
 
+  // A live (still-running) operation opens its Operations detail — the
+  // "Operations › {title}" live view at `/logs` (Stop / live output). A finished
+  // run opens its History detail at `/history/run`.
   const openRun = (r: PastRun) =>
-    router.push(`/history/run/?card=${encodeURIComponent(r.cardId)}&run=${encodeURIComponent(r.runId)}`);
+    r.live
+      ? router.push(`/logs/?card=${encodeURIComponent(r.cardId)}`)
+      : router.push(`/history/run/?card=${encodeURIComponent(r.cardId)}&run=${encodeURIComponent(r.runId)}`);
   const editPatrol = (r: PastRun) => {
     if (r.linkedTaskId) router.push(`/schedules/edit/?id=${encodeURIComponent(r.linkedTaskId)}`);
   };
@@ -248,6 +274,9 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
                   options: [
                     { value: "success", label: t("result.success"), dot: "bg-task-status-done" },
                     { value: "failed", label: t("result.failed"), dot: "bg-destructive" },
+                    ...(includeLive
+                      ? [{ value: "running", label: t("result.running"), dot: "bg-task-status-running" }]
+                      : []),
                   ],
                   selected: resultFilter,
                   onToggle: (v) => toggleResultFilter(v as ResultValue),
@@ -300,15 +329,18 @@ export function RunsHistory({ cards, seeAllHref = "/schedules" }: { cards: Kanba
                     {formatTriggered(r.startedAt)}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
-                    {formatDuration(r)}
+                    {r.live ? formatElapsed(r.startedAt, now) : formatDuration(r)}
                   </TableCell>
                   <TableCell>
                     <AgentChip agent={agentOf(r)} />
                   </TableCell>
-                  <TableCell
-                    className={cn("whitespace-nowrap text-xs", r.ok ? "text-task-status-done" : "text-destructive")}
-                  >
-                    {r.ok ? t("result.success") : t("result.failed")}
+                  <TableCell className={cn("whitespace-nowrap text-xs", RESULT_STYLE[resultValueOf(r)].className)}>
+                    <span className="inline-flex items-center gap-1.5">
+                      {r.live && (
+                        <span className="size-1.5 animate-pulse rounded-full bg-task-status-running" aria-hidden />
+                      )}
+                      {t(RESULT_STYLE[resultValueOf(r)].labelKey)}
+                    </span>
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
                     {r.tokens != null ? t("usage", { tokens: r.tokens }) : "—"}
@@ -379,40 +411,55 @@ type Bucket = { key: string; label: string; ok: number; failed: number };
 
 function buildBuckets(runs: PastRun[], range: TimeRange, now: number): Bucket[] {
   const day = 86_400_000;
+  const hour = 3_600_000;
   const start0 = new Date(now);
   start0.setHours(0, 0, 0, 0);
 
-  let windowDays: number;
-  if (range === "today") windowDays = 1;
-  else if (range === "7d") windowDays = 7;
-  else if (range === "14d") windowDays = 14;
-  else if (range === "30d") windowDays = 30;
-  else {
-    const earliest = runs.reduce((m, r) => Math.min(m, Date.parse(r.startedAt)), now);
-    windowDays = Math.min(365, Math.max(1, Math.ceil((start0.getTime() - earliest) / day) + 1));
-  }
-
-  const step = windowDays > 31 ? 7 : 1;
-  const count = Math.ceil(windowDays / step);
-  const lastStart = start0.getTime() - (step - 1) * day;
-
   const starts: number[] = [];
   const buckets: Bucket[] = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const s = lastStart - i * step * day;
-    starts.push(s);
-    buckets.push({
-      key: new Date(s).toISOString().slice(0, 10),
-      label: new Date(s).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-      ok: 0,
-      failed: 0,
-    });
+  let span: number;
+
+  if (range === "today") {
+    // Hourly buckets so a single day reads as a distribution, not one full-width block.
+    span = hour;
+    for (let h = 0; h < 24; h++) {
+      const s = start0.getTime() + h * hour;
+      starts.push(s);
+      buckets.push({ key: `h${h}`, label: `${String(h).padStart(2, "0")}:00`, ok: 0, failed: 0 });
+    }
+  } else {
+    let windowDays: number;
+    if (range === "7d") windowDays = 7;
+    else if (range === "14d") windowDays = 14;
+    else if (range === "30d") windowDays = 30;
+    else {
+      const earliest = runs.reduce((m, r) => Math.min(m, Date.parse(r.startedAt)), now);
+      windowDays = Math.min(365, Math.max(1, Math.ceil((start0.getTime() - earliest) / day) + 1));
+    }
+
+    const step = windowDays > 31 ? 7 : 1;
+    span = step * day;
+    const count = Math.ceil(windowDays / step);
+    const lastStart = start0.getTime() - (step - 1) * day;
+    for (let i = count - 1; i >= 0; i--) {
+      const s = lastStart - i * span;
+      starts.push(s);
+      buckets.push({
+        key: new Date(s).toISOString().slice(0, 10),
+        label: new Date(s).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+        ok: 0,
+        failed: 0,
+      });
+    }
   }
 
   for (const r of runs) {
+    // Only resolved outcomes feed the trend — skip live / awaiting_review /
+    // needs_feedback runs that have no pass-or-fail verdict yet.
+    if (!r.ok && r.status !== "failed") continue;
     const ts = Date.parse(r.startedAt);
     for (let i = 0; i < starts.length; i++) {
-      if (ts >= starts[i] && ts < starts[i] + step * day) {
+      if (ts >= starts[i] && ts < starts[i] + span) {
         if (r.ok) buckets[i].ok += 1;
         else buckets[i].failed += 1;
         break;
@@ -501,7 +548,33 @@ function SuccessRateChart({ data }: { data: Bucket[] }) {
 
 type SortKey = "task" | "triggered" | "duration" | "agent" | "result" | "usage";
 type SortDir = "asc" | "desc";
-type ResultValue = "success" | "failed";
+type ResultValue = "success" | "failed" | "running" | "review" | "feedback";
+
+/** Result bucket for a run. Live runs are still executing; awaiting_review /
+ *  needs_feedback have ended but await a human, so they're neither pass nor fail. */
+function resultValueOf(run: PastRun): ResultValue {
+  if (run.live) return "running";
+  switch (run.status) {
+    case "completed":
+      return "success";
+    case "awaiting_review":
+      return "review";
+    case "needs_feedback":
+      return "feedback";
+    default:
+      // `failed`, or a stale `running` that ended without completing.
+      return "failed";
+  }
+}
+
+/** Tailwind text color + i18n key for each result bucket. */
+const RESULT_STYLE: Record<ResultValue, { className: string; labelKey: string }> = {
+  running: { className: "text-task-status-running", labelKey: "result.running" },
+  success: { className: "text-task-status-done", labelKey: "result.success" },
+  failed: { className: "text-destructive", labelKey: "result.failed" },
+  review: { className: "text-task-status-needs-you", labelKey: "result.awaitingReview" },
+  feedback: { className: "text-task-status-needs-you", labelKey: "result.needsYou" },
+};
 
 function compareRuns(key: SortKey, a: PastRun, b: PastRun): number {
   switch (key) {

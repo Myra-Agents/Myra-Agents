@@ -1,15 +1,15 @@
 import type { AgentRun, KanbanCard } from "@/types/kanban";
 
 /**
- * A terminal agent execution surfaced on the History page. Flattens every card's
- * `runHistory` into individual past runs (one row per attempt), keeping a link
- * back to the owning card so the agent-session detail can resolve `?card=&run=`.
+ * An agent execution surfaced on the History page. Flattens every card's
+ * `runHistory` into individual runs (one row per attempt), keeping a link back
+ * to the owning card so the agent-session detail can resolve `?card=&run=`.
  *
- * "Past" = a run that has finished, succeeded or not — i.e. `completed` or
- * `failed`. In-flight statuses (running / needs_feedback / awaiting_review) are
- * the live Runs board's concern, not History's.
+ * Includes both finished runs (`completed` / `failed`) and in-flight ones
+ * (`running` / `needs_feedback` / `awaiting_review`) so a just-launched
+ * operation shows up live; the `live` flag distinguishes them.
  */
-export type PastRunStatus = Extract<AgentRun["status"], "completed" | "failed">;
+export type PastRunStatus = AgentRun["status"];
 
 export interface PastRun {
   runId: string;
@@ -20,8 +20,11 @@ export interface PastRun {
   startedAt: string;
   endedAt?: string;
   status: PastRunStatus;
-  /** True when the run completed successfully. */
+  /** True when the run completed successfully (terminal `completed`). */
   ok: boolean;
+  /** True while the agent process is still executing (no `endedAt` yet). Runs
+   *  parked in `awaiting_review` / `needs_feedback` have ended and are NOT live. */
+  live: boolean;
   /** The owning card was auto-archived (Done → Trash at midnight). Drives the
    *  archive icon so History shows it's archived rather than just trashed. */
   archived: boolean;
@@ -33,14 +36,11 @@ export interface PastRun {
   result?: string;
 }
 
-const TERMINAL: ReadonlySet<AgentRun["status"]> = new Set(["completed", "failed"]);
-
 /** Flatten every card's run history into a single, newest-first list of past runs. */
 export function pastRunsFromCards(cards: KanbanCard[]): PastRun[] {
   const runs: PastRun[] = [];
   for (const card of cards) {
     for (const run of card.runHistory ?? []) {
-      if (!TERMINAL.has(run.status)) continue;
       runs.push({
         runId: run.id,
         cardId: card.id,
@@ -48,8 +48,13 @@ export function pastRunsFromCards(cards: KanbanCard[]): PastRun[] {
         linkedTaskId: card.linkedTaskId,
         startedAt: run.startedAt,
         endedAt: run.endedAt,
-        status: run.status as PastRunStatus,
+        status: run.status,
         ok: run.status === "completed",
+        // "Live" = the agent process is still executing — i.e. no end time yet.
+        // Status alone is misleading: `awaiting_review` / `needs_feedback` runs
+        // have already finished (they carry an `endedAt`) and only await a human,
+        // so they must not read as "Running".
+        live: !run.endedAt,
         archived: Boolean(card.archivedAt),
         tokens: run.tokens,
         cost: run.cost,
@@ -115,6 +120,17 @@ export function formatTriggered(iso: string): string {
 export function formatDuration(run: PastRun): string {
   if (!run.endedAt) return "—";
   const ms = Date.parse(run.endedAt) - Date.parse(run.startedAt);
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem ? `${m} m ${rem} s` : `${m} m`;
+}
+
+/** Live elapsed time for an in-flight run: "10 s", "3 m 12 s", "—" when unknown. */
+export function formatElapsed(startedAt: string, now: number): string {
+  const ms = now - Date.parse(startedAt);
   if (!Number.isFinite(ms) || ms < 0) return "—";
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s} s`;

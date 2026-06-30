@@ -12,19 +12,17 @@ import { useShortcutStore } from "@/stores/shortcut-store";
 /** Payload of the `tray-navigate` event emitted by the tray popover's `open_main`. */
 interface TrayNavigate {
   path: string;
-  newTask: boolean;
   newSchedule: boolean;
 }
 
 /**
  * Bridges tray-popover actions into the main window: the popover calls the
  * `open_main` Tauri command (which reveals + focuses this window and emits
- * `tray-navigate`); here we route to the requested path and, for "New task",
- * arm the same pending-new-card flow the ⌘N shortcut uses.
+ * `tray-navigate`); here we route to the requested path and, for "New patrol",
+ * arm the same pending-new-schedule flow the menu uses.
  */
 export function TrayActionListener() {
   const router = useRouter();
-  const requestNewCard = useShortcutStore((s) => s.requestNewCard);
   const requestNewSchedule = useShortcutStore((s) => s.requestNewSchedule);
 
   useEffect(() => {
@@ -34,13 +32,12 @@ export function TrayActionListener() {
     let unlisten: (() => void) | undefined;
     void listen<TrayNavigate>("tray-navigate", ({ payload }) => {
       router.push(payload.path);
-      if (payload.newTask) requestNewCard();
       if (payload.newSchedule) requestNewSchedule();
     }).then((un) => {
       unlisten = un;
     });
     return () => unlisten?.();
-  }, [router, requestNewCard, requestNewSchedule]);
+  }, [router, requestNewSchedule]);
 
   return null;
 }

@@ -99,6 +99,17 @@ class ConnectionManager {
         if (reg.id === CLOUD_HUB_ID) continue; // re-derived from auth, not persisted
         this.hubs.set(reg.id, { reg, client: createHubClient(reg.baseUrl, reg.token) });
       }
+      // A build-time SERVER_URL always wins for LOCAL: a persisted offline/sidecar
+      // entry (baseUrl "") from a prior plain `next dev` must not shadow it, or
+      // invoke() routes to the browser stand-in instead of the configured server
+      // (the "[Dev Mode] Tauri backend not available" symptom). Re-seed LOCAL and
+      // make it primary so the whole app talks to the local backend.
+      if (SERVER_URL) {
+        const local = this.defaultLocal();
+        this.entries.set(local.id, { connection: local, transport: this.buildTransport(local) });
+        this.primaryConnId = LOCAL_ID;
+        return;
+      }
       this.primaryConnId = this.entries.has(persisted.primaryId)
         ? persisted.primaryId
         : (this.entries.keys().next().value ?? LOCAL_ID);

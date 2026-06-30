@@ -1,4 +1,4 @@
-// House, Kanban, ScrollText icons parked — Home/Kanban/Logs nav entries commented out below.
+// House, ScrollText icons parked — Home/Logs nav entries commented out below.
 import { Activity, History, type LucideIcon, Route } from "lucide-react";
 
 export interface NavSubItem {
@@ -75,12 +75,6 @@ export const sidebarItems: NavGroup[] = [
         matchPaths: ["/logs"],
         isNew: true,
       },
-      // {
-      //   title: "Kanban",
-      //   url: "/kanban",
-      //   icon: Kanban,
-      //   description: "Track your agents' tasks across columns — drag cards to move work along.",
-      // },
       {
         title: "Patrols",
         url: "/schedules",

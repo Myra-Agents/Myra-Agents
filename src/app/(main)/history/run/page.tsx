@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -14,6 +14,8 @@ import { ReviewComposer } from "@/components/conversation/review-composer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAgentEvents } from "@/hooks/use-agent-events";
+import { useAgentLogs } from "@/hooks/use-agent-logs";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
@@ -49,7 +51,12 @@ function AgentSessionScreen() {
   const cardId = params.get("card") ?? "";
   const runId = params.get("run") ?? "";
 
-  const { cards, moveCard, addRevisionNote, answerFeedback, cancelAgent } = useKanban();
+  const { cards, moveCard, addRevisionNote, answerFeedback, cancelAgent, upsertCard } = useKanban();
+  // Push-based live updates: `agent-result-changed` flips the card's status the
+  // instant a run finishes / asks for feedback (badge + Stop react without a
+  // manual reload), and `agent-log-appended` streams the run log line-by-line.
+  useAgentEvents(upsertCard);
+  const { logs } = useAgentLogs();
   const { schedules, triggerNow } = useSchedules();
   const { settings } = useSettings();
 
@@ -76,6 +83,15 @@ function AgentSessionScreen() {
   const [logContent, setLogContent] = useState<string | null>(null);
   const [loadingLog, setLoadingLog] = useState(false);
 
+  // Live log tail. `get_run_log` gives the history once on entry; new lines then
+  // arrive via `agent-log-appended` (useAgentLogs). To avoid double-rendering the
+  // lines that were already in the fetched snapshot, we record how many live
+  // lines had accumulated at fetch time and only append the ones after it.
+  const liveLines = useMemo(() => (card ? (logs.get(card.id) ?? []) : []), [logs, card]);
+  const liveLinesRef = useRef(liveLines);
+  liveLinesRef.current = liveLines;
+  const liveBaselineRef = useRef(0);
+
   // Optimistic "stopping" flag: flips the badge + button the instant Stop is
   // clicked, before the backend's status push (agent-result-changed) arrives.
   // Cleared automatically once the real run status leaves "running".
@@ -91,7 +107,11 @@ function AgentSessionScreen() {
     const { connId, entityId } = parseGlobalId(card.id);
     invokeOn<string>(connId, "get_run_log", { cardId: entityId, runId: run.id })
       .then((log) => {
-        if (!cancelled) setLogContent(log);
+        if (cancelled) return;
+        // Snapshot fetched: anything already streamed is part of it — only append
+        // live lines from here on.
+        liveBaselineRef.current = liveLinesRef.current.length;
+        setLogContent(log);
       })
       .catch(() => {
         if (!cancelled) setLogContent(null); // fall back to run.result in parseTranscript
@@ -104,10 +124,28 @@ function AgentSessionScreen() {
     };
   }, [card, run]);
 
+  const running = run?.status === "running";
+
+  // Append the freshly-streamed tail (past the fetch baseline) to the snapshot
+  // while the run is live; once it stops, the re-fetched log is authoritative.
+  const liveTail = liveLines.slice(liveBaselineRef.current).join("\n");
+  const effectiveLog = useMemo(() => {
+    if (!running || !liveTail) return logContent;
+    return [logContent ?? "", liveTail].filter(Boolean).join("\n");
+  }, [logContent, running, liveTail]);
+
   const transcript = useMemo(
-    () => (run ? parseTranscript(logContent, run) : { entries: [], structured: false }),
-    [logContent, run],
+    () => (run ? parseTranscript(effectiveLog, run) : { entries: [], structured: false }),
+    [effectiveLog, run],
   );
+
+  // Keep the live view pinned to the latest output while the agent is running.
+  // Re-runs as the transcript grows (entryCount) so each new line scrolls in.
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const entryCount = transcript.entries.length;
+  useEffect(() => {
+    if (running && entryCount) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [running, entryCount]);
 
   useBreadcrumbOverride(card ? { label: card.title } : null);
 
@@ -259,7 +297,10 @@ function AgentSessionScreen() {
             {loadingLog ? (
               <p className="text-text-tertiary text-sm">{t("loadingLog")}</p>
             ) : (
-              <ConversationView transcript={transcript} />
+              <>
+                <ConversationView transcript={transcript} thinking={running && !stopping} />
+                <div ref={bottomRef} />
+              </>
             )}
           </ScrollArea>
         </div>

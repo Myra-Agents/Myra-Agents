@@ -66,7 +66,7 @@ function toolArgSummary(tool: ToolUseEntry): string {
   );
 }
 
-export function ConversationView({ transcript }: { transcript: Transcript }) {
+export function ConversationView({ transcript, thinking }: { transcript: Transcript; thinking?: boolean }) {
   // Pair tool results to their calls so a result renders under its tool_use.
   const resultsByToolId = useMemo(() => {
     const map = new Map<string, ToolResultEntry>();
@@ -94,6 +94,24 @@ export function ConversationView({ transcript }: { transcript: Transcript }) {
           />
         );
       })}
+      {thinking && <ThinkingIndicator />}
+    </div>
+  );
+}
+
+/** Animated "agent is working" indicator — pulsing spark + bouncing dots.
+ * Rendered at the tail of the transcript while the run is live. */
+function ThinkingIndicator() {
+  const t = useTranslations("logs.conversation");
+  return (
+    <div className="flex items-center gap-2 text-muted-foreground text-xs" aria-live="polite">
+      <SparklesIcon className="size-3.5 animate-pulse text-primary" />
+      <span>{t("working")}</span>
+      <span className="flex items-center gap-1">
+        <span className="size-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:-0.3s]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:-0.15s]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-primary/60" />
+      </span>
     </div>
   );
 }
