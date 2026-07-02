@@ -23,7 +23,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-14 # Apple Silicon
+          # macos-26 (Tahoe image, SDK 26.x) — the linked SDK decides how macOS
+          # renders the app: binaries linked against an older SDK get the legacy
+          # "compatibility" appearance on macOS 26 (smaller traffic lights, old
+          # materials), visibly different from local dev builds. Keep this image
+          # (and the self-hosted x64 Mac) on the same SDK major as dev machines.
+          - platform: macos-26 # Apple Silicon
             target: aarch64-apple-darwin
           # GitHub retired its Intel macOS hosted runner; x86_64 is built on our
           # self-hosted Apple Silicon Mac (label `myra-x64`, see runner.sh in the
@@ -45,6 +50,16 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           submodules: recursive
+
+      # Guard: the macOS SDK we link against must match what dev machines use,
+      # or the released app renders with the legacy compatibility appearance on
+      # current macOS (e.g. smaller traffic lights). Fail fast on image drift.
+      - name: Assert macOS SDK >= 26
+        if: runner.os == 'macOS'
+        run: |
+          SDK="$(xcrun --show-sdk-version)"
+          echo "macOS SDK: $SDK"
+          [ "${SDK%%.*}" -ge 26 ] || { echo "::error::SDK $SDK too old — bump the runner image/Xcode (need 26+)"; exit 1; }
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
