@@ -1,6 +1,6 @@
 "use client";
 
-import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -18,10 +18,13 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import {
   ActivityIcon,
+  ArchiveIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   BotIcon,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CircleStopIcon,
   EyeIcon,
   ListFilterIcon,
@@ -31,8 +34,8 @@ import {
   PencilIcon,
   PlayIcon,
   SearchIcon,
+  Settings2Icon,
   TerminalIcon,
-  ArchiveIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
@@ -49,8 +52,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useKanban } from "@/hooks/use-kanban";
+import { type RunsColumnId, TOGGLEABLE_COLUMNS, useRunsColumns } from "@/hooks/use-runs-columns";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { connIdOf } from "@/lib/aggregate/global-id";
@@ -171,6 +175,7 @@ export default function RunsPage() {
   const router = useRouter();
   const { cards, loading, error, trashCard, restoreCard, moveCard, reorderCard, cancelAgent } = useKanban();
   const { settings } = useSettings();
+  const { hidden, toggleColumn, resetColumns } = useRunsColumns();
 
   // List (table) ↔ Kanban (board) layout — toggled from the top-bar tabs and
   // remembered across reloads. Default to "list", then restore the saved choice
@@ -331,6 +336,71 @@ export default function RunsPage() {
     tagFilter.length > 0 ||
     query.trim().length > 0;
 
+  // ── List-table sticky header + internal scroll (mirrors History) ────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Cap the list to the space left below it inside its scroll container, so the
+  // summary cards + notes above AND the layout's content padding are accounted
+  // for: the list fills to the bottom without pushing the page past the fold.
+  const [listMaxH, setListMaxH] = useState<number>();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: recompute when the list mounts (loading→false) or its rows/view change — reshapes the space it must fill.
+  useEffect(() => {
+    if (view !== "list") return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollParent = (() => {
+      let n = el.parentElement;
+      while (n) {
+        const oy = getComputedStyle(n).overflowY;
+        if (oy === "auto" || oy === "scroll") return n;
+        n = n.parentElement;
+      }
+      return document.documentElement;
+    })();
+    const compute = () => {
+      const parentRect = scrollParent.getBoundingClientRect();
+      const visibleBottom = parentRect.top + scrollParent.clientHeight;
+      let reserve = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== scrollParent) {
+        for (let sib = node.nextElementSibling; sib; sib = sib.nextElementSibling) {
+          const cs = getComputedStyle(sib);
+          if (cs.position !== "absolute" && cs.position !== "fixed") reserve += sib.getBoundingClientRect().height;
+        }
+        const up: HTMLElement | null = node.parentElement;
+        if (up) reserve += Number.parseFloat(getComputedStyle(up).paddingBottom) || 0;
+        node = up;
+      }
+      const available = visibleBottom - el.getBoundingClientRect().top - reserve - 2;
+      setListMaxH((prev) => {
+        const next = Math.max(200, available);
+        return prev != null && Math.abs(prev - next) <= 1 ? prev : next;
+      });
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(document.body);
+    window.addEventListener("resize", compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", compute);
+    };
+  }, [view, loading, rows.length]);
+
+  // Scroll affordance: fade the top/bottom edges + a bounced chevron whenever
+  // rows lie above/below the visible viewport.
+  const [moreBelow, setMoreBelow] = useState(false);
+  const [moreAbove, setMoreAbove] = useState(false);
+  const updateMoreBelow = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const EPS = 8;
+    setMoreBelow(el.scrollTop + el.clientHeight < el.scrollHeight - EPS);
+    setMoreAbove(el.scrollTop > EPS);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure after layout settles.
+  useEffect(updateMoreBelow, [listMaxH, rows.length, view]);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -346,6 +416,60 @@ export default function RunsPage() {
       </div>
     );
   }
+
+  // Column descriptors — one source of truth for the split header/body tables and
+  // the colgroup. "task" is the row anchor and is never hidden; the rest toggle
+  // via the columns menu and persist through useRunsColumns.
+  const columns: ColumnDef[] = [
+    {
+      id: "task",
+      weight: 280,
+      cellClassName: "max-w-[280px] truncate text-sm text-text-primary",
+      cell: (card) => card.title,
+    },
+    {
+      id: "triggered",
+      weight: 180,
+      cellClassName: "whitespace-nowrap text-text-secondary text-xs",
+      cell: (card) => formatTriggered(triggeredAt(card)),
+    },
+    {
+      id: "status",
+      weight: 140,
+      cell: (card) => (
+        <span className="flex items-center gap-2 text-text-primary text-xs">
+          <span className={cn("size-2 rounded-full", DOT_OF[bucketOf(card)])} />
+          {t(`summary.${bucketOf(card)}.label`)}
+        </span>
+      ),
+      filter: {
+        options: BUCKETS.map((b) => ({ value: b.key, label: t(`summary.${b.key}.label`), dot: b.dot })),
+        selected: statusFilter,
+        onToggle: (v) => toggleStatusFilter(v as RunBucket),
+        onClear: () => setStatusFilter([]),
+      },
+    },
+    {
+      id: "duration",
+      weight: 100,
+      cellClassName: "whitespace-nowrap text-text-secondary text-xs tabular-nums",
+      cell: (card) => durationOf(card),
+    },
+    {
+      id: "agent",
+      weight: 150,
+      cell: (card) => (
+        <AgentChip agent={settings.agents.find((a) => a.id === (card.agentPresetId ?? settings.defaultAgentId))} />
+      ),
+      filter: {
+        options: agentOptions.map((n) => ({ value: n, label: n })),
+        selected: agentFilter,
+        onToggle: toggleAgentFilter,
+        onClear: () => setAgentFilter([]),
+      },
+    },
+  ];
+  const visibleColumns = columns.filter((c) => c.id === "task" || !hidden.includes(c.id as RunsColumnId));
 
   return (
     // Figma "App" content width — 968px, shared by the table and the board so the
@@ -414,6 +538,43 @@ export default function RunsPage() {
           })}
         </div>
         <div className="flex items-center gap-2 text-icon-primary">
+          {view === "list" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t("columnsLabel")}
+                  className={cn(
+                    "flex h-6 items-center text-icon-tertiary transition-colors hover:text-icon-primary",
+                    hidden.length > 0 && "text-icon-primary",
+                  )}
+                >
+                  <Settings2Icon className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-text-tertiary text-xs">{t("columnsLabel")}</DropdownMenuLabel>
+                {TOGGLEABLE_COLUMNS.map((id) => (
+                  <DropdownMenuCheckboxItem
+                    key={id}
+                    checked={!hidden.includes(id)}
+                    onCheckedChange={() => toggleColumn(id)}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {t(`columns.${id}`)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {hidden.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-text-tertiary" onClick={resetColumns}>
+                      {t("resetColumns")}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {searchOpen ? (
             <div className="flex h-6 items-center gap-1.5">
               <SearchIcon className="size-4 shrink-0" />
@@ -516,139 +677,148 @@ export default function RunsPage() {
                 {t("showing", { shown: rows.length, total: totalRuns })}
               </span>
             </div>
-            <div className="overflow-hidden rounded-card border border-border-cards bg-card-background">
-              <Table>
-                <TableHeader>
+            {/* Run table — the column header stays pinned while rows scroll under
+                it (mirrors History). The header lives OUTSIDE the scroller so it
+                never moves; header + body are two width-synced `table-fixed`
+                tables sharing <Cols/> for column alignment. */}
+            <div className="relative overflow-hidden rounded-card border border-border-cards bg-card-background">
+              <table className="w-full table-fixed">
+                <Cols columns={visibleColumns} />
+                <TableHeader className="[&_th]:border-border-cards [&_th]:border-b [&_th]:bg-card-background">
                   <TableRow className="border-border-cards hover:bg-transparent">
-                    <ColHead label={t("columns.task")} sortKey="task" sort={sort} setSort={setSort} />
-                    <ColHead
-                      label={t("columns.triggered")}
-                      sortKey="triggered"
-                      sort={sort}
-                      setSort={setSort}
-                      className="w-[170px]"
-                    />
-                    <ColHead
-                      label={t("columns.status")}
-                      sortKey="status"
-                      sort={sort}
-                      setSort={setSort}
-                      className="w-[140px]"
-                      filter={{
-                        options: BUCKETS.map((b) => ({ value: b.key, label: t(`summary.${b.key}.label`), dot: b.dot })),
-                        selected: statusFilter,
-                        onToggle: (v) => toggleStatusFilter(v as RunBucket),
-                        onClear: () => setStatusFilter([]),
-                      }}
-                    />
-                    <ColHead
-                      label={t("columns.duration")}
-                      sortKey="duration"
-                      sort={sort}
-                      setSort={setSort}
-                      className="w-[100px]"
-                    />
-                    <ColHead
-                      label={t("columns.agent")}
-                      sortKey="agent"
-                      sort={sort}
-                      setSort={setSort}
-                      className="w-[130px]"
-                      filter={{
-                        options: agentOptions.map((n) => ({ value: n, label: n })),
-                        selected: agentFilter,
-                        onToggle: toggleAgentFilter,
-                        onClear: () => setAgentFilter([]),
-                      }}
-                    />
+                    {visibleColumns.map((c) => (
+                      <ColHead
+                        key={c.id}
+                        label={t(`columns.${c.id}`)}
+                        sortKey={c.id}
+                        sort={sort}
+                        setSort={setSort}
+                        filter={c.filter}
+                      />
+                    ))}
                     <TableHead className="h-10 w-10" />
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {rows.length === 0 ? (
-                    <TableRow className="border-border-cards hover:bg-transparent">
-                      <TableCell colSpan={6} className="h-24 text-center text-sm">
-                        <div className="flex flex-col items-center gap-2">
-                          <span className="text-text-tertiary">
-                            {query
-                              ? t("noResults")
-                              : isFiltering(activeBucket, statusFilter, agentFilter)
-                                ? t("emptyFiltered")
-                                : t("empty")}
-                          </span>
-                          {narrowed && (
-                            <button
-                              type="button"
-                              onClick={clearAll}
-                              className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
-                            >
-                              {t("clearFilters")}
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    rows.map((card) => {
-                      const bucket = bucketOf(card);
-                      return (
-                        <TableRow
-                          key={card.id}
-                          className="cursor-pointer border-border-cards hover:bg-secondary/40"
-                          onClick={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
-                        >
-                          <TableCell className="max-w-[280px] truncate text-sm text-text-primary">
-                            {card.title}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-text-secondary text-xs">
-                            {formatTriggered(triggeredAt(card))}
-                          </TableCell>
-                          <TableCell>
-                            <span className="flex items-center gap-2 text-text-primary text-xs">
-                              <span className={cn("size-2 rounded-full", DOT_OF[bucket])} />
-                              {t(`summary.${bucket}.label`)}
+              </table>
+              {/* Scrollable body — only the rows scroll, under the fixed header. */}
+              <div
+                ref={scrollRef}
+                onScroll={updateMoreBelow}
+                className="overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                style={{ maxHeight: listMaxH }}
+              >
+                <table className="w-full table-fixed">
+                  <Cols columns={visibleColumns} />
+                  <TableBody>
+                    {rows.length === 0 ? (
+                      <TableRow className="border-border-cards hover:bg-transparent">
+                        <TableCell colSpan={visibleColumns.length + 1} className="h-24 text-center text-sm">
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="text-text-tertiary">
+                              {query
+                                ? t("noResults")
+                                : isFiltering(activeBucket, statusFilter, agentFilter)
+                                  ? t("emptyFiltered")
+                                  : t("empty")}
                             </span>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
-                            {durationOf(card)}
-                          </TableCell>
-                          <TableCell>
-                            <AgentChip
-                              agent={settings.agents.find(
-                                (a) => a.id === (card.agentPresetId ?? settings.defaultAgentId),
-                              )}
-                            />
-                          </TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <RowMenu
-                              onView={() => openLogs(card.id)}
-                              onEdit={bucket !== "done" ? () => editPatrol(card) : undefined}
-                              editDisabled={!card.linkedTaskId}
-                              // Stop only for genuinely running rows.
-                              onStop={bucket === "running" ? () => stopRun(card.id) : undefined}
-                              labels={{
-                                view: t("rowMenu.viewOperation"),
-                                edit: t("rowMenu.editPatrol"),
-                                stop: t("rowMenu.stop"),
-                              }}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-              {rows.length > 0 && rows.length < totalRuns && (
+                            {narrowed && (
+                              <button
+                                type="button"
+                                onClick={clearAll}
+                                className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
+                              >
+                                {t("clearFilters")}
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      rows.map((card) => {
+                        const bucket = bucketOf(card);
+                        return (
+                          <TableRow
+                            key={card.id}
+                            className="cursor-pointer border-border-cards hover:bg-secondary/40"
+                            onClick={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
+                          >
+                            {visibleColumns.map((c) => (
+                              <TableCell key={c.id} className={c.cellClassName}>
+                                {c.cell(card)}
+                              </TableCell>
+                            ))}
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <RowMenu
+                                onView={() => openLogs(card.id)}
+                                onEdit={bucket !== "done" ? () => editPatrol(card) : undefined}
+                                editDisabled={!card.linkedTaskId}
+                                // Stop only for genuinely running rows.
+                                onStop={bucket === "running" ? () => stopRun(card.id) : undefined}
+                                labels={{
+                                  view: t("rowMenu.viewOperation"),
+                                  edit: t("rowMenu.editPatrol"),
+                                  stop: t("rowMenu.stop"),
+                                }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </table>
+              </div>
+              {/* "More above" affordance — absolute overlay on the card (kept out of
+                  the scroller so it can't inflate scrollHeight). Sits below the fixed
+                  header (h-10). Hidden until scrolled down. */}
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-x-0 top-10 flex h-14 items-start justify-center bg-gradient-to-b from-card-background via-card-background/80 to-transparent transition-opacity duration-200",
+                  moreAbove ? "opacity-100" : "opacity-0",
+                )}
+              >
                 <button
                   type="button"
-                  onClick={clearAll}
-                  className="w-full border-border-cards border-t border-dashed py-3 text-center text-text-tertiary text-xs transition-colors hover:text-text-secondary"
+                  onClick={() =>
+                    scrollRef.current?.scrollBy({ top: -(scrollRef.current.clientHeight * 0.6), behavior: "smooth" })
+                  }
+                  aria-label={t("scrollUp")}
+                  tabIndex={moreAbove ? 0 : -1}
+                  className="pointer-events-auto mt-1 rounded-full p-1 text-text-tertiary transition-colors hover:text-text-primary"
                 >
-                  {t("footer", { shown: rows.length, total: totalRuns })}
+                  <ChevronUpIcon className="size-4 [animation:myra-bounce-up-edge_1s_infinite]" />
                 </button>
-              )}
+              </div>
+              {/* "More below" affordance — fades the lower edge + a nudging chevron.
+                  Hidden once scrolled to the bottom. */}
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-x-0 bottom-0 flex h-14 items-end justify-center bg-gradient-to-t from-card-background via-card-background/80 to-transparent transition-opacity duration-200",
+                  moreBelow ? "opacity-100" : "opacity-0",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    scrollRef.current?.scrollBy({ top: scrollRef.current.clientHeight * 0.6, behavior: "smooth" })
+                  }
+                  aria-label={t("scrollDown")}
+                  tabIndex={moreBelow ? 0 : -1}
+                  className="pointer-events-auto mb-1 rounded-full p-1 text-text-tertiary transition-colors hover:text-text-primary"
+                >
+                  <ChevronDownIcon className="size-4 animate-bounce" />
+                </button>
+              </div>
             </div>
+            {rows.length > 0 && rows.length < totalRuns && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-center text-text-tertiary text-xs transition-colors hover:text-text-secondary"
+              >
+                {t("footer", { shown: rows.length, total: totalRuns })}
+              </button>
+            )}
           </div>
         </>
       ) : (
@@ -774,6 +944,44 @@ function ColHead({
         </div>
       </div>
     </TableHead>
+  );
+}
+
+/** Filter affordance attached to a column header (Status + Agent use it). */
+type ColFilter = {
+  options: { value: string; label: string; dot?: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  onClear: () => void;
+};
+
+/** A single Operations table column. `weight` is a relative share of the table
+ *  width — larger is wider. `cellClassName` styles the body cell. */
+type ColumnDef = {
+  id: SortKey;
+  weight: number;
+  cellClassName?: string;
+  cell: (card: KanbanCard) => React.ReactNode;
+  filter?: ColFilter;
+};
+
+/** Weight of the trailing row-actions column (the `⋯` menu) — a thin gutter. */
+const ACTIONS_COL_WEIGHT = 45;
+
+/** Shared column widths for the split header + body tables, so their columns line
+ *  up. Each visible column takes a share of the table width proportional to its
+ *  `weight` (as a percentage so `table-fixed` honors it). Hiding a column makes
+ *  the rest grow to fill the gap, keeping their relative proportions. */
+function Cols({ columns }: { columns: ColumnDef[] }) {
+  const totalWeight = columns.reduce((sum, c) => sum + c.weight, ACTIONS_COL_WEIGHT) || 1;
+  const pct = (w: number) => `${((w / totalWeight) * 100).toFixed(3)}%`;
+  return (
+    <colgroup>
+      {columns.map((c) => (
+        <col key={c.id} style={{ width: pct(c.weight) }} />
+      ))}
+      <col style={{ width: pct(ACTIONS_COL_WEIGHT) }} />
+    </colgroup>
   );
 }
 
@@ -1172,11 +1380,7 @@ function KanbanRunCard({
             aria-label={bucket === "done" ? t("kanban.archive") : t("kanban.trash")}
             className="rounded p-0.5 transition-colors hover:text-destructive"
           >
-            {bucket === "done" ? (
-              <ArchiveIcon className="size-3.5" />
-            ) : (
-              <Trash2Icon className="size-3.5" />
-            )}
+            {bucket === "done" ? <ArchiveIcon className="size-3.5" /> : <Trash2Icon className="size-3.5" />}
           </span>
         </div>
       </div>

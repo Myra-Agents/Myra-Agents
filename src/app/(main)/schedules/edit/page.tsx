@@ -59,7 +59,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAgentEvents } from "@/hooks/use-agent-events";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
@@ -154,10 +153,10 @@ function ScheduleEditScreen() {
   const blankMode = params.get("new") === "1" && !id;
 
   const { loading, createSchedule, updateSchedule, toggleEnabled, triggerNow, byId, schedules } = useSchedules();
-  const { cards, trashCard, restoreCard, upsertCard } = useKanban();
-  // Live-refresh the "Operations & History" tab: a run finishing on any
-  // connection pushes its card in without a manual reload (same as the board).
-  useAgentEvents(upsertCard);
+  // Live-refresh the "Operations & History" tab is global now — the board store
+  // self-subscribes to `agent-result-changed`, so a finishing run shows up here
+  // in real time without per-page wiring.
+  const { cards, cancelAgent } = useKanban();
   const { settings } = useSettings();
 
   // "Create from template" mode: opened as `/schedules/edit/?template=<id>` with
@@ -244,6 +243,9 @@ function ScheduleEditScreen() {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   // Activate-prompt shown when adding a template patrol that is still inactive.
   const [confirmActivate, setConfirmActivate] = useState(false);
+  // Guards "Run now" against an accidental double-trigger while a prior manual
+  // run of this same patrol is still in flight.
+  const [confirmRunAgain, setConfirmRunAgain] = useState(false);
   // Surfaced only after the user tries to Save/Add without a folder selected.
   const [folderErrorShown, setFolderErrorShown] = useState(false);
   // Surfaced only after the user tries to Save/Add with an empty agent instruction.
@@ -549,7 +551,13 @@ function ScheduleEditScreen() {
     );
   }, [cards, task]);
 
-  const runningRuns = useMemo(() => runs.filter((c) => c.status === "in_progress"), [runs]);
+  // Stoppable = a run that's actually executing (in_progress) or queued to run
+  // (backlog, `agentQueued`). "Needs you" (waiting_feedback / awaiting_review)
+  // has no live process to kill, so it never shows Stop all.
+  const runningRuns = useMemo(
+    () => runs.filter((c) => c.status === "in_progress" || c.agentQueued),
+    [runs],
+  );
 
   // Tag vocabulary suggested in the editor — every distinct tag used across cards.
   const tagSuggestions = useMemo(() => {
@@ -558,20 +566,32 @@ function ScheduleEditScreen() {
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [cards]);
 
+  // Stop = cancel the agent (like the per-card Stop): the card lands in Done with
+  // its run marked cancelled and STAYS on the board — not trashed/removed.
   const stopAll = useCallback(() => {
     const ids = runningRuns.map((c) => c.id);
     if (!ids.length) return;
-    void Promise.all(ids.map((rid) => trashCard(rid))).then(() =>
-      toast.success(t("toast.stopped", { count: ids.length }), {
-        action: { label: t("toast.undo"), onClick: () => ids.forEach((rid) => void restoreCard(rid)) },
-      }),
-    );
-  }, [runningRuns, trashCard, restoreCard, t]);
+    void Promise.all(ids.map((rid) => cancelAgent(rid).catch(() => false))).then((results) => {
+      const stopped = results.filter(Boolean).length;
+      if (stopped) toast.success(t("toast.stopped", { count: stopped }));
+    });
+  }, [runningRuns, cancelAgent, t]);
 
-  const runNow = useCallback(() => {
+  const doRunNow = useCallback(() => {
     if (!task) return;
     void triggerNow(task.id).then(() => toast.success(t("toast.triggered")));
   }, [task, triggerNow, t]);
+
+  const runNow = useCallback(() => {
+    if (!task) return;
+    // Only warn when a run of this patrol is already in progress — starting a
+    // second one would run it in parallel.
+    if (runningRuns.length > 0) {
+      setConfirmRunAgain(true);
+      return;
+    }
+    doRunNow();
+  }, [task, runningRuns, doRunNow]);
 
   if (loading && !task) {
     return <div className="flex h-full items-center justify-center text-sm text-text-tertiary">{t("loading")}</div>;
@@ -724,6 +744,27 @@ function ScheduleEditScreen() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Run-now guard — fires when this patrol already has a run in flight. */}
+      <AlertDialog open={confirmRunAgain} onOpenChange={setConfirmRunAgain}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("runAgainTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("runAgainDescription")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("runAgainCancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmRunAgain(false);
+                doRunNow();
+              }}
+            >
+              {t("runAgainConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Title block — editable name + description. pb-4 / pl-1.5 from the Figma "Title" frame. */}
       <header className="flex flex-col gap-0.5 pr-0 pb-4 pl-1.5">
         <input
@@ -831,7 +872,9 @@ function ScheduleEditScreen() {
         </div>
       )}
 
-      <div className="pt-2 pb-10">
+      {/* Runs tab matches the History page's bottom spacing (just the layout
+          padding); the Settings tab keeps its roomier pb-10. */}
+      <div className={cn("pt-2", draftMode || tab === "settings" ? "pb-10" : "pb-0")}>
         {draftMode || tab === "settings" ? (
           <SettingsTab
             draft={draft}
@@ -843,7 +886,7 @@ function ScheduleEditScreen() {
             t={t}
           />
         ) : (
-          <RunsHistory cards={runs} seeAllHref="/history" includeLive />
+          <RunsHistory cards={runs} includeLive />
         )}
       </div>
 

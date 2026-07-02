@@ -33,7 +33,7 @@
     },
     "upcoming": {
       "title": "À venir aujourd'hui",
-      "empty": "Aucune planification prévue aujourd'hui."
+      "empty": "Aucune patrouille prévue aujourd'hui."
     },
     "recent": {
       "title": "Historique des exécutions",
@@ -124,7 +124,16 @@
       "waitingForOutput": "En attente de sortie…",
       "agent": "Agent",
       "queued": "En file",
-      "moveTo": "Déplacer vers"
+      "moveTo": "Déplacer vers",
+      "thinkingMessages": [
+        "On réveille l'agent…",
+        "On apprend à coder aux robots…",
+        "On démêle la logique…",
+        "On aligne les pixels…",
+        "On amadoue le compilateur…",
+        "On traque les cas limites…",
+        "On chauffe les neurones…"
+      ]
     },
     "empty": {
       "draft": "Posez vos idées…",
@@ -614,6 +623,10 @@
     "clearColumnFilter": "Effacer le filtre",
     "columnMenu": "Options {column}",
     "clearFilters": "Effacer les filtres",
+    "columnsLabel": "Afficher les colonnes",
+    "resetColumns": "Réinitialiser les colonnes",
+    "scrollDown": "Défiler vers le bas",
+    "scrollUp": "Défiler vers le haut",
     "filteredHidden": "{hidden, plural, =0 {Filtré} one {# exécution masquée} other {# exécutions masquées}}"
   },
   "history": {
@@ -626,7 +639,8 @@
     "searchPlaceholder": "Rechercher une tâche…",
     "clearFilters": "Effacer les filtres",
     "showing": "Affichage de {shown} sur {total}",
-    "footer": "Affichage de {shown} sur {total} — Cliquez pour voir tous les plannings",
+    "scrollDown": "Défiler vers le bas",
+    "scrollUp": "Défiler vers le haut",
     "ranges": {
       "today": "Aujourd'hui",
       "7d": "7 j",
@@ -642,17 +656,27 @@
     },
     "graph1": "Exécutions dans le temps",
     "graph2": "Taux de réussite",
+    "showStats": "Afficher les stats",
+    "hideStats": "Masquer les stats",
     "columns": {
       "task": "Nom de la tâche",
       "triggered": "Déclenchée",
+      "ended": "Terminée",
       "duration": "Durée",
       "agent": "Agent",
       "result": "Résultat",
       "usage": "Usage"
     },
+    "status": {
+      "backlog": "Backlog",
+      "running": "En cours",
+      "needsYou": "Vous devez agir",
+      "done": "Terminée"
+    },
     "result": {
       "success": "Réussie",
       "failed": "Échouée",
+      "canceled": "Annulée",
       "running": "En cours",
       "awaitingReview": "À vérifier",
       "needsYou": "Votre attention"
@@ -675,7 +699,9 @@
     },
     "filterBy": "Filtrer par",
     "clearColumnFilter": "Effacer le filtre",
-    "columnMenu": "Options de {column}"
+    "columnMenu": "Options de {column}",
+    "columnsLabel": "Afficher les colonnes",
+    "resetColumns": "Réinitialiser les colonnes"
   },
   "agentSession": {
     "back": "Retour",
@@ -687,6 +713,7 @@
       "failed": "Échouée",
       "success": "Réussie",
       "running": "En cours",
+      "needsYou": "Votre attention",
       "stopping": "Arrêt…"
     },
     "agentInstruction": "Instruction de l'agent",
@@ -742,6 +769,7 @@
       "running": "En cours",
       "completed": "Terminé",
       "failed": "Échoué",
+      "needsYou": "Votre attention",
       "needsFeedback": "Retour nécessaire",
       "awaitingReview": "En attente de vérification"
     },
@@ -771,6 +799,28 @@
       "rawTab": "Log brut",
       "thinking": "Raisonnement",
       "working": "L'agent réfléchit…",
+      "workingMessages": [
+        "La colonie s'active…",
+        "On suit la piste de phéromones…",
+        "Les ouvrières s'affairent…",
+        "Exploration de la fourmilière…",
+        "Transport de miettes vers le nid…",
+        "La reine réfléchit…",
+        "On trace une piste odorante…",
+        "Antennes en éveil…",
+        "Recrutement d'ouvrières…",
+        "On porte une brindille 50× plus grosse…",
+        "Ça grouille dans la fourmilière…",
+        "On creuse de nouvelles galeries…",
+        "Marche en file indienne…",
+        "Les éclaireuses font leur rapport…",
+        "On butine les données…",
+        "On veille sur le couvain…",
+        "La colonie encercle le problème…",
+        "Construction d'un pont de fourmis…",
+        "Regroupement au nid…",
+        "On flaire le bon chemin…"
+      ],
       "input": "Entrée",
       "output": "Sortie",
       "changes": "Modifications",
@@ -1230,6 +1280,10 @@
     "activateCancel": "Annuler",
     "activateKeepInactive": "Ajouter inactive",
     "activateConfirm": "Activer",
+    "runAgainTitle": "Relancer ?",
+    "runAgainDescription": "Cette patrouille a déjà une exécution en cours. En démarrer une autre maintenant la lancera une seconde fois en parallèle.",
+    "runAgainCancel": "Annuler",
+    "runAgainConfirm": "Lancer quand même",
     "notFound": "Patrouille introuvable.",
     "backToSchedules": "Retour aux patrouilles",
     "subtitle": "Déployez des patrouilles récurrentes avec des agents IA déclenchés par des événements.",

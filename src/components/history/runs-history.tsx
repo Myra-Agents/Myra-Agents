@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
 import {
-  ArchiveIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   BotIcon,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  EyeIcon,
   ListFilterIcon,
   MoreHorizontalIcon,
+  PencilIcon,
+  RotateCwIcon,
   SearchIcon,
+  Settings2Icon,
   TerminalIcon,
   XIcon,
 } from "lucide-react";
@@ -28,7 +33,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { type HistoryColumnId, TOGGLEABLE_COLUMNS, useHistoryColumns } from "@/hooks/use-history-columns";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import {
@@ -55,11 +61,9 @@ import type { AgentPreset } from "@/types/settings";
  */
 export function RunsHistory({
   cards,
-  seeAllHref = "/schedules",
   includeLive = false,
 }: {
   cards: KanbanCard[];
-  seeAllHref?: string;
   /** Surface in-flight runs (running / needs_feedback / awaiting_review) as live
    *  rows. The standalone History page stays terminal-only; the Patrol editor's
    *  Operations & History tab opts in so a just-launched run shows immediately. */
@@ -70,16 +74,21 @@ export function RunsHistory({
   const now = useNow();
   const { settings } = useSettings();
   const { schedules, triggerNow } = useSchedules();
+  const { hidden, toggleColumn, resetColumns } = useHistoryColumns();
 
   // Resolve the agent preset a run used (falls back to the default agent).
   const agentOf = (r: PastRun): AgentPreset | undefined =>
     settings.agents.find((a) => a.id === (r.agentPresetId ?? settings.defaultAgentId));
 
-  const [range, setRange] = useState<TimeRange>("today");
+  // Default to "all" so older runs still awaiting the human (e.g. an
+  // awaiting_review run from yesterday) aren't hidden by a narrow date window —
+  // the Operations page lists them, History/Patrol tab should match.
+  const [range, setRange] = useState<TimeRange>("all");
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
   const [resultFilter, setResultFilter] = useState<ResultValue[]>([]);
+  const [statsVisible, setStatsVisible] = useState(true);
 
   const allRuns = useMemo(() => {
     const all = pastRunsFromCards(cards);
@@ -93,9 +102,9 @@ export function RunsHistory({
   const stats = useMemo(() => {
     const total = inRange.length;
     const success = inRange.filter((r) => r.ok).length;
-    // Failures are explicit failures only — live, awaiting_review and
-    // needs_feedback runs are neither success nor failure.
-    const failed = inRange.filter((r) => r.status === "failed").length;
+    // Failures are explicit failures only — live, awaiting_review, needs_feedback
+    // and cancelled runs are neither success nor failure.
+    const failed = inRange.filter((r) => r.status === "failed" && !r.canceled).length;
     const tokens = inRange.reduce((sum, r) => sum + (r.tokens ?? 0), 0);
     return { total, success, failed, tokens };
   }, [inRange]);
@@ -122,8 +131,106 @@ export function RunsHistory({
   const toggleResultFilter = (v: ResultValue) =>
     setResultFilter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
 
-  const VISIBLE = 4;
-  const visibleRows = rows.slice(0, VISIBLE);
+  // Scroll pagination: render a page of rows, grow it as a sentinel below the
+  // table scrolls into view. Reset to the first page whenever the filtered set
+  // changes (range / search / column filter / sort) so we never start scrolled.
+  const PAGE = 25;
+  const [visibleCount, setVisibleCount] = useState(PAGE);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on any input that reshapes `rows`.
+  useEffect(() => setVisibleCount(PAGE), [range, query, resultFilter, sort, cards]);
+  const visibleRows = rows.slice(0, visibleCount);
+  const hasMore = visibleCount < rows.length;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Cap the list to the space left below it inside its scroll container, so
+  // everything above (stats/graphs here, plus the whole Patrol form when
+  // embedded) AND the padding below it (the editor's `pb-10`, the layout's
+  // content padding) are accounted for: the list fills to the bottom without
+  // ever pushing the page past the fold. Recomputed on resize / content change.
+  const [listMaxH, setListMaxH] = useState<number>();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: statsVisible reshapes content above the list — recompute on toggle.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const scrollParent = (() => {
+      let n = el.parentElement;
+      while (n) {
+        const oy = getComputedStyle(n).overflowY;
+        if (oy === "auto" || oy === "scroll") return n;
+        n = n.parentElement;
+      }
+      return document.documentElement;
+    })();
+    const compute = () => {
+      const parentRect = scrollParent.getBoundingClientRect();
+      // Bottom of the scroll parent's content box (stable — independent of the
+      // list's own height, unlike scrollHeight which collapses to clientHeight
+      // when the content fits and would pin the list to its current size).
+      const visibleBottom = parentRect.top + scrollParent.clientHeight;
+      // Everything in flow BELOW the list up to the scroll parent: each level's
+      // following siblings + each ancestor's bottom padding (the editor's
+      // `pb-10`, the layout's content padding…). Absolutely-positioned siblings
+      // (the fade/chevron overlay) take no flow space, so skip them. Also stable.
+      let reserve = 0;
+      let node: HTMLElement | null = el;
+      while (node && node !== scrollParent) {
+        for (let sib = node.nextElementSibling; sib; sib = sib.nextElementSibling) {
+          const cs = getComputedStyle(sib);
+          if (cs.position !== "absolute" && cs.position !== "fixed") reserve += sib.getBoundingClientRect().height;
+        }
+        const up: HTMLElement | null = node.parentElement;
+        if (up) reserve += Number.parseFloat(getComputedStyle(up).paddingBottom) || 0;
+        node = up;
+      }
+      const available = visibleBottom - el.getBoundingClientRect().top - reserve - 2;
+      setListMaxH((prev) => {
+        const next = Math.max(200, available);
+        return prev != null && Math.abs(prev - next) <= 1 ? prev : next;
+      });
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(document.body);
+    window.addEventListener("resize", compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", compute);
+    };
+  }, [statsVisible]);
+
+  // Scroll affordance: fade the top/bottom edges + show a bounced chevron
+  // whenever rows lie above/below the visible viewport. Recomputed on scroll
+  // and whenever the list height / row count change.
+  const [moreBelow, setMoreBelow] = useState(false);
+  const [moreAbove, setMoreAbove] = useState(false);
+  const updateMoreBelow = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Tolerance guards against sub-pixel rounding + the sticky affordance's own
+    // box, which would otherwise report a phantom overflow when the rows fit
+    // exactly (e.g. a single row) and wrongly show the bouncing chevron.
+    const EPS = 8;
+    setMoreBelow(el.scrollTop + el.clientHeight < el.scrollHeight - EPS);
+    setMoreAbove(el.scrollTop > EPS);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure after layout settles.
+  useEffect(updateMoreBelow, [listMaxH, visibleCount, rows.length]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    // Observe within the table's own scroll container (the page itself never
+    // scrolls), preloading the next page 200px before the sentinel appears.
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setVisibleCount((c) => Math.min(c + PAGE, rows.length));
+      },
+      { root: scrollRef.current, rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, rows.length]);
   const rangeLabel = t(`ranges.${range}`);
 
   // A live (still-running) operation opens its Operations detail — the
@@ -151,6 +258,83 @@ export function RunsHistory({
     }
   };
 
+  // Column descriptors — one source of truth for the split header/body tables
+  // and the colgroup. The "task" column is the row anchor and is never hidden;
+  // the rest are toggled via the columns menu and persisted by useHistoryColumns.
+  const columns: ColumnDef[] = [
+    {
+      id: "task",
+      weight: 280,
+      headClassName: "pl-[9px]",
+      cellClassName: "max-w-[280px] truncate pl-[9px] text-text-secondary text-xs",
+      cell: (r) => (
+        <span className="flex items-center gap-2">
+          <span
+            role="img"
+            aria-label={t(STATUS_DOT[runBucket(r)].labelKey)}
+            title={t(STATUS_DOT[runBucket(r)].labelKey)}
+            className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[runBucket(r)].dot)}
+          />
+          <span className="truncate">{r.cardTitle}</span>
+        </span>
+      ),
+    },
+    {
+      id: "triggered",
+      weight: 180,
+      cellClassName: "whitespace-nowrap text-text-secondary text-xs",
+      cell: (r) => formatTriggered(r.startedAt),
+    },
+    {
+      id: "ended",
+      weight: 180,
+      cellClassName: "whitespace-nowrap text-text-secondary text-xs",
+      // Unfinished runs (live / awaiting-human) have no end yet → dash.
+      cell: (r) => (r.endedAt ? formatTriggered(r.endedAt) : "—"),
+    },
+    {
+      id: "duration",
+      weight: 120,
+      cellClassName: "whitespace-nowrap text-text-secondary text-xs tabular-nums",
+      cell: (r) => (r.live ? formatElapsed(r.startedAt, now) : formatDuration(r)),
+    },
+    {
+      id: "agent",
+      weight: 150,
+      cell: (r) => <AgentChip agent={agentOf(r)} />,
+    },
+    {
+      id: "result",
+      weight: 120,
+      cellClassName: (r) =>
+        cn(
+          "whitespace-nowrap text-xs",
+          // Cancelled + unfinished runs are both muted grey; only a real verdict is coloured.
+          r.canceled || !hasFinalResult(r) ? "text-text-tertiary" : RESULT_STYLE[resultValueOf(r)].className,
+        ),
+      // Cancelled → "Canceled"; a finished run → its verdict; otherwise a dash.
+      cell: (r) =>
+        r.canceled ? t("result.canceled") : hasFinalResult(r) ? t(RESULT_STYLE[resultValueOf(r)].labelKey) : "—",
+      filter: {
+        options: [
+          { value: "success", label: t("result.success"), dot: "bg-task-status-done" },
+          { value: "failed", label: t("result.failed"), dot: "bg-destructive" },
+          ...(includeLive ? [{ value: "running", label: t("result.running"), dot: "bg-task-status-running" }] : []),
+        ],
+        selected: resultFilter,
+        onToggle: (v) => toggleResultFilter(v as ResultValue),
+        onClear: () => setResultFilter([]),
+      },
+    },
+    {
+      id: "usage",
+      weight: 140,
+      cellClassName: "whitespace-nowrap text-text-secondary text-xs tabular-nums",
+      cell: (r) => (r.tokens != null ? t("usage", { tokens: r.tokens }) : "—"),
+    },
+  ];
+  const visibleColumns = columns.filter((c) => c.id === "task" || !hidden.includes(c.id as HistoryColumnId));
+
   return (
     <div className="flex w-full flex-col">
       {/* Time-range selector */}
@@ -172,28 +356,72 @@ export function RunsHistory({
             </button>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setStatsVisible((v) => !v)}
+          aria-pressed={statsVisible}
+          className="rounded-[10px] px-2 py-[3px] text-text-secondary text-xs transition-colors hover:text-text-primary"
+        >
+          {t(statsVisible ? "hideStats" : "showStats")}
+        </button>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        <StatCard title={t("stats.total")} value={String(stats.total)} />
-        <StatCard title={t("stats.success", { range: rangeLabel })} value={String(stats.success)} accent="ok" />
-        <StatCard title={t("stats.failed", { range: rangeLabel })} value={String(stats.failed)} accent="fail" />
-        <StatCard title={t("stats.tokens")} value={stats.tokens > 0 ? stats.tokens.toLocaleString() : "—"} />
-      </div>
+      {statsVisible && (
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <StatCard title={t("stats.total")} value={String(stats.total)} />
+            <StatCard title={t("stats.success", { range: rangeLabel })} value={String(stats.success)} accent="ok" />
+            <StatCard title={t("stats.failed", { range: rangeLabel })} value={String(stats.failed)} accent="fail" />
+            <StatCard title={t("stats.tokens")} value={stats.tokens > 0 ? stats.tokens.toLocaleString() : "—"} />
+          </div>
 
-      {/* Trend graphs */}
-      <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        <GraphCard label={t("graph1")}>
-          <RunsBarChart data={buckets} />
-        </GraphCard>
-        <GraphCard label={t("graph2")}>
-          <SuccessRateChart data={buckets} />
-        </GraphCard>
-      </div>
+          {/* Trend graphs */}
+          <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <GraphCard label={t("graph1")}>
+              <RunsBarChart data={buckets} />
+            </GraphCard>
+            <GraphCard label={t("graph2")}>
+              <SuccessRateChart data={buckets} />
+            </GraphCard>
+          </div>
+        </>
+      )}
 
-      {/* Global text search */}
-      <div className="mt-10 flex items-center justify-end gap-2 text-icon-tertiary">
+      {/* Global text search + column visibility */}
+      <div className={cn("flex items-center justify-end gap-2 text-icon-tertiary", statsVisible && "mt-10")}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={t("columnsLabel")}
+              className={cn("transition-colors hover:text-icon-primary", hidden.length > 0 && "text-icon-primary")}
+            >
+              <Settings2Icon className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel className="text-text-tertiary text-xs">{t("columnsLabel")}</DropdownMenuLabel>
+            {TOGGLEABLE_COLUMNS.map((id) => (
+              <DropdownMenuCheckboxItem
+                key={id}
+                checked={!hidden.includes(id)}
+                onCheckedChange={() => toggleColumn(id)}
+                onSelect={(e) => e.preventDefault()}
+              >
+                {t(`columns.${id}`)}
+              </DropdownMenuCheckboxItem>
+            ))}
+            {hidden.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-text-tertiary" onClick={resetColumns}>
+                  {t("resetColumns")}
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
         {searchOpen ? (
           <div className="flex h-4 items-center gap-1.5">
             <SearchIcon className="size-4 shrink-0" />
@@ -243,162 +471,218 @@ export function RunsHistory({
         {t("showing", { shown: visibleRows.length, total: rows.length })}
       </p>
 
-      {/* Run table */}
-      <div className="mt-2.5 overflow-hidden rounded-[10px] border border-border-cards bg-card-background">
-        <Table>
-          <TableHeader>
+      {/* Run table — content-sized, capped to the space left below it; only the
+          list scrolls past the cap (the page itself does not). The column header
+          stays pinned while rows scroll under it. */}
+      <div className="relative mt-2.5 overflow-hidden rounded-[10px] border border-border-cards bg-card-background">
+        {/* Fixed column header, kept OUTSIDE the scroller so it never moves.
+            WebKit leaves a gap above a sticky <th> when an inner <table> scrolls,
+            so the header and body are split into two width-synced `table-fixed`
+            tables sharing <Cols/> for column alignment. */}
+        <table className="w-full table-fixed">
+          <Cols columns={visibleColumns} />
+          <TableHeader className="[&_th]:border-border-cards [&_th]:border-b [&_th]:bg-card-background">
             <TableRow className="border-border-cards hover:bg-transparent">
-              <ColHead label={t("columns.task")} sortKey="task" sort={sort} setSort={setSort} className="pl-[9px]" />
-              <ColHead
-                label={t("columns.triggered")}
-                sortKey="triggered"
-                sort={sort}
-                setSort={setSort}
-                className="w-[180px]"
-              />
-              <ColHead
-                label={t("columns.duration")}
-                sortKey="duration"
-                sort={sort}
-                setSort={setSort}
-                className="w-[120px]"
-              />
-              <ColHead label={t("columns.agent")} sortKey="agent" sort={sort} setSort={setSort} className="w-[150px]" />
-              <ColHead
-                label={t("columns.result")}
-                sortKey="result"
-                sort={sort}
-                setSort={setSort}
-                className="w-[120px]"
-                filter={{
-                  options: [
-                    { value: "success", label: t("result.success"), dot: "bg-task-status-done" },
-                    { value: "failed", label: t("result.failed"), dot: "bg-destructive" },
-                    ...(includeLive
-                      ? [{ value: "running", label: t("result.running"), dot: "bg-task-status-running" }]
-                      : []),
-                  ],
-                  selected: resultFilter,
-                  onToggle: (v) => toggleResultFilter(v as ResultValue),
-                  onClear: () => setResultFilter([]),
-                }}
-              />
-              <ColHead label={t("columns.usage")} sortKey="usage" sort={sort} setSort={setSort} className="w-[140px]" />
+              {visibleColumns.map((c) => (
+                <ColHead
+                  key={c.id}
+                  label={t(`columns.${c.id}`)}
+                  sortKey={c.id}
+                  sort={sort}
+                  setSort={setSort}
+                  className={c.headClassName}
+                  filter={c.filter}
+                />
+              ))}
               <TableHead className="h-10 w-10" />
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {visibleRows.length === 0 ? (
-              <TableRow className="border-border-cards hover:bg-transparent">
-                <TableCell colSpan={7} className="h-24 text-center text-sm">
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-text-tertiary">{narrowed ? t("noResults") : t("empty")}</span>
-                    {narrowed && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setQuery("");
-                          setSearchOpen(false);
-                          setResultFilter([]);
-                          setSort(null);
-                        }}
-                        className="text-text-secondary text-xs underline-offset-2 transition-colors hover:text-text-primary hover:underline"
-                      >
-                        {t("clearFilters")}
-                      </button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              visibleRows.map((r) => (
-                <TableRow
-                  key={`${r.cardId}:${r.runId}`}
-                  className="cursor-pointer border-border-cards hover:bg-secondary/40"
-                  onClick={() => openRun(r)}
-                >
-                  <TableCell className="max-w-[280px] truncate pl-[9px] text-text-secondary text-xs">
-                    <span className="flex items-center gap-1.5">
-                      {r.archived && (
-                        <ArchiveIcon className="size-3 shrink-0 text-text-tertiary" aria-label={t("archived")} />
-                      )}
-                      <span className="truncate">{r.cardTitle}</span>
-                    </span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-text-secondary text-xs">
-                    {formatTriggered(r.startedAt)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
-                    {r.live ? formatElapsed(r.startedAt, now) : formatDuration(r)}
-                  </TableCell>
-                  <TableCell>
-                    <AgentChip agent={agentOf(r)} />
-                  </TableCell>
-                  <TableCell className={cn("whitespace-nowrap text-xs", RESULT_STYLE[resultValueOf(r)].className)}>
-                    <span className="inline-flex items-center gap-1.5">
-                      {r.live && (
-                        <span className="size-1.5 animate-pulse rounded-full bg-task-status-running" aria-hidden />
-                      )}
-                      {t(RESULT_STYLE[resultValueOf(r)].labelKey)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-text-secondary text-xs tabular-nums">
-                    {r.tokens != null ? t("usage", { tokens: r.tokens }) : "—"}
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+        </table>
+        {/* Scrollable body — only the rows scroll, under the fixed header. */}
+        <div
+          ref={scrollRef}
+          onScroll={updateMoreBelow}
+          className="overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          // `max-height` (not height): the list sizes to its content and only
+          // scrolls once it exceeds the space left below it — no empty room inside
+          // the card when there are few rows.
+          style={{ maxHeight: listMaxH }}
+        >
+          <table className="w-full table-fixed">
+            <Cols columns={visibleColumns} />
+            <TableBody>
+              {visibleRows.length === 0 ? (
+                <TableRow className="border-border-cards hover:bg-transparent">
+                  <TableCell colSpan={visibleColumns.length + 1} className="h-24 text-center text-sm">
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="text-text-tertiary">{narrowed ? t("noResults") : t("empty")}</span>
+                      {narrowed && (
                         <button
                           type="button"
-                          className="rounded p-1 text-icon-tertiary transition hover:text-icon-primary"
-                          aria-label={t("rowMenu.open")}
+                          onClick={() => {
+                            setQuery("");
+                            setSearchOpen(false);
+                            setResultFilter([]);
+                            setSort(null);
+                          }}
+                          className="text-text-secondary text-xs underline-offset-2 transition-colors hover:text-text-primary hover:underline"
                         >
-                          <MoreHorizontalIcon className="size-4" />
+                          {t("clearFilters")}
                         </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onClick={() => openRun(r)} className="whitespace-nowrap">
-                          {t("rowMenu.viewOperation")}
-                        </DropdownMenuItem>
-                        {/* Patrol actions need an owning schedule — disable when the run
-                            isn't linked to one (e.g. a one-off / manual card). */}
-                        <DropdownMenuItem
-                          disabled={!r.linkedTaskId}
-                          onClick={() => editPatrol(r)}
-                          className="whitespace-nowrap"
-                        >
-                          {t("rowMenu.editPatrol")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!r.linkedTaskId}
-                          onClick={() => void rerun(r)}
-                          className="whitespace-nowrap"
-                        >
-                          {t("rowMenu.rerun")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-        {rows.length > VISIBLE && (
+              ) : (
+                visibleRows.map((r) => (
+                  <TableRow
+                    key={`${r.cardId}:${r.runId}`}
+                    className="cursor-pointer border-border-cards hover:bg-secondary/40"
+                    onClick={() => openRun(r)}
+                  >
+                    {visibleColumns.map((c) => (
+                      <TableCell
+                        key={c.id}
+                        className={typeof c.cellClassName === "function" ? c.cellClassName(r) : c.cellClassName}
+                      >
+                        {c.cell(r)}
+                      </TableCell>
+                    ))}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="rounded p-1 text-icon-tertiary transition hover:text-icon-primary"
+                            aria-label={t("rowMenu.open")}
+                          >
+                            <MoreHorizontalIcon className="size-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem onClick={() => openRun(r)} className="whitespace-nowrap">
+                            <EyeIcon className="size-3.5" />
+                            {t("rowMenu.viewOperation")}
+                          </DropdownMenuItem>
+                          {/* Patrol actions need an owning schedule — disable when the run
+                            isn't linked to one (e.g. a one-off / manual card). */}
+                          <DropdownMenuItem
+                            disabled={!r.linkedTaskId}
+                            onClick={() => editPatrol(r)}
+                            className="whitespace-nowrap"
+                          >
+                            <PencilIcon className="size-3.5" />
+                            {t("rowMenu.editPatrol")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!r.linkedTaskId}
+                            onClick={() => void rerun(r)}
+                            className="whitespace-nowrap"
+                          >
+                            <RotateCwIcon className="size-3.5" />
+                            {t("rowMenu.rerun")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </table>
+          {hasMore && <div ref={sentinelRef} aria-hidden className="h-px w-full" />}
+        </div>
+        {/* "More above" affordance — absolute overlay on the card (NOT inside the
+            scroller, so it can't inflate scrollHeight and trigger a phantom
+            overflow). Sits just below the fixed header (h-10). Hidden until
+            scrolled down. */}
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 top-10 flex h-14 items-start justify-center bg-gradient-to-b from-card-background via-card-background/80 to-transparent transition-opacity duration-200",
+            moreAbove ? "opacity-100" : "opacity-0",
+          )}
+        >
           <button
             type="button"
-            onClick={() => router.push(seeAllHref)}
-            className="w-full border-border-cards border-t py-[7px] text-center font-light text-text-tertiary text-xs transition-colors hover:text-text-secondary"
+            onClick={() =>
+              scrollRef.current?.scrollBy({ top: -(scrollRef.current.clientHeight * 0.6), behavior: "smooth" })
+            }
+            aria-label={t("scrollUp")}
+            tabIndex={moreAbove ? 0 : -1}
+            className="pointer-events-auto mt-1 rounded-full p-1 text-text-tertiary transition-colors hover:text-text-primary"
           >
-            {t("footer", { shown: visibleRows.length, total: rows.length })}
+            <ChevronUpIcon className="size-4 [animation:myra-bounce-up-edge_1s_infinite]" />
           </button>
-        )}
+        </div>
+        {/* "More below" affordance — fades the lower edge + a nudging chevron so
+            it's obvious the list scrolls. Clicking the chevron nudges the list
+            down a few rows. Hidden once scrolled to the bottom. */}
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-0 bottom-0 flex h-14 items-end justify-center bg-gradient-to-t from-card-background via-card-background/80 to-transparent transition-opacity duration-200",
+            moreBelow ? "opacity-100" : "opacity-0",
+          )}
+        >
+          <button
+            type="button"
+            onClick={() =>
+              scrollRef.current?.scrollBy({ top: scrollRef.current.clientHeight * 0.6, behavior: "smooth" })
+            }
+            aria-label={t("scrollDown")}
+            tabIndex={moreBelow ? 0 : -1}
+            className="pointer-events-auto mb-1 rounded-full p-1 text-text-tertiary transition-colors hover:text-text-primary"
+          >
+            <ChevronDownIcon className="size-4 animate-bounce" />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 // ── internals ────────────────────────────────────────────────────────────────
+
+/** Filter affordance attached to a column header (only Result uses it today). */
+type ColFilter = {
+  options: { value: string; label: string; dot?: string }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  onClear: () => void;
+};
+
+/** A single table column. `weight` is a relative share of the table width — the
+ *  larger it is, the wider the column. `cellClassName` may depend on the row
+ *  (Result colors by verdict). */
+type ColumnDef = {
+  id: SortKey;
+  weight: number;
+  headClassName?: string;
+  cellClassName?: string | ((r: PastRun) => string);
+  cell: (r: PastRun) => React.ReactNode;
+  filter?: ColFilter;
+};
+
+/** Weight of the trailing row-actions column (the `⋯` menu). Small, so it stays
+ *  a thin gutter while every other column gets the bulk of the width. */
+const ACTIONS_COL_WEIGHT = 45;
+
+/** Shared column widths for the split header + body tables, so their columns
+ *  line up. Each visible column takes a share of the table width proportional to
+ *  its `weight` (expressed as a percentage so table-fixed honors it — `calc()` on
+ *  a `<col>` is ignored and collapses to equal columns). Hiding a column makes the
+ *  rest grow to fill the gap, keeping their relative proportions. */
+function Cols({ columns }: { columns: ColumnDef[] }) {
+  const totalWeight = columns.reduce((sum, c) => sum + c.weight, ACTIONS_COL_WEIGHT) || 1;
+  const pct = (w: number) => `${((w / totalWeight) * 100).toFixed(3)}%`;
+  return (
+    <colgroup>
+      {columns.map((c) => (
+        <col key={c.id} style={{ width: pct(c.weight) }} />
+      ))}
+      <col style={{ width: pct(ACTIONS_COL_WEIGHT) }} />
+    </colgroup>
+  );
+}
 
 /** Stable "now" for the lifetime of the view (static export has no server time). */
 function useNow(): number {
@@ -455,8 +739,8 @@ function buildBuckets(runs: PastRun[], range: TimeRange, now: number): Bucket[] 
 
   for (const r of runs) {
     // Only resolved outcomes feed the trend — skip live / awaiting_review /
-    // needs_feedback runs that have no pass-or-fail verdict yet.
-    if (!r.ok && r.status !== "failed") continue;
+    // needs_feedback / cancelled runs that have no pass-or-fail verdict.
+    if (r.canceled || (!r.ok && r.status !== "failed")) continue;
     const ts = Date.parse(r.startedAt);
     for (let i = 0; i < starts.length; i++) {
       if (ts >= starts[i] && ts < starts[i] + span) {
@@ -546,9 +830,50 @@ function SuccessRateChart({ data }: { data: Bucket[] }) {
   );
 }
 
-type SortKey = "task" | "triggered" | "duration" | "agent" | "result" | "usage";
+type SortKey = "task" | "triggered" | "ended" | "duration" | "agent" | "result" | "usage";
 type SortDir = "asc" | "desc";
 type ResultValue = "success" | "failed" | "running" | "review" | "feedback";
+
+/** The four status buckets shown as the dot next to the operation name — the
+ *  app's semantic groups (backlog / in-progress / needs-you / done), NOT the six
+ *  raw board columns. `awaiting_review` and `needs_feedback` both collapse into
+ *  the single "Needs you" bucket. */
+type StatusBucket = "backlog" | "running" | "needsYou" | "done";
+
+const STATUS_DOT: Record<StatusBucket, { dot: string; labelKey: string }> = {
+  backlog: { dot: "bg-task-status-backlog", labelKey: "status.backlog" },
+  running: { dot: "bg-task-status-running", labelKey: "status.running" },
+  needsYou: { dot: "bg-task-status-needs-you", labelKey: "status.needsYou" },
+  done: { dot: "bg-task-status-done", labelKey: "status.done" },
+};
+
+/** Bucket a *single run* maps to. Derived from the run (each row is one
+ *  attempt), NOT the card's current status: a card re-running a new attempt is
+ *  running, but an earlier row that ended awaiting a human must still read as
+ *  "Needs you". */
+function runBucket(run: PastRun): StatusBucket {
+  if (run.live) return "running";
+  // A cancelled run lands its card in Done, so it belongs in the Done bucket.
+  if (run.canceled) return "done";
+  switch (run.status) {
+    case "completed":
+      return "done";
+    case "awaiting_review":
+    case "needs_feedback":
+      return "needsYou";
+    case "failed":
+      // A failed run bounces its card back to Todo (the backlog).
+      return "backlog";
+    default:
+      return "running";
+  }
+}
+
+/** A run only has a final verdict once it has completed or failed. Live and
+ *  awaiting-human (review / feedback) runs are unfinished → "—" in Result. */
+function hasFinalResult(run: PastRun): boolean {
+  return !run.live && (run.status === "completed" || run.status === "failed");
+}
 
 /** Result bucket for a run. Live runs are still executing; awaiting_review /
  *  needs_feedback have ended but await a human, so they're neither pass nor fail. */
@@ -572,7 +897,9 @@ const RESULT_STYLE: Record<ResultValue, { className: string; labelKey: string }>
   running: { className: "text-task-status-running", labelKey: "result.running" },
   success: { className: "text-task-status-done", labelKey: "result.success" },
   failed: { className: "text-destructive", labelKey: "result.failed" },
-  review: { className: "text-task-status-needs-you", labelKey: "result.awaitingReview" },
+  // Both human-attention buckets surface under one label ("Needs you") to match
+  // the Operations page; they keep distinct buckets only for color/filter intent.
+  review: { className: "text-task-status-needs-you", labelKey: "result.needsYou" },
   feedback: { className: "text-task-status-needs-you", labelKey: "result.needsYou" },
 };
 
@@ -582,6 +909,9 @@ function compareRuns(key: SortKey, a: PastRun, b: PastRun): number {
       return a.cardTitle.localeCompare(b.cardTitle);
     case "triggered":
       return a.startedAt.localeCompare(b.startedAt);
+    case "ended":
+      // Unfinished runs have no end — sort them before finished ones.
+      return (a.endedAt ?? "").localeCompare(b.endedAt ?? "");
     case "duration":
       return durationSeconds(a) - durationSeconds(b);
     case "result":

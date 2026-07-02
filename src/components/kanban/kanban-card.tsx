@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MyraThinking } from "@/components/ui/myra-thinking";
 import { useConnections } from "@/hooks/use-connections";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { tagClassName } from "@/lib/kanban-tags";
@@ -346,7 +347,7 @@ function InProgressBlock({ card, logLines, onViewLogs, stop, isCancelling = fals
           ))}
         </div>
       ) : (
-        <p className="text-[11px] text-muted-foreground italic">{t("waitingForOutput")}</p>
+        <MyraThinking messages={t.raw("thinkingMessages") as string[]} />
       )}
 
       {onViewLogs && (

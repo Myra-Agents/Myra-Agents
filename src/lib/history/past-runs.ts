@@ -28,6 +28,11 @@ export interface PastRun {
   /** The owning card was auto-archived (Done → Trash at midnight). Drives the
    *  archive icon so History shows it's archived rather than just trashed. */
   archived: boolean;
+  /** The run was cancelled (the user stopped the agent). Detected as the card's
+   *  latest run ending `failed` while the card landed in Done — a genuine failure
+   *  bounces the card back to Todo, so only a deliberate stop lands failed+Done.
+   *  Shown as a grey "Canceled" verdict instead of "Failed". */
+  canceled: boolean;
   tokens?: number;
   cost?: number;
   agentPresetId?: string;
@@ -40,7 +45,13 @@ export interface PastRun {
 export function pastRunsFromCards(cards: KanbanCard[]): PastRun[] {
   const runs: PastRun[] = [];
   for (const card of cards) {
-    for (const run of card.runHistory ?? []) {
+    const history = card.runHistory ?? [];
+    // A cancel lands the card in Done with its latest run `failed`; a real
+    // failure sends the card back to Todo. Resolve an archived (trashed) card to
+    // the column it came from.
+    const effectiveStatus = card.status === "trashed" ? (card.previousStatus ?? "done") : card.status;
+    const lastRunId = history.at(-1)?.id;
+    for (const run of history) {
       runs.push({
         runId: run.id,
         cardId: card.id,
@@ -56,6 +67,7 @@ export function pastRunsFromCards(cards: KanbanCard[]): PastRun[] {
         // so they must not read as "Running".
         live: !run.endedAt,
         archived: Boolean(card.archivedAt),
+        canceled: run.status === "failed" && run.id === lastRunId && effectiveStatus === "done",
         tokens: run.tokens,
         cost: run.cost,
         agentPresetId: card.agentPresetId,

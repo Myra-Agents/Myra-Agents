@@ -3,7 +3,6 @@
 import { useTranslations } from "next-intl";
 
 import { RunsHistory } from "@/components/history/runs-history";
-import { useAgentEvents } from "@/hooks/use-agent-events";
 import { useKanban } from "@/hooks/use-kanban";
 
 /**
@@ -15,11 +14,10 @@ import { useKanban } from "@/hooks/use-kanban";
  */
 export default function HistoryPage() {
   const t = useTranslations("history");
-  const { cards, loading, error, upsertCard } = useKanban();
-  // Live-refresh: a run finishing (or asking for feedback) on any connection
-  // pushes its updated card straight into the list, so History reflects new runs
-  // without a manual reload. The board page wires the same subscription.
-  useAgentEvents(upsertCard);
+  // Live-refresh is global now: the board store self-subscribes to
+  // `agent-result-changed`, so a run finishing on any connection updates this
+  // list in real time without per-page wiring.
+  const { cards, loading, error } = useKanban();
 
   if (loading) {
     return (

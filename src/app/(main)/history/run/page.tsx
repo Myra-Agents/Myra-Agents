@@ -14,16 +14,16 @@ import { ReviewComposer } from "@/components/conversation/review-composer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAgentEvents } from "@/hooks/use-agent-events";
-import { useAgentLogs } from "@/hooks/use-agent-logs";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
+import { connectionManager } from "@/lib/connections/manager";
 import { parseTranscript } from "@/lib/conversation/parse";
 import { effortOf } from "@/lib/history/past-runs";
 import { invokeOn } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
+import { useBoardStore } from "@/stores/board-store";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import type { AgentRun } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
@@ -51,12 +51,12 @@ function AgentSessionScreen() {
   const cardId = params.get("card") ?? "";
   const runId = params.get("run") ?? "";
 
-  const { cards, moveCard, addRevisionNote, answerFeedback, cancelAgent, upsertCard } = useKanban();
-  // Push-based live updates: `agent-result-changed` flips the card's status the
-  // instant a run finishes / asks for feedback (badge + Stop react without a
-  // manual reload), and `agent-log-appended` streams the run log line-by-line.
-  useAgentEvents(upsertCard);
-  const { logs } = useAgentLogs();
+  const { cards, moveCard, addRevisionNote, answerFeedback, cancelAgent } = useKanban();
+  // Live updates are global now (the board store self-subscribes to
+  // `agent-result-changed` + `agent-log-appended`): the card's status flips the
+  // instant a run finishes/asks for feedback, and the run log streams in via the
+  // store's `logs` map. We only read the live log tail here.
+  const logs = useBoardStore((s) => s.logs);
   const { schedules, triggerNow } = useSchedules();
   const { settings } = useSettings();
 
@@ -84,13 +84,24 @@ function AgentSessionScreen() {
   const [loadingLog, setLoadingLog] = useState(false);
 
   // Live log tail. `get_run_log` gives the history once on entry; new lines then
-  // arrive via `agent-log-appended` (useAgentLogs). To avoid double-rendering the
-  // lines that were already in the fetched snapshot, we record how many live
+  // arrive via `agent-log-appended` (board store `logs`). To avoid double-rendering
+  // the lines that were already in the fetched snapshot, we record how many live
   // lines had accumulated at fetch time and only append the ones after it.
   const liveLines = useMemo(() => (card ? (logs.get(card.id) ?? []) : []), [logs, card]);
   const liveLinesRef = useRef(liveLines);
   liveLinesRef.current = liveLines;
   const liveBaselineRef = useRef(0);
+
+  // Register this card as having a live viewer. `agent-log-appended` is gated on
+  // the backend to watched cards only (headless/scheduled runs elsewhere stay
+  // quiet), so without this the run log wouldn't stream in. Cleared on unmount.
+  useEffect(() => {
+    if (!cardId) return;
+    void connectionManager.setLogWatch([cardId]);
+    return () => {
+      void connectionManager.setLogWatch([]);
+    };
+  }, [cardId]);
 
   // Optimistic "stopping" flag: flips the badge + button the instant Stop is
   // clicked, before the backend's status push (agent-result-changed) arrives.
@@ -336,8 +347,8 @@ function RunStatusBadge({ status, stopping }: { status: AgentRun["status"]; stop
     { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
   > = {
     running: { label: t("result.running"), variant: "default" },
-    needs_feedback: { label: t("result.running"), variant: "secondary" },
-    awaiting_review: { label: t("result.running"), variant: "outline" },
+    needs_feedback: { label: t("result.needsYou"), variant: "outline" },
+    awaiting_review: { label: t("result.needsYou"), variant: "outline" },
     completed: { label: t("result.success"), variant: "default" },
     failed: { label: t("result.failed"), variant: "destructive" },
   };

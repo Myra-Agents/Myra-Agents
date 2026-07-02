@@ -403,3 +403,74 @@ html {
 .disable-transitions * {
   transition: none !important;
 }
+
+/* Myra logo loaders. All magnitudes are driven by CSS custom properties set on the
+   <svg> (inherited by the animated <g>), so every knob is parameterizable from the
+   component props: --myra-loader-dur, --myra-ease, --myra-dist, --myra-min-op. */
+
+/* shimmer — diagonal opacity/drift wave across the 7 chevrons */
+@keyframes myra-shimmer {
+  0%,
+  100% {
+    opacity: var(--myra-min-op, 0.22);
+    transform: translate(0px, 0px);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(var(--myra-dist, 24px), calc(-1 * var(--myra-dist, 24px)));
+  }
+}
+
+/* assemble — chevrons slide in one by one (bottom-left → top-right), hold assembled,
+   then slide out the same way, on a loop (matches the exported GIF). */
+@keyframes myra-assemble {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-1 * var(--myra-dist, 380px)), var(--myra-dist, 380px));
+  }
+  17% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  77%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--myra-dist, 380px), calc(-1 * var(--myra-dist, 380px)));
+  }
+}
+
+/* bounce-up-edge — mirrors Tailwind's default `bounce` but toward the top
+   edge (translateY 0 -> +25%) instead of away from it, for the "more above"
+   chevron nudging into the scroll container's top border. */
+@keyframes myra-bounce-up-edge {
+  0%,
+  100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(25%);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.myra-loader g {
+  transform-box: fill-box;
+  animation: myra-shimmer var(--myra-loader-dur, 1.3s) var(--myra-ease, ease-in-out) infinite;
+}
+
+.myra-loader[data-variant="assemble"] g {
+  animation-name: myra-assemble;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .myra-loader g {
+    animation: none;
+    opacity: 0.85;
+    transform: none;
+  }
+}

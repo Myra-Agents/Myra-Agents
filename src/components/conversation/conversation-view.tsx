@@ -4,7 +4,7 @@
 // and reasoning, every tool call paired with its output, and a final usage
 // footer. Driven by a parsed `Transcript` (see `lib/conversation/parse.ts`).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   BrainIcon,
@@ -25,6 +25,7 @@ import {
 import { useTranslations } from "next-intl";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { MyraLoader } from "@/components/ui/myra-loader";
 import type { ToolResultEntry, ToolUseEntry, Transcript, TranscriptEntry } from "@/lib/conversation/types";
 import { cn } from "@/lib/utils";
 
@@ -99,18 +100,36 @@ export function ConversationView({ transcript, thinking }: { transcript: Transcr
   );
 }
 
-/** Animated "agent is working" indicator — pulsing spark + bouncing dots.
- * Rendered at the tail of the transcript while the run is live. */
+/** Animated "agent is working" indicator — the animated Myra mark (shimmer) next
+ * to a rotating playful status message (Claude-Code style). Rendered at the tail
+ * of the transcript while the run is live. */
 function ThinkingIndicator() {
   const t = useTranslations("logs.conversation");
+  // Pull the funny message pool from i18n; fall back to the single "working" line.
+  const messages = useMemo(() => {
+    const raw = t.raw("workingMessages");
+    return Array.isArray(raw) && raw.length > 0 ? (raw as string[]) : [t("working")];
+  }, [t]);
+
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (messages.length <= 1) return;
+    const id = setInterval(() => {
+      // Hop to a different random message so it never repeats back-to-back.
+      setIdx((i) => {
+        let n = i;
+        while (n === i) n = Math.floor(Math.random() * messages.length);
+        return n;
+      });
+    }, 7000);
+    return () => clearInterval(id);
+  }, [messages.length]);
+
   return (
     <div className="flex items-center gap-2 text-muted-foreground text-xs" aria-live="polite">
-      <SparklesIcon className="size-3.5 animate-pulse text-primary" />
-      <span>{t("working")}</span>
-      <span className="flex items-center gap-1">
-        <span className="size-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:-0.3s]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:-0.15s]" />
-        <span className="size-1.5 animate-bounce rounded-full bg-primary/60" />
+      <MyraLoader size={16} className="shrink-0 text-primary" />
+      <span key={messages[idx]} className="fade-in animate-in duration-500">
+        {messages[idx]}
       </span>
     </div>
   );

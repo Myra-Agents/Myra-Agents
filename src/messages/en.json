@@ -33,7 +33,7 @@
     },
     "upcoming": {
       "title": "Up next today",
-      "empty": "No schedule due today."
+      "empty": "No patrol due today."
     },
     "recent": {
       "title": "Run history",
@@ -124,7 +124,16 @@
       "waitingForOutput": "Waiting for output…",
       "agent": "Agent",
       "queued": "Queued",
-      "moveTo": "Move to"
+      "moveTo": "Move to",
+      "thinkingMessages": [
+        "Summoning the agent…",
+        "Teaching robots to code…",
+        "Untangling the logic…",
+        "Reticulating splines…",
+        "Bribing the compiler…",
+        "Chasing down edge cases…",
+        "Warming up the neurons…"
+      ]
     },
     "empty": {
       "draft": "Draft your ideas…",
@@ -614,6 +623,10 @@
     "clearColumnFilter": "Clear filter",
     "columnMenu": "{column} options",
     "clearFilters": "Clear filters",
+    "columnsLabel": "Toggle columns",
+    "resetColumns": "Reset columns",
+    "scrollDown": "Scroll down for more",
+    "scrollUp": "Scroll up for more",
     "filteredHidden": "{hidden, plural, =0 {Filtered} one {# run hidden} other {# runs hidden}}"
   },
   "history": {
@@ -626,7 +639,8 @@
     "searchPlaceholder": "Search a task…",
     "clearFilters": "Clear filters",
     "showing": "Showing {shown} of {total}",
-    "footer": "Showing {shown} of {total} — Click to see all schedules",
+    "scrollDown": "Scroll down for more",
+    "scrollUp": "Scroll up for more",
     "ranges": {
       "today": "Today",
       "7d": "7d",
@@ -642,17 +656,27 @@
     },
     "graph1": "Runs over time",
     "graph2": "Success rate",
+    "showStats": "Show stats",
+    "hideStats": "Hide stats",
     "columns": {
       "task": "Operation name",
       "triggered": "Triggered",
+      "ended": "Ended",
       "duration": "Duration",
       "agent": "Agent",
       "result": "Result",
       "usage": "Usage"
     },
+    "status": {
+      "backlog": "Backlog",
+      "running": "In progress",
+      "needsYou": "Needs you",
+      "done": "Done"
+    },
     "result": {
       "success": "Success",
       "failed": "Failed",
+      "canceled": "Canceled",
       "running": "Running",
       "awaitingReview": "Awaiting review",
       "needsYou": "Needs you"
@@ -675,7 +699,9 @@
     },
     "filterBy": "Filter by",
     "clearColumnFilter": "Clear filter",
-    "columnMenu": "{column} options"
+    "columnMenu": "{column} options",
+    "columnsLabel": "Toggle columns",
+    "resetColumns": "Reset columns"
   },
   "agentSession": {
     "back": "Back",
@@ -687,6 +713,7 @@
       "failed": "Failed",
       "success": "Success",
       "running": "Running",
+      "needsYou": "Needs you",
       "stopping": "Stopping…"
     },
     "agentInstruction": "Agent Instruction",
@@ -742,6 +769,7 @@
       "running": "Running",
       "completed": "Completed",
       "failed": "Failed",
+      "needsYou": "Needs you",
       "needsFeedback": "Needs feedback",
       "awaitingReview": "Awaiting review"
     },
@@ -771,6 +799,28 @@
       "rawTab": "Raw log",
       "thinking": "Thought process",
       "working": "Agent is working…",
+      "workingMessages": [
+        "The colony stirs…",
+        "Following the pheromone trail…",
+        "Workers scurrying about…",
+        "Exploring the anthill…",
+        "Hauling crumbs back to the nest…",
+        "The queen is pondering…",
+        "Laying down a scent trail…",
+        "Antennae twitching…",
+        "Recruiting more workers…",
+        "Carrying a twig 50× our size…",
+        "The colony is buzzing…",
+        "Digging fresh tunnels…",
+        "Marching in single file…",
+        "Scouts reporting back…",
+        "Foraging for data…",
+        "Tending the brood…",
+        "Swarming the problem…",
+        "Building an ant bridge…",
+        "Regrouping at the nest…",
+        "Sniffing out the path…"
+      ],
       "input": "Input",
       "output": "Output",
       "changes": "Changes",
@@ -1230,6 +1280,10 @@
     "activateCancel": "Cancel",
     "activateKeepInactive": "Add inactive",
     "activateConfirm": "Activate",
+    "runAgainTitle": "Run again?",
+    "runAgainDescription": "This patrol already has a run in progress. Starting another one now will run it a second time in parallel.",
+    "runAgainCancel": "Cancel",
+    "runAgainConfirm": "Run anyway",
     "notFound": "Patrol not found.",
     "backToSchedules": "Back to patrols",
     "subtitle": "Deploy recurring patrols with AI agents triggered by events.",
