@@ -67,18 +67,25 @@ export function AppUpdatePanel() {
         <div className="flex items-center gap-2 rounded-md border p-3">
           {available ? (
             <ArrowUpCircleIcon className="size-4 shrink-0 text-primary" />
-          ) : (
+          ) : checkedOnce ? (
             <CheckCircle2Icon className="size-4 shrink-0 text-green-500" />
+          ) : (
+            <ArrowUpCircleIcon className="size-4 shrink-0 text-muted-foreground" />
           )}
           <div className="min-w-0 text-sm">
             {available ? (
               <p className="text-foreground">{t("available", { version: newVersion ?? "" })}</p>
             ) : (
-              <p className="text-muted-foreground">
+              <p className={checkedOnce ? "text-foreground" : "text-muted-foreground"}>
                 {checkedOnce ? t("upToDate") : t("current", { version: currentVersion ?? "?" })}
               </p>
             )}
-            <p className="mt-0.5 text-muted-foreground text-xs">{t("current", { version: currentVersion ?? "?" })}</p>
+            {/* Show the current version as a subline only once the headline says
+                something else (available / up to date) — avoids duplicating it in
+                the pre-check state where the headline already is the version. */}
+            {(available || checkedOnce) && (
+              <p className="mt-0.5 text-muted-foreground text-xs">{t("current", { version: currentVersion ?? "?" })}</p>
+            )}
           </div>
         </div>
 
