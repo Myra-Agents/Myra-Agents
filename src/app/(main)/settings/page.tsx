@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 
+import { buildAgentCommand } from "@myra/shared";
 import {
   CheckCircle2Icon,
   CopyIcon,
@@ -18,8 +19,6 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-
-import { buildAgentCommand } from "@myra/shared";
 
 import { AgentOptions } from "@/components/agents/agent-options";
 import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
@@ -48,6 +47,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MyraLoader, type MyraLoaderVariant } from "@/components/ui/myra-loader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -293,11 +293,16 @@ function AgentPresetCard({
                 // `ollama launch` wrapping for local presets. Falls back to a
                 // best-effort string if the template is mid-edit (no {prompt}).
                 try {
-                  const { binary, args } = buildAgentCommand(preset.binary, preset.argsTemplate ?? "{prompt}", "hello", {
-                    flags: preset.flags ?? [],
-                    launchVia: preset.launchVia ?? "direct",
-                    ollamaModel: preset.ollamaModel ?? "",
-                  });
+                  const { binary, args } = buildAgentCommand(
+                    preset.binary,
+                    preset.argsTemplate ?? "{prompt}",
+                    "hello",
+                    {
+                      flags: preset.flags ?? [],
+                      launchVia: preset.launchVia ?? "direct",
+                      ollamaModel: preset.ollamaModel ?? "",
+                    },
+                  );
                   return [binary, ...args].filter(Boolean).join(" ");
                 } catch {
                   return [
@@ -369,6 +374,8 @@ export default function SettingsPage() {
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
+  const loaderVariant = usePreferencesStore((state) => state.loaderVariant);
+  const setLoaderVariant = usePreferencesStore((state) => state.setLoaderVariant);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
@@ -462,6 +469,12 @@ export default function SettingsPage() {
 
   const handleTimezoneChange = (timezone: string) => {
     update({ timezone });
+  };
+
+  const handleLoaderVariantChange = (variant: string) => {
+    const next = variant as MyraLoaderVariant;
+    setLoaderVariant(next);
+    void persistPreference("loader_variant", next);
   };
 
   const handleExportBoard = useCallback(async () => {
@@ -684,6 +697,23 @@ export default function SettingsPage() {
                       <SelectItem value="system">{t("preferences.themeOptions.system")}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    {t("preferences.loaderAnimation")}
+                    <MyraLoader size={16} variant={loaderVariant} className="text-primary" />
+                  </Label>
+                  <Select value={loaderVariant} onValueChange={handleLoaderVariantChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="shimmer">{t("preferences.loaderOptions.shimmer")}</SelectItem>
+                      <SelectItem value="assemble">{t("preferences.loaderOptions.assemble")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">{t("preferences.loaderAnimationHint")}</p>
                 </div>
 
                 <div className="space-y-2">

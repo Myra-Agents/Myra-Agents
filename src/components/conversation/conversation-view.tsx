@@ -28,6 +28,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { MyraLoader } from "@/components/ui/myra-loader";
 import type { ToolResultEntry, ToolUseEntry, Transcript, TranscriptEntry } from "@/lib/conversation/types";
 import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { CopyButton } from "./copy-button";
 import { DiffView, looksLikeDiff } from "./diff-view";
@@ -105,6 +106,7 @@ export function ConversationView({ transcript, thinking }: { transcript: Transcr
  * of the transcript while the run is live. */
 function ThinkingIndicator() {
   const t = useTranslations("logs.conversation");
+  const loaderVariant = usePreferencesStore((s) => s.loaderVariant);
   // Pull the funny message pool from i18n; fall back to the single "working" line.
   const messages = useMemo(() => {
     const raw = t.raw("workingMessages");
@@ -127,7 +129,7 @@ function ThinkingIndicator() {
 
   return (
     <div className="flex items-center gap-2 text-muted-foreground text-xs" aria-live="polite">
-      <MyraLoader size={16} className="shrink-0 text-primary" />
+      <MyraLoader size={16} variant={loaderVariant} className="shrink-0 text-primary" />
       <span key={messages[idx]} className="fade-in animate-in duration-500">
         {messages[idx]}
       </span>

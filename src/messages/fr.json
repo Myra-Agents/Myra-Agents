@@ -1136,7 +1136,13 @@
       "homeFolder": "Dossier home",
       "homeFolderHint": "Dossier de base parcouru par le sélecteur de dossiers des patrouilles. Par défaut, votre dossier utilisateur.",
       "timezone": "Fuseau horaire",
-      "timezoneHint": "Utilisé pour l'automatisation nocturne — les opérations Done sont archivées à minuit dans ce fuseau."
+      "timezoneHint": "Utilisé pour l'automatisation nocturne — les opérations Done sont archivées à minuit dans ce fuseau.",
+      "loaderAnimation": "Animation d'activité",
+      "loaderAnimationHint": "Le logo Myra animé affiché à côté du message de statut pendant qu'un agent tourne.",
+      "loaderOptions": {
+        "shimmer": "Shimmer (discret)",
+        "assemble": "Assemblage (ludique)"
+      }
     },
     "data": {
       "title": "Gestion des données",

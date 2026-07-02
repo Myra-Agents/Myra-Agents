@@ -695,7 +695,7 @@ function useNow(): number {
   return now;
 }
 
-type Bucket = { key: string; label: string; ok: number; failed: number };
+type Bucket = { key: string; label: string; ok: number; failed: number; canceled: number };
 
 function buildBuckets(runs: PastRun[], range: TimeRange, now: number): Bucket[] {
   const day = 86_400_000;
@@ -713,7 +713,7 @@ function buildBuckets(runs: PastRun[], range: TimeRange, now: number): Bucket[] 
     for (let h = 0; h < 24; h++) {
       const s = start0.getTime() + h * hour;
       starts.push(s);
-      buckets.push({ key: `h${h}`, label: `${String(h).padStart(2, "0")}:00`, ok: 0, failed: 0 });
+      buckets.push({ key: `h${h}`, label: `${String(h).padStart(2, "0")}:00`, ok: 0, failed: 0, canceled: 0 });
     }
   } else {
     let windowDays: number;
@@ -737,18 +737,20 @@ function buildBuckets(runs: PastRun[], range: TimeRange, now: number): Bucket[] 
         label: new Date(s).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
         ok: 0,
         failed: 0,
+        canceled: 0,
       });
     }
   }
 
   for (const r of runs) {
-    // Only resolved outcomes feed the trend — skip live / awaiting_review /
-    // needs_feedback / cancelled runs that have no pass-or-fail verdict.
-    if (r.canceled || (!r.ok && r.status !== "failed")) continue;
+    // Skip runs with no terminal outcome — live / awaiting_review / needs_feedback.
+    // Cancelled runs DO count (own segment), even though they have no pass/fail verdict.
+    if (!r.canceled && !r.ok && r.status !== "failed") continue;
     const ts = Date.parse(r.startedAt);
     for (let i = 0; i < starts.length; i++) {
       if (ts >= starts[i] && ts < starts[i] + span) {
-        if (r.ok) buckets[i].ok += 1;
+        if (r.canceled) buckets[i].canceled += 1;
+        else if (r.ok) buckets[i].ok += 1;
         else buckets[i].failed += 1;
         break;
       }
@@ -758,18 +760,19 @@ function buildBuckets(runs: PastRun[], range: TimeRange, now: number): Bucket[] 
 }
 
 function RunsBarChart({ data }: { data: Bucket[] }) {
-  const max = Math.max(1, ...data.map((d) => d.ok + d.failed));
+  const max = Math.max(1, ...data.map((d) => d.ok + d.failed + d.canceled));
   return (
     <div className="flex h-full w-full items-end gap-1 overflow-hidden border-border-cards border-b">
       {data.map((d) => {
-        const total = d.ok + d.failed;
+        const total = d.ok + d.failed + d.canceled;
         const okH = (d.ok / max) * 100;
         const failH = (d.failed / max) * 100;
+        const cancelH = (d.canceled / max) * 100;
         return (
           <div
             key={d.key}
             className="flex h-full min-w-0 flex-1 flex-col justify-end"
-            title={`${d.label}: ${d.ok}✓ ${d.failed}✗`}
+            title={`${d.label}: ${d.ok}✓ ${d.failed}✗ ${d.canceled}⊘`}
           >
             {total > 0 && (
               <>
@@ -777,6 +780,11 @@ function RunsBarChart({ data }: { data: Bucket[] }) {
                 <div
                   className={cn("w-full bg-task-status-done", d.failed === 0 && "rounded-t-[2px]")}
                   style={{ height: `${okH}%` }}
+                />
+                {/* Cancelled runs — darker grey base segment (no pass/fail verdict). */}
+                <div
+                  className={cn("w-full bg-muted-foreground", d.failed === 0 && d.ok === 0 && "rounded-t-[2px]")}
+                  style={{ height: `${cancelH}%` }}
                 />
               </>
             )}

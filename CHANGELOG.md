@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ### Added
 
+- **Working animation preference** — pick the animated Myra mark shown while an agent runs (Shimmer / Assemble) under Settings → Preferences; persisted to `localStorage` and applied to the live thinking indicator.
 - **Runs page** — task overview with status filtering and list/kanban toggle.
 - **Self-hosted hub** — registration UI in Settings to connect a custom hub server.
 - **Navigation history** — back/forward controls in the header (in progress).
@@ -29,6 +30,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 ### Changed
 
 - Column-visibility hooks (`useRunsColumns`, `useHistoryColumns`) extracted into a shared `makeColumnVisibilityHook` factory — eliminates duplicated persist/toggle/reset logic.
+- **Runs trend chart** — cancelled runs now show as their own (grey) segment instead of being dropped, so the bars reflect every terminal outcome.
+- **Settings command preview** — the previewed agent command now reflects preset flags and `ollama launch` wrapping (via the extended `buildAgentCommand`).
 
 ---
 

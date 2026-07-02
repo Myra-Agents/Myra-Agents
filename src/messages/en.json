@@ -1136,7 +1136,13 @@
       "homeFolder": "Home folder",
       "homeFolderHint": "Base folder the patrol folder picker browses. Defaults to your user home folder.",
       "timezone": "Timezone",
-      "timezoneHint": "Used for nightly automation — Done operations are archived at midnight in this timezone."
+      "timezoneHint": "Used for nightly automation — Done operations are archived at midnight in this timezone.",
+      "loaderAnimation": "Working animation",
+      "loaderAnimationHint": "The animated Myra mark shown next to the status message while an agent is running.",
+      "loaderOptions": {
+        "shimmer": "Shimmer (subtle)",
+        "assemble": "Assemble (playful)"
+      }
     },
     "data": {
       "title": "Data Management",

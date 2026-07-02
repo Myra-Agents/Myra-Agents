@@ -104,6 +104,9 @@ function MyraLoader({
   );
 }
 
+/** All selectable loader animations (for settings/validation). */
+export const MYRA_LOADER_VARIANTS = ["shimmer", "assemble"] as const satisfies readonly MyraLoaderVariant[];
+
 export type { MyraLoaderVariant };
 
 export { MyraLoader };
