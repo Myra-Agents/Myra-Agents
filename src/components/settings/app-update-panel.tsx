@@ -35,8 +35,12 @@ export function AppUpdatePanel() {
   if (!isTauri()) return null;
 
   const handleCheck = async () => {
-    const found = await check();
-    if (!found) toast.success(t("upToDate"));
+    try {
+      const found = await check();
+      if (!found) toast.success(t("upToDate"));
+    } catch {
+      toast.error(t("checkFailed"));
+    }
   };
 
   const handleInstall = async () => {

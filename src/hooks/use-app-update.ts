@@ -23,7 +23,6 @@ export function useAppUpdate() {
   const [downloading, setDownloading] = useState(false);
   /** 0..1 download progress; `null` while indeterminate (no content-length). */
   const [progress, setProgress] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   /** True once a manual/auto check has completed at least once this mount. */
   const [checkedOnce, setCheckedOnce] = useState(false);
 
@@ -34,20 +33,18 @@ export function useAppUpdate() {
       .catch((e) => console.error("[useAppUpdate] getVersion failed:", e));
   }, []);
 
-  /** Query the update endpoint. Returns true when a newer build is available. */
+  /**
+   * Query the update endpoint. Returns true when a newer build is available.
+   * Rethrows on a fetch/endpoint failure so callers can distinguish an error
+   * (e.g. no `latest.json` published yet → 404) from a genuine "up to date".
+   */
   const check = useCallback(async (): Promise<boolean> => {
     if (!isTauri()) return false;
     setChecking(true);
-    setError(null);
     try {
       const found = await checkForUpdate();
       setUpdate(found);
       return found !== null;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("[useAppUpdate] check failed:", e);
-      return false;
     } finally {
       setChecking(false);
       setCheckedOnce(true);
@@ -59,7 +56,6 @@ export function useAppUpdate() {
     if (!update) return;
     setDownloading(true);
     setProgress(null);
-    setError(null);
     try {
       let total = 0;
       let downloaded = 0;
@@ -81,10 +77,10 @@ export function useAppUpdate() {
       // Swap complete — restart into the new version.
       await relaunch();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("[useAppUpdate] install failed:", e);
+      // Reset so the button re-enables, and rethrow for the caller to surface.
       setDownloading(false);
+      console.error("[useAppUpdate] install failed:", e);
+      throw e;
     }
   }, [update]);
 
@@ -100,7 +96,6 @@ export function useAppUpdate() {
     checking,
     downloading,
     progress,
-    error,
     checkedOnce,
     check,
     installAndRelaunch,
