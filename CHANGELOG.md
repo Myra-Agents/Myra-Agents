@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-02
+
 ### Added
 
 - **Working animation preference** — pick the animated Myra mark shown while an agent runs (Shimmer / Assemble) under Settings → Preferences; persisted to `localStorage` and applied to the live thinking indicator.
