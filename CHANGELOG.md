@@ -20,6 +20,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 - Prevent native drag ghost on images and links inside the sidebar in the Tauri desktop app (`-webkit-user-drag: none` on `body`, `img`, and `a`).
 - **Windows title bar** — minimize/maximize/close buttons now span the full header height on hover (Windows 11-style flush coverage).
 - **Windows/Linux window** — removed rounded corners; window now has sharp edges on Windows and Linux.
+- **Board/schedules live subscriptions** — concurrent topology changes (e.g. hub reconnect + local restart) could leave duplicate `agent-result-changed` / `agent-log-appended` / `schedules-updated` listeners, causing events to fire twice; subscriptions are now serialised via a promise chain.
+- **Connection manager** — when `NEXT_PUBLIC_MYRA_SERVER_URL` is set, the previously chosen remote primary connection was silently reset to `local`; the persisted primary is now preserved.
+- **History time-range filter** — opening the History page with a non-default range (e.g. "7d") briefly showed all runs before the correct filter applied; `useNow()` now initialises to `Date.now()` instead of `0`.
+- **Logs — Stop button** — clicking Stop now immediately shows a disabled "Stopping…" state while the cancellation is in flight, instead of keeping the active "Stop" label until the backend confirms.
+- **Dead shortcut flag** — `pendingNewSchedule` in the shortcut store was set by the tray but never consumed by any component (the URL param `?new=1` already handles the intent); removed the dead state and its callers.
+
+### Changed
+
+- Column-visibility hooks (`useRunsColumns`, `useHistoryColumns`) extracted into a shared `makeColumnVisibilityHook` factory — eliminates duplicated persist/toggle/reset logic.
 
 ---
 
