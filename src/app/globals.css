@@ -45,6 +45,22 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Figma "Theme" semantic tokens (new UI refactor) — text/icon tiers, card
+     surfaces, and task-status accents. Enables utilities like text-text-tertiary,
+     bg-card-background, border-border-cards, bg-task-status-running, … */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-icon-primary: var(--icon-primary);
+  --color-icon-tertiary: var(--icon-tertiary);
+  --color-card-background: var(--card-background);
+  --color-card-background-secondary: var(--card-background-secondary);
+  --color-border-cards: var(--border-cards);
+  --color-task-status-backlog: var(--task-status-backlog);
+  --color-task-status-running: var(--task-status-running);
+  --color-task-status-needs-you: var(--task-status-needs-you);
+  --color-task-status-done: var(--task-status-done);
+  --radius-card: var(--card-radius);
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-sans);
@@ -89,25 +105,55 @@ These serve as the fallback; there is no separate default.css file. */
   --font-mono: var(--font-geist-mono);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+
+  /* Figma "Theme" semantic tokens — light mode (derived: Figma ships dark only,
+     so text/icon tiers mirror the dark alpha ramp onto the ink #141414; the
+     task-status accents are semantic and identical across modes). */
+  --text-primary: #141414f0;
+  --text-secondary: #141414b2;
+  --text-tertiary: #1414147a;
+  /* Opaque equivalents of the icon ink composited over the light surface — avoids
+     stroke-overlap double-darkening that semi-transparent SVG icons produce. */
+  --icon-primary: #353535;
+  --icon-tertiary: #5b5b5b;
+  --card-background: #fcfcfc;
+  /* Kanban column "task list" surface — one step off the card surface so the
+     buckets read as containers behind their cards (Figma Theme/card-background-secondary). */
+  --card-background-secondary: #ebeae4;
+  --border-cards: #1414140f;
+  --task-status-backlog: #888780;
+  --task-status-running: #ff6900;
+  --task-status-needs-you: #7f77dd;
+  --task-status-done: #639922;
+
+  /* App chrome dimensions (Figma theme.json float vars) — invariant across
+     presets, so they live here, not in a preset. */
+  --app-sidebar-width: 280px;
+  --mac-top-height: 42px;
+  --window-radius: 15px;
+  --kanban-radius: 10px;
+  --card-radius: 12px;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  /* Surfaces re-themed to the Figma "Theme" dark palette (canvas #141414,
+     cards #181818, ink #e4e4e4) so the default preset matches the new design. */
+  --background: #141414;
+  --foreground: #e4e4e4;
+  --card: #181818;
+  --card-foreground: #e4e4e4;
+  --popover: #1f1f1f;
+  --popover-foreground: #d4d4d4;
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted-foreground: #e4e4e4b3;
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --border: #27272a;
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.87 0 0);
@@ -115,14 +161,30 @@ These serve as the fallback; there is no separate default.css file. */
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: #1b1d1e;
+  --sidebar-foreground: #e4e4e4;
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: #252525;
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Figma "Theme" semantic tokens — dark mode (verbatim from the export). */
+  --text-primary: #e4e4e4f0;
+  --text-secondary: #e4e4e4b2;
+  --text-tertiary: #e4e4e47a;
+  /* Opaque equivalents of the icon ink composited over the dark surface — avoids
+     stroke-overlap double-darkening that semi-transparent SVG icons produce. */
+  --icon-primary: #c7c7c7;
+  --icon-tertiary: #a6a6a6;
+  --card-background: #181818;
+  --card-background-secondary: #1f1f1f;
+  --border-cards: #e4e4e40a;
+  --task-status-backlog: #888780;
+  --task-status-running: #ff6900;
+  --task-status-needs-you: #7f77dd;
+  --task-status-done: #639922;
 }
 
 @layer base {
@@ -138,6 +200,13 @@ These serve as the fallback; there is no separate default.css file. */
     /* App-wide: text is not selectable/copyable (desktop-app feel). */
     user-select: none;
     -webkit-user-select: none;
+    /* Prevent native drag ghost on images and links. */
+    -webkit-user-drag: none;
+  }
+
+  img,
+  a {
+    -webkit-user-drag: none;
   }
   /* Keep editable fields selectable so typing/editing still works. */
   input,
@@ -148,6 +217,27 @@ These serve as the fallback; there is no separate default.css file. */
   }
   html {
     @apply font-sans;
+  }
+
+  /* Pointer cursor on anything clickable (Tailwind v4 preflight no longer sets
+     it on <button>). Disabled controls fall back to the default arrow. */
+  button,
+  [role="button"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="tab"],
+  [role="option"],
+  a[href],
+  label[for],
+  summary,
+  select {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: default;
   }
 
   :root {
@@ -196,18 +286,7 @@ These serve as the fallback; there is no separate default.css file. */
   }
   html[data-tauri] [data-slot="sidebar-wrapper"] {
     background: var(--sidebar);
-    border-radius: 18px;
     overflow: hidden;
-  }
-
-  /* Full-viewport overlay backdrops render in a body-level portal, outside the
-     rounded wrapper, so their square corners would poke past the window's
-     rounded corners. Match the window radius so the blur stays inside. */
-  html[data-tauri] [data-slot="dialog-overlay"],
-  html[data-tauri] [data-slot="alert-dialog-overlay"],
-  html[data-tauri] [data-slot="sheet-overlay"],
-  html[data-tauri] [data-slot="drawer-overlay"] {
-    border-radius: 18px;
   }
 }
 
@@ -323,4 +402,75 @@ html {
 
 .disable-transitions * {
   transition: none !important;
+}
+
+/* Myra logo loaders. All magnitudes are driven by CSS custom properties set on the
+   <svg> (inherited by the animated <g>), so every knob is parameterizable from the
+   component props: --myra-loader-dur, --myra-ease, --myra-dist, --myra-min-op. */
+
+/* shimmer — diagonal opacity/drift wave across the 7 chevrons */
+@keyframes myra-shimmer {
+  0%,
+  100% {
+    opacity: var(--myra-min-op, 0.22);
+    transform: translate(0px, 0px);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(var(--myra-dist, 24px), calc(-1 * var(--myra-dist, 24px)));
+  }
+}
+
+/* assemble — chevrons slide in one by one (bottom-left → top-right), hold assembled,
+   then slide out the same way, on a loop (matches the exported GIF). */
+@keyframes myra-assemble {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-1 * var(--myra-dist, 380px)), var(--myra-dist, 380px));
+  }
+  17% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(0px, 0px);
+  }
+  77%,
+  100% {
+    opacity: 0;
+    transform: translate(var(--myra-dist, 380px), calc(-1 * var(--myra-dist, 380px)));
+  }
+}
+
+/* bounce-up-edge — mirrors Tailwind's default `bounce` but toward the top
+   edge (translateY 0 -> +25%) instead of away from it, for the "more above"
+   chevron nudging into the scroll container's top border. */
+@keyframes myra-bounce-up-edge {
+  0%,
+  100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(25%);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.myra-loader g {
+  transform-box: fill-box;
+  animation: myra-shimmer var(--myra-loader-dur, 1.3s) var(--myra-ease, ease-in-out) infinite;
+}
+
+.myra-loader[data-variant="assemble"] g {
+  animation-name: myra-assemble;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .myra-loader g {
+    animation: none;
+    opacity: 0.85;
+    transform: none;
+  }
 }

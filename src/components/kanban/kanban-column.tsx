@@ -24,6 +24,8 @@ interface KanbanColumnProps {
   onReviewCard: (card: KanbanCard) => void;
   onOpenConversation: (card: KanbanCard) => void;
   onLaunchCard: (card: KanbanCard) => void;
+  onStopCard: (card: KanbanCard) => void;
+  cancellingIds?: Set<string>;
   onMoveCard: (id: string, status: KanbanStatus) => void;
   columnLabel: (status: KanbanStatus) => string;
   selectedIds?: Set<string>;
@@ -44,6 +46,8 @@ export function KanbanColumn({
   onReviewCard,
   onOpenConversation,
   onLaunchCard,
+  onStopCard,
+  cancellingIds,
   onMoveCard,
   columnLabel,
   selectedIds,
@@ -105,6 +109,7 @@ export function KanbanColumn({
               columnLabel={columnLabel}
               onEdit={() => onEditCard(card)}
               onLaunch={() => onLaunchCard(card)}
+              onStop={() => onStopCard(card)}
               onMove={(target) => onMoveCard(card.id, target)}
               onReview={() => onReviewCard(card)}
               onViewLogs={onViewLogs ? () => onViewLogs(card) : undefined}
@@ -112,6 +117,7 @@ export function KanbanColumn({
             >
               <KanbanCardComponent
                 card={card}
+                isCancelling={cancellingIds?.has(card.id)}
                 onEdit={() => onEditCard(card)}
                 onTrash={() => onTrashCard(card.id)}
                 onReview={() => onReviewCard(card)}

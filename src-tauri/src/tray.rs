@@ -41,20 +41,21 @@ impl TrayState {
 }
 
 /// Payload for `tray-navigate`, consumed by the main window's listener to route
-/// and (optionally) trigger the new-task flow.
+/// and (optionally) trigger the new-patrol flow.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct TrayNavigate {
-    path: String,
-    new_task: bool,
+pub struct TrayNavigate {
+    pub path: String,
+    pub new_schedule: bool,
 }
 
 /// Build the system tray: left-click toggles the popover, right-click opens a
 /// minimal native menu (Open / Quit) as a fallback. The tooltip is static.
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "Open Myra Agents", true, None::<&str>)?;
+    let new_patrol_item = MenuItem::with_id(app, "new_patrol", "Create a Patrol", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+    let menu = Menu::with_items(app, &[&show_item, &new_patrol_item, &quit_item])?;
 
     let icon = load_png_icon(include_bytes!("../../media/logo/logo-dark.png"))
         .unwrap_or_else(|| app.default_window_icon().unwrap().clone());
@@ -67,6 +68,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_window(app),
+            "new_patrol" => open_patrol_editor(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -97,6 +99,17 @@ fn show_window(app: &AppHandle) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+/// Reveal the main window and route it straight to the blank patrol editor.
+/// Mirrors the in-app "Add patrol" action (`/schedules/edit/?new=1`); the
+/// editor only persists on "Add", so a cancelled draft never lingers.
+fn open_patrol_editor(app: &AppHandle) {
+    show_window(app);
+    let _ = app.emit(
+        "tray-navigate",
+        TrayNavigate { path: "/schedules/edit/?new=1".into(), new_schedule: false },
+    );
 }
 
 /// Get the popover window, creating it (hidden) on first use. The webview is
@@ -233,13 +246,12 @@ pub fn hide_tray_popover(app: AppHandle) {
     }
 }
 
-/// Reveal the main window, route it to `path`, and (optionally) trigger the
-/// new-task flow. The popover dismisses itself. Navigation + the zustand
-/// new-task request happen in the main webview via the `tray-navigate` event.
+/// Reveal the main window and route it to `path`. The popover dismisses itself.
+/// Navigation happens in the main webview via the `tray-navigate` event.
 #[tauri::command]
-pub fn open_main(app: AppHandle, path: String, new_task: bool) {
+pub fn open_main(app: AppHandle, path: String) {
     show_window(&app);
-    let _ = app.emit("tray-navigate", TrayNavigate { path, new_task });
+    let _ = app.emit("tray-navigate", TrayNavigate { path, new_schedule: false });
     if let Some(w) = app.get_webview_window(POPOVER_LABEL) {
         let _ = w.hide();
     }

@@ -1,12 +1,12 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Myra Agents",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "identifier": "com.myra-agents.app",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run sidecar:build & npm run dev",
+    "beforeDevCommand": "npm run sidecar:build && npm run dev",
     "beforeBuildCommand": "npm run sidecar:build && npm run build"
   },
   "plugins": {

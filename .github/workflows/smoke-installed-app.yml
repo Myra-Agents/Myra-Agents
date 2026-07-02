@@ -1,0 +1,304 @@
+# Post-release smoke test: install the published Windows build on the self-hosted
+# `myra-win-vm` runner (a real Windows 11 VM, see Myrastack runner.sh / the cergy
+# remote lab) and assert the app actually launches and stays up — not just that
+# the installer ran. Complements release.yml (which BUILDS on windows-latest);
+# this VERIFIES the shipped artifact installs + runs on a clean-ish Windows box.
+#
+# SECURITY: self-hosted runners must never execute untrusted code from forks.
+# This workflow only fires on workflow_dispatch and on our own published
+# releases (tag `v*`) — never on pull_request. Do not add a pull_request trigger.
+name: Smoke test (installed app)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag to test (e.g. v0.2.1), or "latest"'
+        default: "latest"
+        required: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows · install + run
+    # Only app releases (v*) — skip server-v* / other tags. Always run on manual dispatch.
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: [self-hosted, myra-win-vm]
+    timeout-minutes: 20
+    steps:
+      - name: Resolve release + download MSI
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = if ($env:RELEASE_TAG) { $env:RELEASE_TAG }
+                 elseif ($env:INPUT_VERSION -and $env:INPUT_VERSION -ne 'latest') { $env:INPUT_VERSION }
+                 else { '' }
+          $hdr = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'myra-ci'; Accept = 'application/vnd.github+json' }
+          $api = "https://api.github.com/repos/${{ github.repository }}/releases"
+          $rel = if ($tag) { Invoke-RestMethod "$api/tags/$tag" -Headers $hdr } else { Invoke-RestMethod "$api/latest" -Headers $hdr }
+          Write-Host "Testing release: $($rel.tag_name)"
+          $asset = $rel.assets | Where-Object { $_.name -match '_x64_.*\.msi$' } | Select-Object -First 1
+          if (-not $asset) { throw "no x64 .msi asset found in release $($rel.tag_name)" }
+          $msi = Join-Path $env:RUNNER_TEMP 'myra.msi'
+          Write-Host "Downloading $($asset.name) ..."
+          Invoke-WebRequest $asset.browser_download_url -OutFile $msi
+          "MSI=$msi"            | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+          "TAG=$($rel.tag_name)" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+
+      - name: Install (silent MSI)
+        shell: powershell
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'msi.log'
+          $p = Start-Process msiexec -ArgumentList '/i', "$env:MSI", '/qn', '/norestart', '/l*v', "$log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { if (Test-Path $log) { Get-Content $log -Tail 40 }; throw "msiexec install failed: $($p.ExitCode)" }
+          Write-Host "installed $env:TAG"
+
+      - name: Launch + assert running
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Resolve the installed exe via its Start Menu shortcut (name-agnostic:
+          # the Tauri binary is `app.exe`, productName "Myra Agents").
+          $lnk = Get-ChildItem `
+            "C:\ProgramData\Microsoft\Windows\Start Menu\Programs", `
+            "$env:APPDATA\Microsoft\Windows\Start Menu\Programs" `
+            -Recurse -Filter '*Myra*.lnk' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $lnk) { throw "no 'Myra*' Start Menu shortcut after install" }
+          $exe  = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk.FullName).TargetPath
+          $proc = [System.IO.Path]::GetFileNameWithoutExtension($exe)
+          Write-Host "exe=$exe  proc=$proc"
+
+          # The runner is a service in session 0; a GUI app launched there has no
+          # desktop. Launch into the interactive console session via schtasks /it.
+          # A no-space .cmd wrapper avoids schtasks's broken quoting on the spaced
+          # install path ("...\Myra Agents\app.exe").
+          New-Item -ItemType Directory -Force C:\smoke | Out-Null
+          "start `"`" `"$exe`"" | Set-Content -Encoding ascii C:\smoke\launch.cmd
+          schtasks /create /tn myrasmoke /tr 'C:\smoke\launch.cmd' /sc once /st 23:59 /it /ru admin /f | Out-Null
+          schtasks /run /tn myrasmoke | Out-Null
+
+          # Poll up to 30s for the process to appear, then confirm it survives.
+          $app = $null
+          for ($i = 0; $i -lt 15; $i++) { Start-Sleep 2; $app = Get-Process $proc -ErrorAction SilentlyContinue | Select-Object -First 1; if ($app) { break } }
+          if (-not $app) { throw "app process '$proc' never started" }
+          Start-Sleep 6
+          $app = Get-Process $proc -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $app) { throw "app exited shortly after launch (crash on startup)" }
+          Write-Host "APP OK  pid=$($app.Id)  responding=$($app.Responding)"
+
+          $side = Get-Process myra-server -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($side) { Write-Host "SIDECAR OK  pid=$($side.Id)" } else { Write-Warning "sidecar 'myra-server' not running" }
+
+      - name: Screenshot (best-effort)
+        if: always()
+        shell: powershell
+        run: |
+          @'
+          Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+          $b  = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bm = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bm).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bm.Save("C:\smoke\smoke.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          '@ | Set-Content C:\smoke\cap.ps1
+          schtasks /create /tn capsmoke /tr 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\smoke\cap.ps1' /sc once /st 23:58 /it /ru admin /f | Out-Null
+          schtasks /run /tn capsmoke | Out-Null
+          Start-Sleep 5
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ env.TAG }}-windows
+          path: C:\smoke\smoke.png
+          if-no-files-found: warn
+
+      - name: Cleanup (uninstall + kill)
+        if: always()
+        shell: powershell
+        run: |
+          Get-Process app, myra-server -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          schtasks /delete /tn myrasmoke /f 2>$null | Out-Null
+          schtasks /delete /tn capsmoke /f 2>$null | Out-Null
+          $entries = Get-ItemProperty `
+            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", `
+            "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+            -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'Myra' }
+          foreach ($e in $entries) {
+            if ($e.UninstallString -match 'MsiExec') {
+              Start-Process msiexec -ArgumentList '/x', $e.PSChildName, '/qn', '/norestart' -Wait
+            } elseif ($e.UninstallString -match 'uninstall\.exe') {
+              $u = ($e.UninstallString -replace '"', ''); if (Test-Path $u) { Start-Process $u -ArgumentList '/S' -Wait }
+            }
+          }
+          Remove-Item C:\smoke -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "cleanup done"
+
+  linux:
+    name: Linux · install + run
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: [self-hosted, myra-ubuntu-vm]
+    timeout-minutes: 15
+    # One-time runner prereqs (no sudo at job time): webkit2gtk-4.1, xvfb,
+    # imagemagick, dbus-x11. The Tauri GUI links the SYSTEM webkit2gtk, which
+    # falls back to software GL under Xvfb (the AppImage's bundled webkit aborts
+    # on EGL headless, so we use the .deb payload instead).
+    env:
+      DISPLAY: ":97"
+    steps:
+      - name: Resolve release + download .deb
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_TAG:-}" ]; then TAG="$RELEASE_TAG"
+          elif [ -n "${INPUT_VERSION:-}" ] && [ "$INPUT_VERSION" != latest ]; then TAG="$INPUT_VERSION"
+          else TAG=""; fi
+          # Ubuntu has no curl; use python3 (always present) for the API + download.
+          python3 - "$TAG" <<'PY'
+          import json, os, sys, urllib.request
+          tag = sys.argv[1]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          tok = os.environ["GH_TOKEN"]
+          base = f"https://api.github.com/repos/{repo}/releases"
+          url = f"{base}/tags/{tag}" if tag else f"{base}/latest"
+          req = urllib.request.Request(url, headers={"Authorization": f"Bearer {tok}", "User-Agent": "myra-ci", "Accept": "application/vnd.github+json"})
+          rel = json.load(urllib.request.urlopen(req))
+          asset = next((a for a in rel["assets"] if a["name"].endswith("_amd64.deb")), None)
+          if not asset: sys.exit(f"no amd64 .deb asset in {rel['tag_name']}")
+          deb = os.path.join(os.environ["RUNNER_TEMP"], "myra.deb")
+          urllib.request.urlretrieve(asset["browser_download_url"], deb)
+          print(f"downloaded {asset['name']} -> {deb}")
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"DEB={deb}\nTAG={rel['tag_name']}\n")
+          PY
+
+      - name: Extract (no root) + launch + assert
+        shell: bash
+        run: |
+          set -euo pipefail
+          EX="$RUNNER_TEMP/myra-ex"
+          rm -rf "$EX"; dpkg-deb -x "$DEB" "$EX"          # extract payload, no sudo
+          APP="$EX/usr/bin/app"
+          test -x "$APP" || { echo "no app binary in .deb"; exit 1; }
+
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/xdg"; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"
+          export WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+          pkill -f myra-ex 2>/dev/null || true; pkill Xvfb 2>/dev/null || true; sleep 1
+          Xvfb "$DISPLAY" -screen 0 1280x800x24 >"$RUNNER_TEMP/xvfb.log" 2>&1 &
+          sleep 3
+          dbus-run-session -- "$APP" >"$RUNNER_TEMP/app.log" 2>&1 &
+          sleep 16
+
+          echo "::group::app.log"; tail -20 "$RUNNER_TEMP/app.log" || true; echo "::endgroup::"
+          if ! pgrep -f "myra-ex/usr/bin/app" >/dev/null; then echo "app process not running (crash)"; exit 1; fi
+          echo "APP OK  pid=$(pgrep -f 'myra-ex/usr/bin/app' | head -1)"
+          if pgrep -f "myra-ex/usr/bin/myra-server" >/dev/null; then echo "SIDECAR OK  pid=$(pgrep -f 'myra-ex/usr/bin/myra-server' | head -1)"; else echo "::warning::sidecar myra-server not running"; fi
+
+      - name: Screenshot (best-effort)
+        if: always()
+        shell: bash
+        run: |
+          export DISPLAY="${DISPLAY:-:97}"
+          import -window root "$RUNNER_TEMP/smoke-linux.png" 2>/dev/null && echo "captured" || echo "::warning::screenshot failed"
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ env.TAG }}-linux
+          path: ${{ runner.temp }}/smoke-linux.png
+          if-no-files-found: warn
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: |
+          pkill -f myra-ex 2>/dev/null || true
+          pkill Xvfb 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/myra-ex" "$RUNNER_TEMP/myra.deb" 2>/dev/null || true
+          echo "cleanup done"
+
+  macos:
+    name: macOS · install + serve (headless core)
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'v') }}
+    runs-on: [self-hosted, myra-mac-vm]
+    timeout-minutes: 15
+    # NOTE: this is a HEADLESS CORE smoke, not a GUI test. The runner is a
+    # LaunchDaemon (Background session) with no Aqua login, so a Tauri GUI window
+    # can't be shown. Instead we verify the shipped .dmg installs (mounts +
+    # extracts), the .app bundle is code-signed + valid, and its bundled
+    # myra-server sidecar runs headlessly and serves. (Driving the GUI would
+    # need a kept-alive interactive login — see the PR notes.)
+    steps:
+      - name: Resolve release + download .dmg
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ -n "${RELEASE_TAG:-}" ]; then TAG="$RELEASE_TAG"
+          elif [ -n "${INPUT_VERSION:-}" ] && [ "$INPUT_VERSION" != latest ]; then TAG="$INPUT_VERSION"
+          else TAG=""; fi
+          case "$(uname -m)" in arm64) ARCH=aarch64 ;; *) ARCH=x64 ;; esac
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
+          url="$api/latest"; [ -n "$TAG" ] && url="$api/tags/$TAG"
+          json=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: myra-ci" "$url")
+          tag=$(printf '%s' "$json" | /usr/bin/python3 -c 'import sys,json;print(json.load(sys.stdin)["tag_name"])')
+          dl=$(printf '%s' "$json" | /usr/bin/python3 -c "import sys,json;a=[x for x in json.load(sys.stdin)['assets'] if x['name'].endswith('_${ARCH}.dmg')];print(a[0]['browser_download_url'] if a else '')")
+          [ -n "$dl" ] || { echo "no _${ARCH}.dmg asset in $tag"; exit 1; }
+          dmg="$RUNNER_TEMP/myra.dmg"; curl -fsSL -o "$dmg" "$dl"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"; echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "downloaded $dl"
+
+      - name: Mount + extract + verify bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mnt="$RUNNER_TEMP/mnt"; rm -rf "$mnt" "$RUNNER_TEMP/Myra.app"; mkdir -p "$mnt"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" >/dev/null
+          src=$(find "$mnt" -maxdepth 1 -name '*.app' | head -1)
+          cp -R "$src" "$RUNNER_TEMP/Myra.app"
+          hdiutil detach "$mnt" >/dev/null || true
+          APP="$RUNNER_TEMP/Myra.app"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          echo "version: $(defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString)"
+          codesign --verify --verbose=1 "$APP" 2>&1 | tail -1
+          test -x "$APP/Contents/MacOS/myra-server" || { echo "no bundled sidecar"; exit 1; }
+
+      - name: Run sidecar headless + assert it serves
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkill myra-server 2>/dev/null || true; sleep 1
+          log="$RUNNER_TEMP/sidecar.log"
+          nohup "$APP/Contents/MacOS/myra-server" >"$log" 2>&1 &
+          for i in $(seq 1 15); do sleep 2; grep -qE 'http://127\.0\.0\.1:[0-9]+' "$log" && break; done
+          echo "::group::sidecar.log"; cat "$log"; echo "::endgroup::"
+          pgrep -f 'Myra.app/Contents/MacOS/myra-server' >/dev/null || { echo "sidecar not running"; exit 1; }
+          port_url=$(grep -oE 'http://127\.0\.0\.1:[0-9]+' "$log" | head -1)
+          [ -n "$port_url" ] || { echo "sidecar never reported a listen address"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$port_url" || echo 000)
+          echo "SERVE OK  $port_url -> HTTP $code"
+          [ "$code" != 000 ] || { echo "sidecar port not reachable"; exit 1; }
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: |
+          pkill myra-server 2>/dev/null || true
+          hdiutil detach "$RUNNER_TEMP/mnt" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/Myra.app" "$RUNNER_TEMP/myra.dmg" 2>/dev/null || true
+          echo "cleanup done"

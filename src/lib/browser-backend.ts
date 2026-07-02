@@ -9,7 +9,7 @@ import {
   UnknownCommandError,
 } from "@myra/shared";
 
-import { DEMO_RUN_LOGS, demoCards } from "@/lib/conversation/demo";
+import { DEMO_RUN_LOGS, demoCards, demoSchedules } from "@/lib/conversation/demo";
 
 const CARDS_KEY = "myra-agents.dev.cards";
 const SETTINGS_KEY = "myra-agents.dev.settings";
@@ -83,6 +83,14 @@ const localStorageStore: Store = {
     writeJson(SETTINGS_KEY, settings);
   },
   async getSchedules() {
+    // First run (no persisted schedules): seed demo schedules so the Schedules
+    // page lists rows in `bun run dev`.
+    const present = (browserStorage()?.getItem(SCHEDULES_KEY) ?? memoryStore.get(SCHEDULES_KEY)) != null;
+    if (!present) {
+      const seeded = demoSchedules();
+      writeJson(SCHEDULES_KEY, seeded);
+      return seeded;
+    }
     return readJson<ScheduledTask[]>(SCHEDULES_KEY, []);
   },
   async saveSchedules(schedules) {

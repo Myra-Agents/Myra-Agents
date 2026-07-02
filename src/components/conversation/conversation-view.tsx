@@ -4,7 +4,7 @@
 // and reasoning, every tool call paired with its output, and a final usage
 // footer. Driven by a parsed `Transcript` (see `lib/conversation/parse.ts`).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   BrainIcon,
@@ -25,8 +25,10 @@ import {
 import { useTranslations } from "next-intl";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { MyraLoader } from "@/components/ui/myra-loader";
 import type { ToolResultEntry, ToolUseEntry, Transcript, TranscriptEntry } from "@/lib/conversation/types";
 import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { CopyButton } from "./copy-button";
 import { DiffView, looksLikeDiff } from "./diff-view";
@@ -66,7 +68,7 @@ function toolArgSummary(tool: ToolUseEntry): string {
   );
 }
 
-export function ConversationView({ transcript }: { transcript: Transcript }) {
+export function ConversationView({ transcript, thinking }: { transcript: Transcript; thinking?: boolean }) {
   // Pair tool results to their calls so a result renders under its tool_use.
   const resultsByToolId = useMemo(() => {
     const map = new Map<string, ToolResultEntry>();
@@ -94,6 +96,43 @@ export function ConversationView({ transcript }: { transcript: Transcript }) {
           />
         );
       })}
+      {thinking && <ThinkingIndicator />}
+    </div>
+  );
+}
+
+/** Animated "agent is working" indicator — the animated Myra mark (shimmer) next
+ * to a rotating playful status message (Claude-Code style). Rendered at the tail
+ * of the transcript while the run is live. */
+function ThinkingIndicator() {
+  const t = useTranslations("logs.conversation");
+  const loaderVariant = usePreferencesStore((s) => s.loaderVariant);
+  // Pull the funny message pool from i18n; fall back to the single "working" line.
+  const messages = useMemo(() => {
+    const raw = t.raw("workingMessages");
+    return Array.isArray(raw) && raw.length > 0 ? (raw as string[]) : [t("working")];
+  }, [t]);
+
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    if (messages.length <= 1) return;
+    const id = setInterval(() => {
+      // Hop to a different random message so it never repeats back-to-back.
+      setIdx((i) => {
+        let n = i;
+        while (n === i) n = Math.floor(Math.random() * messages.length);
+        return n;
+      });
+    }, 7000);
+    return () => clearInterval(id);
+  }, [messages.length]);
+
+  return (
+    <div className="flex items-center gap-2 text-muted-foreground text-xs" aria-live="polite">
+      <MyraLoader size={16} variant={loaderVariant} className="shrink-0 text-primary" />
+      <span key={messages[idx]} className="fade-in animate-in duration-500">
+        {messages[idx]}
+      </span>
     </div>
   );
 }

@@ -1,101 +1,129 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { isTauri } from "@tauri-apps/api/core";
+import { useRouter } from "next/navigation";
+
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   BotIcon,
-  CheckCircle2Icon,
-  ChevronRightIcon,
+  CheckIcon,
   ClockIcon,
-  CoffeeIcon,
   CopyIcon,
-  FlaskConicalIcon,
-  FolderIcon,
+  CopyPlusIcon,
   GitBranchIcon,
-  HelpCircleIcon,
-  ListChecksIcon,
-  ListPlusIcon,
-  Loader2Icon,
-  type LucideIcon,
+  GlobeIcon,
+  LayoutTemplateIcon,
+  ListFilterIcon,
+  MailIcon,
   MoreHorizontalIcon,
-  PackageIcon,
-  PencilIcon,
   PlayIcon,
   PlusIcon,
-  SparklesIcon,
+  SearchIcon,
+  ShieldIcon,
+  TerminalIcon,
   TrashIcon,
-  UsersIcon,
-  XCircleIcon,
   XIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { AgentOptions } from "@/components/agents/agent-options";
-import { WorkingDirField } from "@/components/agents/working-dir-field";
+import { HeaderActions } from "@/app/(main)/_components/header-actions";
+import { AgentInstallGate, useBinaryStatus } from "@/components/agents/binary-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
-import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
 import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
-import { cronToSchedule, scheduleToCron } from "@/lib/schedule-cron";
-import { invoke } from "@/lib/tauri";
+import type { ConnectorKey, IdeaCategory } from "@/lib/schedule-ideas";
+import { IDEA_CATEGORIES, SCHEDULE_IDEAS } from "@/lib/schedule-ideas";
+import { openExternal } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type {
-  CreateScheduleInput,
-  ScheduledTask,
-  ScheduleKind,
-  ScheduleKindType,
-  UpdateScheduleInput,
-} from "@/types/schedule";
-import { defaultScheduleKind, describeSchedule, formatHm } from "@/types/schedule";
+import type { CreateScheduleInput, ScheduledTask } from "@/types/schedule";
+import { describeSchedule, formatHm } from "@/types/schedule";
 import type { AgentPreset } from "@/types/settings";
+import { OLLAMA_INSTALL_INFO } from "@/types/settings";
 
-interface SchedulePreset {
-  id: string;
-  icon: LucideIcon;
-  schedule: ScheduleKind;
-  tags: string[];
+/** The 4-colour Slack mark — lucide has no brand glyph, so inline it. */
+function SlackMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} role="img" fill="none">
+      <title>Slack</title>
+      <path d="M5.04 15.16a2.52 2.52 0 1 1-2.52-2.52h2.52v2.52Z" fill="#e01e5a" />
+      <path d="M6.31 15.16a2.52 2.52 0 0 1 5.04 0v6.32a2.52 2.52 0 0 1-5.04 0v-6.32Z" fill="#e01e5a" />
+      <path d="M8.83 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52H8.83Z" fill="#36c5f0" />
+      <path d="M8.83 6.31a2.52 2.52 0 0 1 0 5.04H2.52a2.52 2.52 0 0 1 0-5.04h6.31Z" fill="#36c5f0" />
+      <path d="M18.96 8.83a2.52 2.52 0 1 1 2.52 2.52h-2.52V8.83Z" fill="#2eb67d" />
+      <path d="M17.69 8.83a2.52 2.52 0 0 1-5.04 0V2.52a2.52 2.52 0 0 1 5.04 0v6.31Z" fill="#2eb67d" />
+      <path d="M15.16 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52h2.52Z" fill="#ecb22e" />
+      <path d="M15.16 17.69a2.52 2.52 0 0 1 0-5.04h6.32a2.52 2.52 0 0 1 0 5.04h-6.32Z" fill="#ecb22e" />
+    </svg>
+  );
 }
 
-// Starter recurring tasks surfaced as "More ideas" chips. Clicking one opens the
-// editor prefilled — labels/copy come from i18n (`schedules.ideas.<id>.*`).
-const SCHEDULE_PRESETS: SchedulePreset[] = [
-  { id: "dailyBrief", icon: CoffeeIcon, schedule: { type: "daily", time: "09:00" }, tags: ["brief"] },
-  {
-    id: "standupPrep",
-    icon: UsersIcon,
-    schedule: { type: "weekly", days: [1, 2, 3, 4, 5], time: "08:45" },
-    tags: ["standup"],
-  },
-  {
-    id: "weeklyReview",
-    icon: ListChecksIcon,
-    schedule: { type: "weekly", days: [1], time: "09:00" },
-    tags: ["review"],
-  },
-  { id: "depUpdates", icon: PackageIcon, schedule: { type: "weekly", days: [1], time: "10:00" }, tags: ["deps"] },
-  { id: "testSweep", icon: FlaskConicalIcon, schedule: { type: "daily", time: "08:00" }, tags: ["tests"] },
-];
+/** The GitHub octocat mark — lucide dropped brand glyphs, so inline it. */
+function GithubMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} role="img" fill="currentColor">
+      <title>GitHub</title>
+      <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58l-.01-2.04c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.81 1.1.81 2.22l-.01 3.29c0 .32.21.7.82.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5Z" />
+    </svg>
+  );
+}
+
+/** Connector glyph at icon-card scale, keyed by connector. */
+const CONNECTOR_ICON: Record<ConnectorKey, ReactNode> = {
+  clock: <ClockIcon className="size-3 text-icon-primary/85" />,
+  github: <GithubMark className="size-3 text-icon-primary/85" />,
+  slack: <SlackMark className="size-3" />,
+  mail: <MailIcon className="size-3 text-icon-primary/85" />,
+  globe: <GlobeIcon className="size-3 text-icon-primary/85" />,
+  shield: <ShieldIcon className="size-3 text-icon-primary/85" />,
+};
+
+/** The "flow" row of an idea card: glyphs joined by thin connector lines. */
+function ConnectorFlow({ keys }: { keys: ConnectorKey[] }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {keys.map((k, i) => (
+        <Fragment key={k}>
+          {i > 0 && <span aria-hidden className="h-px w-3.5 rounded-full bg-icon-tertiary" />}
+          {CONNECTOR_ICON[k]}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+/** Pick a lucide glyph for an agent binary (no brand marks in lucide). */
+function agentIcon(binary: string) {
+  const b = binary.toLowerCase();
+  if (b.includes("opencode")) return BotIcon;
+  return TerminalIcon;
+}
 
 /** Friendly label of the connection that owns a (globalized) schedule id —
  *  "This device", a server name, etc. Mirrors Cursor's "Author" column. */
@@ -108,56 +136,132 @@ function scheduleSource(id: string): string {
   }
 }
 
-/** Compact "Mar 7"-style date for the "Created" column. */
-function formatCreated(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+/** Next-run countdown broken into a unit + count for i18n formatting. */
+function relativeParts(iso?: string): { unit: "now" | "min" | "hours" | "days"; n: number } | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso) - Date.now();
+  if (Number.isNaN(ms)) return null;
+  if (ms <= 0) return { unit: "now", n: 0 };
+  const min = Math.round(ms / 60000);
+  if (min < 60) return { unit: "min", n: min };
+  const h = Math.round(min / 60);
+  if (h < 48) return { unit: "hours", n: h };
+  return { unit: "days", n: Math.round(h / 24) };
+}
+
+/** Sortable schedule columns. */
+type SortKey = "name" | "source" | "agent" | "nextRun";
+type SortDir = "asc" | "desc";
+
+/** Dialog shown when no harness is installed and the user tries to create a patrol. */
+function HarnessGateDialog({
+  open,
+  onOpenChange,
+  harness,
+  onContinueAnyway,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  harness: ReturnType<typeof useBinaryStatus>;
+  onContinueAnyway: () => void;
+}) {
+  const t = useTranslations("schedules");
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("harnessGate.title")}</DialogTitle>
+          <DialogDescription>{t("harnessGate.description")}</DialogDescription>
+        </DialogHeader>
+
+        <AgentInstallGate state={harness} />
+
+        <div className="rounded-md border border-dashed p-3">
+          <p className="mb-1 font-medium text-xs">{t("harnessGate.ollamaTitle")}</p>
+          <p className="mb-2 text-muted-foreground text-xs">{t("harnessGate.ollamaDescription")}</p>
+          <button
+            type="button"
+            className="text-[11px] text-primary underline-offset-2 hover:underline"
+            onClick={() => openExternal(OLLAMA_INSTALL_INFO.docsUrl)}
+          >
+            {t("harnessGate.ollamaLearnMore")}
+          </button>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="ghost" size="sm" onClick={onContinueAnyway}>
+            {t("harnessGate.continueAnyway")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function SchedulesPage() {
   const t = useTranslations("schedules");
-  const { schedules, loading, error, createSchedule, updateSchedule, deleteSchedule, toggleEnabled, triggerNow } =
-    useSchedules();
+  const router = useRouter();
+  const { schedules, loading, error, createSchedule, deleteSchedule, toggleEnabled, triggerNow } = useSchedules();
   const { settings } = useSettings();
 
-  // Resolve an agent-preset id → its display name for the "Tools" column.
-  const agentNameById = useMemo(() => new Map(settings.agents.map((p) => [p.id, p.name])), [settings.agents]);
+  const agentById = useMemo(() => new Map(settings.agents.map((p) => [p.id, p])), [settings.agents]);
 
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<ScheduledTask | null>(null);
-  const [presetInput, setPresetInput] = useState<CreateScheduleInput | null>(null);
-  const [triggering, setTriggering] = useState<string | null>(null);
+  // Harness gate — opencode must be installed before creating a patrol.
+  const harness = useBinaryStatus("opencode");
+  const [gateOpen, setGateOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
-  const handleNew = useCallback(() => {
-    setEditingTask(null);
-    setPresetInput(null);
-    setEditModalOpen(true);
-  }, []);
+  // Once the binary transitions to installed while the gate is open, close + proceed.
+  useEffect(() => {
+    if (gateOpen && harness.resolved && !harness.missing) {
+      setGateOpen(false);
+      const action = pendingAction;
+      setPendingAction(null);
+      action?.();
+    }
+  }, [gateOpen, harness.resolved, harness.missing, pendingAction]);
 
-  const handleIdea = useCallback(
-    (preset: SchedulePreset) => {
-      setEditingTask(null);
-      setPresetInput({
-        name: t(`ideas.${preset.id}.name`),
-        cardTitle: t(`ideas.${preset.id}.cardTitle`),
-        cardDescription: t(`ideas.${preset.id}.description`),
-        agentPrompt: t(`ideas.${preset.id}.prompt`),
-        tags: preset.tags,
-        schedule: preset.schedule,
-        enabled: true,
-      });
-      setEditModalOpen(true);
+  const withHarnessCheck = useCallback(
+    (action: () => void) => {
+      if (harness.resolved && harness.missing) {
+        setPendingAction(() => action);
+        setGateOpen(true);
+        return;
+      }
+      action();
     },
-    [t],
+    [harness.resolved, harness.missing],
   );
 
-  const handleEdit = useCallback((task: ScheduledTask) => {
-    setEditingTask(task);
-    setPresetInput(null);
-    setEditModalOpen(true);
-  }, []);
+  const [triggering, setTriggering] = useState<string | null>(null);
+
+  // Listing controls (Figma filter row).
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [activeCategory, setActiveCategory] = useState<IdeaCategory>("personal");
+
+  // Per-column sort + value filters (mirrors the Runs list view).
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<string[]>([]);
+  const [agentFilter, setAgentFilter] = useState<string[]>([]);
+
+  // Anchor for the "browse templates" jump when the list pushes them off-screen.
+  const ideasRef = useRef<HTMLDivElement>(null);
+
+  const handleEdit = useCallback(
+    (task: ScheduledTask) => {
+      router.push(`/schedules/edit/?id=${encodeURIComponent(task.id)}`);
+    },
+    [router],
+  );
+
+  // Open the editor on a blank draft. Nothing is persisted until the user hits
+  // "Add", so a cancelled patrol never lingers in the list (the editor creates it).
+  const doCreate = useCallback(() => {
+    router.push("/schedules/edit/?new=1");
+  }, [router]);
+  const handleCreate = useCallback(() => withHarnessCheck(doCreate), [withHarnessCheck, doCreate]);
 
   const handleTrigger = useCallback(
     async (id: string) => {
@@ -171,148 +275,459 @@ export default function SchedulesPage() {
     [triggerNow],
   );
 
-  const handleSave = useCallback(
-    async (input: CreateScheduleInput | UpdateScheduleInput) => {
-      if ("id" in input) {
-        await updateSchedule(input);
-      } else {
-        await createSchedule(input);
+  // Clone a schedule onto its owning server, disabled, with a "(copy)" name.
+  const handleDuplicate = useCallback(
+    async (task: ScheduledTask) => {
+      const { connId } = parseGlobalId(task.id);
+      const input: CreateScheduleInput = {
+        name: t("duplicateName", { name: task.name }),
+        cardTitle: task.cardTitle,
+        cardDescription: task.cardDescription,
+        agentPrompt: task.agentPrompt,
+        tags: task.tags,
+        schedule: task.schedule,
+        enabled: false,
+        agentPresetId: task.agentPresetId,
+        agentFlags: task.agentFlags,
+        useWorktree: task.useWorktree,
+        workingDir: task.workingDir,
+        launchVia: task.launchVia,
+        ollamaModel: task.ollamaModel,
+      };
+      try {
+        await createSchedule(input, connId);
+        toast.success(t("toast.duplicated", { name: task.name }));
+      } catch (e) {
+        toast.error(String(e));
       }
-      setEditModalOpen(false);
     },
-    [createSchedule, updateSchedule],
+    [createSchedule, t],
   );
 
-  // Stable order independent of enable/disable — toggling a schedule must not
-  // make its row jump. Sort by creation time (oldest first); fall back to id so
-  // rows without a timestamp stay deterministic.
-  const sorted = [...schedules].sort((a, b) => {
-    const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
-    const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
-    if (ta !== tb) return ta - tb;
-    return a.id.localeCompare(b.id);
-  });
+  // Copy the raw schedule JSON to the clipboard.
+  const handleCopyJson = useCallback(
+    async (task: ScheduledTask) => {
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(task, null, 2));
+        toast.success(t("toast.copiedJson"));
+      } catch {
+        toast.error(t("toast.copyFailed"));
+      }
+    },
+    [t],
+  );
 
-  // Tag suggestions for the editor: every tag already used across schedules.
+  // Stable order independent of enable/disable — toggling must not reorder rows.
+  const sorted = useMemo(
+    () =>
+      [...schedules].sort((a, b) => {
+        const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+        const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+        if (ta !== tb) return ta - tb;
+        return a.id.localeCompare(b.id);
+      }),
+    [schedules],
+  );
+
+  // Tag suggestions: every tag already used across schedules.
   const availableTags = useMemo(
     () => [...new Set(schedules.flatMap((s) => s.tags.map(normalizeTag)).filter(Boolean))],
     [schedules],
   );
 
+  // Display label of a schedule's agent (falls back to "No agent").
+  const agentNameOf = useCallback(
+    (s: ScheduledTask) => (s.agentPresetId ? (agentById.get(s.agentPresetId)?.name ?? t("noAgent")) : t("noAgent")),
+    [agentById, t],
+  );
+
+  const toggleTagFilter = useCallback(
+    (tag: string) => setTagFilter((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag])),
+    [],
+  );
+  const toggleSourceFilter = useCallback(
+    (v: string) => setSourceFilter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])),
+    [],
+  );
+  const toggleAgentFilter = useCallback(
+    (v: string) => setAgentFilter((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v])),
+    [],
+  );
+
+  const clearFilters = useCallback(() => {
+    setTagFilter([]);
+    setSourceFilter([]);
+    setAgentFilter([]);
+    setQuery("");
+    setSearchOpen(false);
+  }, []);
+
+  // Distinct column-filter options.
+  const sourceOptions = useMemo(
+    () => [...new Set(schedules.map((s) => scheduleSource(s.id)).filter(Boolean))],
+    [schedules],
+  );
+  const agentOptions = useMemo(() => [...new Set(schedules.map(agentNameOf))], [schedules, agentNameOf]);
+
+  // Apply tag chips + search query + column value filters to the listing.
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return sorted.filter((s) => {
+      if (tagFilter.length && !s.tags.map(normalizeTag).some((tag) => tagFilter.includes(tag))) return false;
+      if (sourceFilter.length && !sourceFilter.includes(scheduleSource(s.id))) return false;
+      if (agentFilter.length && !agentFilter.includes(agentNameOf(s))) return false;
+      if (q) {
+        // Search across name, schedule, source, agent and tags.
+        const haystack = [s.name, describeSchedule(s.schedule), scheduleSource(s.id), agentNameOf(s), ...s.tags]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [sorted, tagFilter, sourceFilter, agentFilter, query, agentNameOf]);
+
+  // Column sort over the filtered set (stable createdAt order when unsorted).
+  const rows = useMemo(() => {
+    if (!sort) return filtered;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const nextTs = (s: ScheduledTask) =>
+      s.enabled && s.nextRunAt ? Date.parse(s.nextRunAt) || Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY;
+    const val = (s: ScheduledTask): string | number => {
+      switch (sort.key) {
+        case "name":
+          return s.name.toLowerCase();
+        case "source":
+          return scheduleSource(s.id).toLowerCase();
+        case "agent":
+          return agentNameOf(s).toLowerCase();
+        case "nextRun":
+          return nextTs(s);
+      }
+    };
+    return [...filtered].sort((a, b) => {
+      const va = val(a);
+      const vb = val(b);
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }, [filtered, sort, agentNameOf]);
+
+  const narrowed = tagFilter.length > 0 || sourceFilter.length > 0 || agentFilter.length > 0 || query.trim().length > 0;
+  const ideas = useMemo(() => SCHEDULE_IDEAS.filter((i) => i.category === activeCategory), [activeCategory]);
+  // Smooth-scroll to the templates section (used by the floating FAB).
+  const scrollToIdeas = useCallback(() => ideasRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);
+
+  // Show the floating jump-to-templates FAB only while the templates are off-screen.
+  // Callback ref wires up scroll + resize listeners when the templates node mounts
+  // (it renders after loading) — a ResizeObserver also recomputes when the list
+  // grows and pushes the templates below the fold.
+  const [templatesOffscreen, setTemplatesOffscreen] = useState(false);
+  const cleanupFabRef = useRef<(() => void) | null>(null);
+  const setIdeasNode = useCallback((node: HTMLDivElement | null) => {
+    ideasRef.current = node;
+    cleanupFabRef.current?.();
+    cleanupFabRef.current = null;
+    if (!node) return;
+    const compute = () => setTemplatesOffscreen(node.getBoundingClientRect().top > window.innerHeight - 80);
+    const scroller = node.closest(".overflow-y-auto");
+    compute();
+    scroller?.addEventListener("scroll", compute, { passive: true });
+    window.addEventListener("resize", compute);
+    const ro = new ResizeObserver(compute);
+    ro.observe(document.body);
+    cleanupFabRef.current = () => {
+      scroller?.removeEventListener("scroll", compute);
+      window.removeEventListener("resize", compute);
+      ro.disconnect();
+    };
+  }, []);
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">{t("loading")}</p>
+      <div className="flex h-full items-center justify-center">
+        <p className="text-text-tertiary text-sm">{t("loading")}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ClockIcon className="size-5 text-muted-foreground" />
-          <h1 className="text-xl font-semibold tracking-tight">{t("title")}</h1>
-        </div>
-        <Button size="sm" onClick={handleNew}>
-          <PlusIcon className="size-3.5" />
-          {t("newSchedule")}
-        </Button>
+    // Figma "App" content width — 968px, centred in the window.
+    <div className="mx-auto flex w-full max-w-[968px] flex-col">
+      <HarnessGateDialog
+        open={gateOpen}
+        onOpenChange={(open) => {
+          if (!open) setPendingAction(null);
+          setGateOpen(open);
+        }}
+        harness={harness}
+        onContinueAnyway={() => {
+          setGateOpen(false);
+          const action = pendingAction;
+          setPendingAction(null);
+          action?.();
+        }}
+      />
+
+      {/* Title block (Figma: 6px left inset, no inner gap) */}
+      <div className="flex flex-col pl-1.5">
+        <h1 className="text-text-primary text-base font-medium">{t("title")}</h1>
+        <p className="text-text-secondary text-xs font-light">{t("subtitle")}</p>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {/* Filter row: tag chips + search / new (24px below the title) */}
+      <div className="mt-6 flex items-center justify-between gap-3">
+        <div className="no-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto">
+          <span className="shrink-0 pr-2 text-text-tertiary text-xs">{t("tags")}</span>
+          {availableTags.length === 0 && <span className="shrink-0 text-text-tertiary/70 text-xs">{t("noTags")}</span>}
+          {availableTags.map((tag) => {
+            const active = tagFilter.includes(tag);
+            return (
+              <button
+                type="button"
+                key={tag}
+                aria-pressed={active}
+                onClick={() => toggleTagFilter(tag)}
+                className={cn(
+                  // Same per-tag palette as the Tools-column badges.
+                  "shrink-0 rounded-full border px-2 py-0.5 text-xs transition-all",
+                  tagClassName(tag),
+                  active ? "opacity-100 ring-1 ring-current/40" : "opacity-60 hover:opacity-100",
+                )}
+              >
+                {tag}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 text-icon-primary">
+          {searchOpen ? (
+            <div className="flex h-6 items-center gap-1.5">
+              <SearchIcon className="size-4 shrink-0" />
+              <input
+                ref={(el) => el?.focus()}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setQuery("");
+                    setSearchOpen(false);
+                  }
+                }}
+                onBlur={() => {
+                  if (!query.trim()) setSearchOpen(false);
+                }}
+                placeholder={t("searchPlaceholder")}
+                className="w-44 bg-transparent text-text-primary text-xs outline-none placeholder:text-text-tertiary"
+                aria-label={t("search")}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setSearchOpen(false);
+                }}
+                className="shrink-0 transition-colors hover:text-icon-primary"
+                aria-label={t("clearSearch")}
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="flex h-6 items-center transition-colors hover:text-icon-primary"
+              aria-label={t("search")}
+            >
+              <SearchIcon className="size-4" />
+            </button>
+          )}
+        </div>
+      </div>
 
-      {sorted.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground text-sm">{t("emptyState")}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="overflow-hidden rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{t("columns.automation")}</TableHead>
-                <TableHead className="hidden sm:table-cell">{t("columns.source")}</TableHead>
-                <TableHead className="hidden md:table-cell">{t("columns.tools")}</TableHead>
-                <TableHead className="hidden sm:table-cell">{t("columns.created")}</TableHead>
-                <TableHead className="w-10" />
+      {/* New Patrol lives in the shared top bar (left of the theme switcher). */}
+      <HeaderActions>
+        <button
+          type="button"
+          onClick={handleCreate}
+          className="flex h-6 items-center gap-1 rounded-md bg-primary px-2 font-medium text-[11px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+        >
+          <PlusIcon className="size-3.5 shrink-0" />
+          <span className="whitespace-nowrap">{t("newSchedule")}</span>
+        </button>
+      </HeaderActions>
+
+      {error && <p className="mt-2 text-destructive text-xs">{error}</p>}
+
+      {/* Count line (Figma: right-aligned, light tertiary). */}
+      <div className="mt-2 flex items-center justify-end gap-2 text-xs">
+        {narrowed && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
+          >
+            {t("clearFilters")}
+          </button>
+        )}
+        <span className="text-text-tertiary font-light">
+          {t("showing", { shown: rows.length, total: filtered.length })}
+        </span>
+      </div>
+
+      {/* Schedule list table */}
+      <div className="mt-2 overflow-hidden rounded-card border border-border-cards bg-card-background">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-border-cards hover:bg-transparent">
+              <ColHead label={t("columns.name")} sortKey="name" sort={sort} setSort={setSort} />
+              <ColHead
+                label={t("columns.source")}
+                sortKey="source"
+                sort={sort}
+                setSort={setSort}
+                className="w-[150px]"
+                filter={{
+                  options: sourceOptions.map((v) => ({ value: v, label: v })),
+                  selected: sourceFilter,
+                  onToggle: toggleSourceFilter,
+                  onClear: () => setSourceFilter([]),
+                }}
+              />
+              <ColHead
+                label={t("columns.agent")}
+                sortKey="agent"
+                sort={sort}
+                setSort={setSort}
+                className="w-[150px]"
+                filter={{
+                  options: agentOptions.map((v) => ({ value: v, label: v })),
+                  selected: agentFilter,
+                  onToggle: toggleAgentFilter,
+                  onClear: () => setAgentFilter([]),
+                }}
+              />
+              <ColHead
+                label={t("columns.tools")}
+                sort={sort}
+                setSort={setSort}
+                className="w-[180px]"
+                filter={{
+                  options: availableTags.map((v) => ({ value: v, label: v })),
+                  selected: tagFilter,
+                  onToggle: toggleTagFilter,
+                  onClear: () => setTagFilter([]),
+                  colored: true,
+                }}
+              />
+              <ColHead
+                label={t("columns.nextRun")}
+                sortKey="nextRun"
+                sort={sort}
+                setSort={setSort}
+                className="w-[120px]"
+              />
+              <TableHead className="h-10 w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow className="border-border-cards hover:bg-transparent">
+                <TableCell colSpan={6} className="h-24 text-center text-sm">
+                  <span className="text-text-tertiary">{narrowed ? t("emptyFiltered") : t("emptyState")}</span>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((task) => {
-                const agentName = task.agentPresetId ? agentNameById.get(task.agentPresetId) : undefined;
+            ) : (
+              rows.map((task) => {
+                const agent = task.agentPresetId ? agentById.get(task.agentPresetId) : undefined;
                 const source = scheduleSource(task.id);
+                const rel = task.enabled ? relativeParts(task.nextRunAt) : null;
                 return (
-                  <TableRow key={task.id} className={cn("group", !task.enabled && "opacity-60")}>
+                  <TableRow
+                    key={task.id}
+                    onClick={() => handleEdit(task)}
+                    className={cn(
+                      "group cursor-pointer border-border-cards transition-colors hover:bg-secondary/40",
+                      !task.enabled && "opacity-60",
+                    )}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Switch checked={task.enabled} onCheckedChange={(v) => toggleEnabled(task.id, v)} />
+                        {/* Toggle must not open the editor. */}
+                        <Switch
+                          checked={task.enabled}
+                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={(v) => toggleEnabled(task.id, v)}
+                        />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium">{task.name}</span>
-                            {!task.enabled && (
-                              <Badge
-                                variant="secondary"
-                                className="h-4 px-1.5 text-[10px] font-normal text-muted-foreground"
-                              >
-                                {t("status.inactive")}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {describeSchedule(task.schedule)}
-                            {task.enabled && task.nextRunAt
-                              ? ` · ${t("next", { time: formatHm(task.nextRunAt) })}`
-                              : ""}
-                          </p>
+                          <p className="truncate text-text-primary text-sm">{task.name}</p>
+                          <p className="truncate text-text-tertiary text-xs">{describeSchedule(task.schedule)}</p>
                         </div>
                       </div>
                     </TableCell>
-
-                    <TableCell className="hidden whitespace-nowrap text-sm text-muted-foreground sm:table-cell">
-                      {source || "—"}
+                    <TableCell className="whitespace-nowrap text-text-secondary text-xs">{source || "—"}</TableCell>
+                    <TableCell>
+                      <AgentChip agent={agent} />
                     </TableCell>
-
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs text-muted-foreground">
-                          <BotIcon className="size-3" />
-                          {agentName ?? t("noAgent")}
-                        </span>
                         {task.useWorktree && (
-                          <span className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-muted-foreground">
+                          <span className="inline-flex items-center rounded-md border border-border-cards px-1.5 py-0.5 text-icon-tertiary">
                             <GitBranchIcon className="size-3" />
                           </span>
                         )}
-                        {task.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className={tagClassName(tag, "h-5 text-[10px]")}>
-                            {tag}
-                          </Badge>
-                        ))}
+                        {task.tags.length === 0 ? (
+                          <span className="text-text-tertiary text-xs">—</span>
+                        ) : (
+                          task.tags.map((tag) => (
+                            <Badge key={tag} variant="outline" className={tagClassName(tag, "h-5 text-[10px]")}>
+                              {tag}
+                            </Badge>
+                          ))
+                        )}
                       </div>
                     </TableCell>
-
-                    <TableCell className="hidden whitespace-nowrap text-sm text-muted-foreground sm:table-cell">
-                      {formatCreated(task.createdAt)}
+                    <TableCell>
+                      {rel ? (
+                        <div className="flex flex-col">
+                          <span className="whitespace-nowrap text-text-primary text-xs">
+                            {rel.unit === "now" ? t("relative.now") : t(`relative.${rel.unit}`, { n: rel.n })}
+                          </span>
+                          {task.nextRunAt && (
+                            <span className="whitespace-nowrap text-text-tertiary text-[10px]">
+                              {formatHm(task.nextRunAt)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-text-tertiary text-xs">—</span>
+                      )}
                     </TableCell>
-
-                    <TableCell className="text-right">
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-xs" title={t("actions.edit")}>
-                            <MoreHorizontalIcon />
-                          </Button>
+                          <button
+                            type="button"
+                            className="flex size-7 items-center justify-center rounded-md text-icon-tertiary transition-colors hover:bg-secondary hover:text-icon-primary"
+                            aria-label={t("actions.edit")}
+                          >
+                            <MoreHorizontalIcon className="size-4" />
+                          </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleTrigger(task.id)} disabled={triggering === task.id}>
                             <PlayIcon className="size-3.5" />
                             {t("actions.runNow")}
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(task)}>
-                            <PencilIcon className="size-3.5" />
-                            {t("actions.edit")}
+                          <DropdownMenuItem onClick={() => handleDuplicate(task)}>
+                            <CopyPlusIcon className="size-3.5" />
+                            {t("actions.duplicate")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleCopyJson(task)}>
+                            <CopyIcon className="size-3.5" />
+                            {t("actions.copyJson")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -327,789 +742,226 @@ export default function SchedulesPage() {
                     </TableCell>
                   </TableRow>
                 );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+              })
+            )}
+          </TableBody>
+        </Table>
+        {/* Filters hide some rows — dashed footer to clear them (Runs list view). */}
+        {narrowed && rows.length > 0 && filtered.length < schedules.length && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="w-full border-border-cards border-t border-dashed py-3 text-center text-text-tertiary text-xs transition-colors hover:text-text-secondary"
+          >
+            {t("seeAll", { shown: filtered.length, total: schedules.length })}
+          </button>
+        )}
+      </div>
 
-      <div className="space-y-2 pt-2">
-        <p className="text-xs font-medium text-muted-foreground">{t("ideas.heading")}</p>
-        <div className="flex flex-wrap gap-2">
-          {SCHEDULE_PRESETS.map((preset) => {
-            const Icon = preset.icon;
+      {/* Use-case ideas (Figma: category tabs + card grid, 40px below the table) */}
+      <div ref={setIdeasNode} className="mt-10 flex scroll-mt-4 flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <LayoutTemplateIcon className="size-3.5 text-text-tertiary" />
+          <h2 className="text-text-secondary text-xs font-medium">{t("templatesHeading")}</h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-1">
+          {IDEA_CATEGORIES.map((cat) => {
+            const active = activeCategory === cat;
             return (
-              <Button key={preset.id} variant="outline" size="sm" onClick={() => handleIdea(preset)}>
-                <Icon className="size-3.5" />
-                {t(`ideas.${preset.id}.label`)}
-              </Button>
+              <button
+                type="button"
+                key={cat}
+                aria-pressed={active}
+                onClick={() => setActiveCategory(cat)}
+                className={cn(
+                  "rounded-card px-2 py-1 text-xs transition-colors",
+                  active ? "bg-secondary text-text-primary" : "text-text-tertiary hover:text-text-secondary",
+                )}
+              >
+                {t(`ideas.categories.${cat}`)}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {ideas.map((idea) => {
+            const openTemplate = () =>
+              withHarnessCheck(() => router.push(`/schedules/edit/?template=${encodeURIComponent(idea.id)}`));
+            return (
+              <button
+                type="button"
+                key={idea.id}
+                onClick={openTemplate}
+                className="flex flex-col gap-2 rounded-card border border-border-cards bg-card-background p-2.5 pr-10 text-left transition-colors hover:border-border hover:bg-secondary/40"
+              >
+                <ConnectorFlow keys={idea.connectors} />
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-text-primary text-xs font-medium">{t(`ideas.${idea.id}.name`)}</h3>
+                  <p className="text-text-secondary text-[11px] font-light leading-relaxed">
+                    {t(`ideas.${idea.id}.description`)}
+                  </p>
+                </div>
+                <span className="self-start rounded-card border border-border-cards px-2 py-0.5 text-text-primary text-[11px] font-medium transition-colors hover:bg-secondary">
+                  {t("ideas.add")}
+                </span>
+              </button>
             );
           })}
         </div>
       </div>
 
-      <ScheduleEditModal
-        key={`${editingTask?.id ?? presetInput?.name ?? "new"}-${editModalOpen}`}
-        open={editModalOpen}
-        task={editingTask}
-        initial={presetInput}
-        availableTags={availableTags}
-        onSave={handleSave}
-        onClose={() => setEditModalOpen(false)}
-      />
+      {/* Floating jump-to-templates FAB: always on top, bottom-right, slides in
+          from below once the templates scroll out of view. */}
+      <button
+        type="button"
+        onClick={scrollToIdeas}
+        aria-label={t("browseTemplates")}
+        title={t("browseTemplates")}
+        className={cn(
+          "fixed right-5 bottom-5 z-50 flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-primary-foreground shadow-md ring-1 ring-black/10 transition-all duration-300 hover:bg-primary/90",
+          templatesOffscreen ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-12 opacity-0",
+        )}
+      >
+        <LayoutTemplateIcon className="size-4 shrink-0" />
+        <span className="whitespace-nowrap text-xs font-medium">{t("templatesShort")}</span>
+      </button>
     </div>
   );
 }
 
-interface ScheduleEditModalProps {
-  open: boolean;
-  task: ScheduledTask | null;
-  initial?: CreateScheduleInput | null;
-  availableTags?: string[];
-  onSave: (input: CreateScheduleInput | UpdateScheduleInput) => Promise<void>;
-  onClose: () => void;
-}
-
-/** Strip common agent-CLI noise (code fences, surrounding quotes) from a
- *  one-shot completion so the raw model text lands cleanly in the field. */
-function cleanGenerated(raw: string): string {
-  return raw
-    .trim()
-    .replace(/^```[a-zA-Z]*\n?/, "")
-    .replace(/\n?```$/, "")
-    .trim()
-    .replace(/^["'`]+|["'`]+$/g, "")
-    .trim();
-}
-
-function ScheduleEditModal({ open, task, initial, availableTags = [], onSave, onClose }: ScheduleEditModalProps) {
-  const t = useTranslations("schedules");
-  const { settings, save: saveSettings } = useSettings();
-  const agentPresets = settings.agents;
-  const defaultAgentId = settings.defaultAgentId;
-
-  // Editing an existing task wins; otherwise seed from a clicked "More ideas" preset.
-  const seed = task ?? initial ?? null;
-  const [name, setName] = useState(seed?.name ?? "");
-  const [cardTitle, setCardTitle] = useState(seed?.cardTitle ?? "");
-  const [cardDescription, setCardDescription] = useState(seed?.cardDescription ?? "");
-  const [agentPrompt, setAgentPrompt] = useState(seed?.agentPrompt ?? "");
-  const [tagList, setTagList] = useState<string[]>(() => [
-    ...new Set((seed?.tags ?? []).map(normalizeTag).filter(Boolean)),
-  ]);
-  const [tagInput, setTagInput] = useState("");
-  const [kindType, setKindType] = useState<ScheduleKindType>(seed?.schedule.type ?? "daily");
-  const [schedule, setSchedule] = useState<ScheduleKind>(seed?.schedule ?? defaultScheduleKind("daily"));
-  const [enabled, setEnabled] = useState(seed?.enabled ?? true);
-  const [saving, setSaving] = useState(false);
-
-  // Agent run config inherited by every materialized card (mirrors New Task).
-  const [agentPresetId, setAgentPresetId] = useState(seed?.agentPresetId ?? "");
-  const [agentFlags, setAgentFlags] = useState<string[] | undefined>(seed?.agentFlags);
-  const [useWorktree, setUseWorktree] = useState<boolean | undefined>(seed?.useWorktree);
-  const [workingDir, setWorkingDir] = useState(seed?.workingDir ?? "");
-  const [launchVia, setLaunchVia] = useState<"direct" | "ollama" | undefined>(seed?.launchVia);
-  const [ollamaModel, setOllamaModel] = useState<string | undefined>(seed?.ollamaModel);
-
-  // Raw text of the "cron equivalent" field while the user types; null = follow
-  // the structured schedule (so the cron shows the derived form).
-  const [cronDraft, setCronDraft] = useState<string | null>(null);
-
-  // Live preset connectivity-test state, keyed by preset id (seeded from cache).
-  const [testResults, setTestResults] = useState<Record<string, StoredTestResult | null>>({});
-  const [testingId, setTestingId] = useState<string | null>(null);
-  const [generating, setGenerating] = useState<null | "prompt" | "tags">(null);
-  // A generated prompt waiting for the user to accept/dismiss (so questions the
-  // agent raises are surfaced rather than silently dropped into the field).
-  const [promptDraft, setPromptDraft] = useState<string | null>(null);
-
-  const selectedPreset = useMemo(() => agentPresets.find((p) => p.id === agentPresetId), [agentPresets, agentPresetId]);
-  const selectedTest = agentPresetId ? (testResults[agentPresetId] ?? null) : null;
-  // A preset whose live test failed can't be accepted; one mid-test blocks too.
-  const presetBlocked = Boolean(selectedPreset) && (selectedTest?.status === "failed" || testingId === agentPresetId);
-
-  // Seed the default preset + cached test results once settings finish loading.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time seed when presets load
-  useEffect(() => {
-    if (agentPresets.length === 0) return;
-    setAgentPresetId((cur) => (cur ? cur : (seed?.agentPresetId ?? defaultAgentId ?? agentPresets[0]?.id ?? "")));
-    setTestResults((cur) => {
-      if (Object.keys(cur).length > 0) return cur;
-      const map: Record<string, StoredTestResult | null> = {};
-      for (const p of agentPresets) {
-        // Prefer the local cache; fall back to the durable "tested" flag stored
-        // on the preset in settings (e.g. a fresh machine with no cache yet).
-        map[p.id] =
-          loadTestResult(p.id) ?? (p.lastTestedAt ? { status: "passed", ts: Date.parse(p.lastTestedAt) } : null);
-      }
-      return map;
-    });
-  }, [agentPresets, defaultAgentId]);
-
-  /** Run `test_agent` for a preset, cache + reflect the result. Returns pass. */
-  const runPresetTest = useCallback(
-    async (preset: AgentPreset): Promise<boolean> => {
-      if (!isTauri()) return true; // No sidecar in the browser — don't block dev.
-      setTestingId(preset.id);
-      try {
-        await invoke("test_agent", {
-          binary: preset.binary,
-          argsTemplate: preset.argsTemplate,
-          workingDir: preset.workingDir ?? null,
-        });
-        const result = persistTestResult(preset.id, "passed");
-        setTestResults((cur) => ({ ...cur, [preset.id]: result }));
-        // Persist the pass into settings data so the "tested" state is durable
-        // (survives reloads, shared with Settings) — not just a localStorage cache.
-        void saveSettings({
-          ...settings,
-          agents: settings.agents.map((p) =>
-            p.id === preset.id ? { ...p, lastTestedAt: new Date().toISOString() } : p,
-          ),
-        });
-        return true;
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : typeof err === "string" ? err : undefined;
-        const result = persistTestResult(preset.id, "failed", reason);
-        setTestResults((cur) => ({ ...cur, [preset.id]: result }));
-        toast.error(t("agent.testFailedToast", { name: preset.name }));
-        return false;
-      } finally {
-        setTestingId(null);
-      }
-    },
-    [t, settings, saveSettings],
-  );
-
-  const handlePresetChange = (value: string) => {
-    setAgentPresetId(value);
-    // Card-level overrides belong to the previous preset — drop them so the
-    // options editor falls back to the newly selected preset's defaults.
-    setAgentFlags(undefined);
-    setUseWorktree(undefined);
-    setLaunchVia(undefined);
-    setOllamaModel(undefined);
-    const preset = agentPresets.find((p) => p.id === value);
-    // Auto-test on select unless a passing result is already cached.
-    if (preset && testResults[value]?.status !== "passed") void runPresetTest(preset);
-  };
-
-  // ── tags ───────────────────────────────────────────────────────────────
-  const tagSuggestions = useMemo(() => {
-    const needle = normalizeTag(tagInput);
-    return [...new Set(availableTags.map(normalizeTag))]
-      .filter((tag) => tag && !tagList.includes(tag) && (!needle || tag.includes(needle)))
-      .slice(0, 8);
-  }, [availableTags, tagInput, tagList]);
-
-  const addTag = useCallback((value: string) => {
-    const tag = normalizeTag(value);
-    if (!tag) return;
-    setTagList((cur) => (cur.includes(tag) ? cur : [...cur, tag]));
-    setTagInput("");
-  }, []);
-  const removeTag = (tag: string) => setTagList((cur) => cur.filter((x) => x !== tag));
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      addTag(tagInput);
-    } else if (e.key === "Backspace" && !tagInput) {
-      setTagList((cur) => cur.slice(0, -1));
-    }
-  };
-
-  // ── LLM one-shot generation (runs the selected preset's agent) ──────────
-  const runAgentComplete = useCallback(
-    async (metaPrompt: string): Promise<string | null> => {
-      if (!selectedPreset) {
-        toast.error(t("agent.needPreset"));
-        return null;
-      }
-      if (!isTauri()) {
-        toast.error(t("agent.devOnly"));
-        return null;
-      }
-      const res = await invoke<{ output?: string }>("agent_complete", {
-        binary: selectedPreset.binary,
-        argsTemplate: selectedPreset.argsTemplate,
-        prompt: metaPrompt,
-        flags: agentFlags ?? selectedPreset.flags ?? [],
-        workingDir: workingDir.trim() ? workingDir.trim() : (selectedPreset.workingDir ?? null),
-        launchVia: launchVia ?? selectedPreset.launchVia ?? "direct",
-        ollamaModel: ollamaModel ?? selectedPreset.ollamaModel ?? null,
-      });
-      return res?.output ?? null;
-    },
-    [selectedPreset, agentFlags, workingDir, launchVia, ollamaModel, t],
-  );
-
-  // Both drafters need a name + description to give the agent any context.
-  const hasContext = name.trim().length > 0 && cardDescription.trim().length > 0;
-
-  const handleGeneratePrompt = async () => {
-    if (!hasContext) {
-      toast.error(t("agent.needContext"));
-      return;
-    }
-    setGenerating("prompt");
-    try {
-      const meta = t("agent.promptMeta", { name: name.trim(), description: cardDescription.trim() });
-      const out = await runAgentComplete(meta);
-      const text = out ? cleanGenerated(out) : "";
-      // Show the result as a draft to review (so questions surface) instead of
-      // overwriting the field outright.
-      if (text) setPromptDraft(text);
-      else if (out !== null) toast.error(t("agent.generateEmpty"));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("agent.generateError"));
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handleSuggestTags = async () => {
-    if (!hasContext) {
-      toast.error(t("agent.needContext"));
-      return;
-    }
-    setGenerating("tags");
-    try {
-      const meta = t("agent.tagsMeta", { name: name.trim(), description: cardDescription.trim() });
-      const out = await runAgentComplete(meta);
-      const proposed = (out ? cleanGenerated(out) : "").split(/[,\n]/).map(normalizeTag).filter(Boolean).slice(0, 6);
-      if (proposed.length === 0) {
-        if (out !== null) toast.error(t("agent.generateEmpty"));
-        return;
-      }
-      setTagList((cur) => [...new Set([...cur, ...proposed])]);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("agent.generateError"));
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handleKindChange = (type: ScheduleKindType) => {
-    setKindType(type);
-    setSchedule(defaultScheduleKind(type));
-    setCronDraft(null); // structured edit → cron field follows again
-  };
-
-  // Edits to the structured fields go through here so the cron field re-derives.
-  const handleScheduleChange = (next: ScheduleKind) => {
-    setSchedule(next);
-    setCronDraft(null);
-  };
-
-  // Cron field value: the user's draft while typing, else the derived form.
-  const cronValue = cronDraft ?? scheduleToCron(schedule) ?? "";
-  const cronExpressible = schedule.type === "cron" || scheduleToCron(schedule) !== null;
-
-  // Editing the cron text re-derives the kind: a daily/weekly/interval match
-  // selects that type, anything else falls back to a raw cron ("custom").
-  const handleCronChange = (text: string) => {
-    setCronDraft(text);
-    const parsed = cronToSchedule(text);
-    if (parsed) {
-      setSchedule(parsed);
-      setKindType(parsed.type);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !cardTitle.trim() || presetBlocked) return;
-    setSaving(true);
-    try {
-      const input: CreateScheduleInput = {
-        name: name.trim(),
-        cardTitle: cardTitle.trim(),
-        cardDescription,
-        agentPrompt,
-        tags: tagList,
-        schedule,
-        enabled,
-        agentPresetId: agentPresetId || undefined,
-        agentFlags,
-        useWorktree,
-        workingDir: workingDir.trim() || undefined,
-        launchVia,
-        ollamaModel,
-      };
-      if (task) {
-        await onSave({ ...input, id: task.id });
-      } else {
-        await onSave(input);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const canGenerate = Boolean(selectedPreset) && !presetBlocked && generating === null;
-  // Heuristic: a draft containing a question mark is likely the agent asking for
-  // clarification rather than a ready-to-use prompt — flag it so the user answers.
-  const promptDraftIsQuestion = promptDraft !== null && promptDraft.includes("?");
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <DialogHeader className="shrink-0 border-b p-4 pr-12">
-          <DialogTitle className="flex items-center gap-2">
-            <ListPlusIcon className="size-4 text-muted-foreground" />
-            {task ? t("editSchedule") : t("newSchedule")}
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-            <div className="space-y-2">
-              <Label>{t("form.scheduleName")} *</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t("form.scheduleNamePlaceholder")}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>{t("form.cardTitle")} *</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="h-6 gap-1 text-muted-foreground"
-                  onClick={() => setCardTitle(name)}
-                  disabled={!name.trim()}
-                  title={t("form.copyName")}
-                >
-                  <CopyIcon className="size-3" />
-                  {t("form.copyName")}
-                </Button>
-              </div>
-              <Input
-                value={cardTitle}
-                onChange={(e) => setCardTitle(e.target.value)}
-                placeholder={t("form.cardTitlePlaceholder")}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t("form.description")}</Label>
-              <Textarea
-                value={cardDescription}
-                onChange={(e) => setCardDescription(e.target.value)}
-                rows={2}
-                placeholder={t("form.descriptionPlaceholder")}
-              />
-            </div>
-
-            {agentPresets.length > 0 && (
-              <div className="space-y-2 rounded-lg border bg-foreground/5 p-3">
-                <Label>{t("form.agentPreset")}</Label>
-                <Select value={agentPresetId} onValueChange={handlePresetChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("agent.needPreset")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agentPresets.map((preset) => {
-                      const r = testResults[preset.id];
-                      return (
-                        <SelectItem key={preset.id} value={preset.id}>
-                          <span className="flex items-center gap-2">
-                            {preset.name}
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
-                                r?.status === "passed"
-                                  ? "bg-green-500/15 text-green-600"
-                                  : r?.status === "failed"
-                                    ? "bg-red-500/15 text-red-600"
-                                    : "bg-muted text-muted-foreground",
-                              )}
-                            >
-                              {r?.status === "passed" ? (
-                                <CheckCircle2Icon className="size-2.5" />
-                              ) : r?.status === "failed" ? (
-                                <XCircleIcon className="size-2.5" />
-                              ) : null}
-                              {r?.status === "passed"
-                                ? t("agent.tested")
-                                : r?.status === "failed"
-                                  ? t("agent.testFailed")
-                                  : t("agent.untested")}
-                            </span>
-                          </span>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-
-                {selectedPreset && testingId === agentPresetId && (
-                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2Icon className="size-3 animate-spin" />
-                    {t("agent.testing", { name: selectedPreset.name })}
-                  </p>
-                )}
-                {selectedPreset && presetBlocked && selectedTest?.status === "failed" && (
-                  <div className="space-y-1.5">
-                    <p className="flex items-center gap-1.5 text-xs text-destructive">
-                      <XCircleIcon className="size-3" />
-                      {t("agent.blocked")}
-                    </p>
-                    {selectedTest.reason && (
-                      <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
-                        {selectedTest.reason}
-                      </p>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      onClick={() => selectedPreset && void runPresetTest(selectedPreset)}
-                      disabled={testingId !== null}
-                    >
-                      <FlaskConicalIcon className="size-3" />
-                      {t("agent.retry")}
-                    </Button>
-                  </div>
-                )}
-
-                {selectedPreset && (
-                  <details className="group rounded-md border bg-background/40 px-2.5 py-2">
-                    <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground text-xs hover:text-foreground">
-                      <ChevronRightIcon className="size-3 transition-transform group-open:rotate-90" />
-                      {t("form.override")}
-                    </summary>
-                    <div className="pt-2">
-                      <AgentOptions
-                        binary={selectedPreset.binary}
-                        flags={agentFlags ?? selectedPreset.flags ?? []}
-                        useWorktree={useWorktree ?? selectedPreset.useWorktree ?? false}
-                        launchVia={launchVia ?? selectedPreset.launchVia ?? "direct"}
-                        ollamaModel={ollamaModel ?? selectedPreset.ollamaModel ?? ""}
-                        onFlagsChange={setAgentFlags}
-                        onWorktreeChange={setUseWorktree}
-                        onLaunchViaChange={setLaunchVia}
-                        onOllamaModelChange={setOllamaModel}
-                      />
-                    </div>
-                  </details>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <FolderIcon className="size-3.5 text-muted-foreground" />
-                {t("form.workingDir")}
-                <span className="font-normal text-muted-foreground">({t("form.optional")})</span>
-              </Label>
-              <WorkingDirField
-                value={workingDir}
-                onChange={setWorkingDir}
-                placeholder={selectedPreset?.workingDir ?? ""}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>{t("form.agentPrompt")}</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => void handleGeneratePrompt()}
-                  disabled={!canGenerate}
-                  title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
-                >
-                  {generating === "prompt" ? (
-                    <Loader2Icon className="size-3 animate-spin" />
-                  ) : (
-                    <SparklesIcon className="size-3" />
-                  )}
-                  {t("actions.generate")}
-                </Button>
-              </div>
-              <Textarea
-                value={agentPrompt}
-                onChange={(e) => setAgentPrompt(e.target.value)}
-                rows={3}
-                className="font-mono text-xs"
-              />
-              {promptDraft !== null && (
-                <div className="space-y-1.5 rounded-md border bg-foreground/5 p-2.5">
-                  <div className="flex items-center gap-1.5 font-medium text-xs">
-                    {promptDraftIsQuestion ? (
-                      <HelpCircleIcon className="size-3.5 text-amber-500" />
-                    ) : (
-                      <SparklesIcon className="size-3.5 text-muted-foreground" />
-                    )}
-                    {promptDraftIsQuestion ? t("agent.previewQuestion") : t("agent.previewTitle")}
-                  </div>
-                  <p className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded bg-background px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
-                    {promptDraft}
-                  </p>
-                  <div className="flex gap-1.5">
-                    <Button
-                      type="button"
-                      size="xs"
-                      onClick={() => {
-                        setAgentPrompt(promptDraft);
-                        setPromptDraft(null);
-                      }}
-                    >
-                      {t("agent.useDraft")}
-                    </Button>
-                    <Button type="button" size="xs" variant="ghost" onClick={() => setPromptDraft(null)}>
-                      {t("agent.dismissDraft")}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>{t("form.tags")}</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => void handleSuggestTags()}
-                  disabled={!canGenerate}
-                  title={selectedPreset ? t("agent.generateHint") : t("agent.needPreset")}
-                >
-                  {generating === "tags" ? (
-                    <Loader2Icon className="size-3 animate-spin" />
-                  ) : (
-                    <SparklesIcon className="size-3" />
-                  )}
-                  {t("actions.suggestTags")}
-                </Button>
-              </div>
-              <div className="flex min-h-10 flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1.5">
-                {tagList.map((tag) => (
-                  <Badge key={tag} variant="outline" className={tagClassName(tag, "h-6 gap-1 pr-1")}>
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="rounded-full p-0.5 hover:bg-background/60"
-                    >
-                      <XIcon className="size-3" />
-                    </button>
-                  </Badge>
-                ))}
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  onBlur={() => addTag(tagInput)}
-                  placeholder={tagList.length === 0 ? t("form.tagsPlaceholder") : ""}
-                  className="h-7 min-w-32 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
-                />
-              </div>
-              {tagSuggestions.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {tagSuggestions.map((tag) => (
-                    <Button key={tag} type="button" variant="outline" size="xs" onClick={() => addTag(tag)}>
-                      {tag}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t("form.scheduleKind")}</Label>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="flex flex-col gap-1">
-                  <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                    {t("form.typeLabel")}
-                  </Label>
-                  <Select value={kindType} onValueChange={(v) => handleKindChange(v as ScheduleKindType)}>
-                    <SelectTrigger className="w-32 shrink-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="once">{t("kind.once")}</SelectItem>
-                      <SelectItem value="daily">{t("kind.daily")}</SelectItem>
-                      <SelectItem value="weekly">{t("kind.weekly")}</SelectItem>
-                      <SelectItem value="interval">{t("kind.interval")}</SelectItem>
-                      <SelectItem value="cron">{t("kind.custom")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Structured field(s) for the kind, inline to the right. */}
-                {kindType !== "cron" && (
-                  <div className="flex flex-wrap items-end gap-2">
-                    <ScheduleKindFields schedule={schedule} onChange={handleScheduleChange} inline />
-                  </div>
-                )}
-
-                {/* Cron equivalent — sits right after the time, with a margin. */}
-                <div className="ml-2 flex flex-col gap-1">
-                  <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                    {t("form.cronEquivalent")}
-                  </Label>
-                  <Input
-                    value={cronValue}
-                    onChange={(e) => handleCronChange(e.target.value)}
-                    placeholder={cronExpressible ? "0 9 * * *" : t("form.cronNotExpressible")}
-                    disabled={!cronExpressible && kindType !== "cron"}
-                    className="h-8 w-36 font-mono text-xs"
-                    title={t("form.cronEquivalent")}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch checked={enabled} onCheckedChange={setEnabled} />
-              <Label>{t("enabled")}</Label>
-            </div>
-          </div>
-
-          <DialogFooter className="mx-0 mb-0 shrink-0">
-            <Button type="button" variant="outline" onClick={onClose}>
-              {t("actions.cancel")}
-            </Button>
-            <Button type="submit" disabled={!name.trim() || !cardTitle.trim() || presetBlocked || saving}>
-              {saving ? t("actions.saving") : task ? t("actions.update") : t("actions.create")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function ScheduleKindFields({
-  schedule,
-  onChange,
-  inline = false,
+/** A column header with a hover-revealed sort + (optional) value-filter menu.
+ *  Mirrors the Runs list view. `sortKey` omitted → header is filter-only. */
+function ColHead({
+  label,
+  sortKey,
+  sort,
+  setSort,
+  filter,
+  className,
 }: {
-  schedule: ScheduleKind;
-  onChange: (s: ScheduleKind) => void;
-  inline?: boolean;
+  label: string;
+  sortKey?: SortKey;
+  sort: { key: SortKey; dir: SortDir } | null;
+  setSort: (next: { key: SortKey; dir: SortDir } | null) => void;
+  filter?: {
+    options: { value: string; label: string }[];
+    selected: string[];
+    onToggle: (value: string) => void;
+    onClear: () => void;
+    /** Render each option as a tag-coloured pill (Tools column). */
+    colored?: boolean;
+  };
+  className?: string;
 }) {
   const t = useTranslations("schedules");
-  const weekdays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+  const sorted = sortKey != null && sort?.key === sortKey;
+  const hasFilter = (filter?.selected.length ?? 0) > 0;
+  const active = sorted || hasFilter;
+  // Re-selecting the active direction clears the sort.
+  const applySort = (dir: SortDir) =>
+    sortKey != null && setSort(sorted && sort?.dir === dir ? null : { key: sortKey, dir });
 
-  // Wrap a labelled control: compact (tiny label, fixed-height input) when inline
-  // so it sits on the schedule-type row, otherwise the original stacked block.
-  const field = (label: string, control: React.ReactNode) =>
-    inline ? (
-      <div className="flex flex-col gap-1">
-        <Label className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</Label>
-        {control}
+  return (
+    <TableHead className={cn("group/col h-10 text-text-tertiary text-xs font-normal", className)}>
+      <div className="flex items-center gap-1">
+        <span>{label}</span>
+        <div className="ml-auto flex items-center gap-0.5">
+          {sorted && (
+            <button
+              type="button"
+              onClick={() => applySort(sort?.dir === "asc" ? "desc" : "asc")}
+              aria-label={t(sort?.dir === "asc" ? "sort.desc" : "sort.asc")}
+              className="rounded p-0.5 text-icon-primary transition"
+            >
+              {sort?.dir === "asc" ? <ArrowUpIcon className="size-3.5" /> : <ArrowDownIcon className="size-3.5" />}
+            </button>
+          )}
+          {(sortKey != null || (filter && filter.options.length > 0)) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t("columnMenu", { column: label })}
+                  className={cn(
+                    "rounded p-0.5 text-icon-tertiary opacity-0 transition hover:text-icon-primary group-hover/col:opacity-100 data-[state=open]:opacity-100",
+                    active && "text-icon-primary opacity-100",
+                  )}
+                >
+                  <ListFilterIcon className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {sortKey != null && (
+                  <>
+                    <DropdownMenuLabel className="text-text-tertiary text-xs">{t("sort.label")}</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => applySort("asc")}>
+                      <ArrowUpIcon className="size-3.5" />
+                      {t("sort.asc")}
+                      {sorted && sort?.dir === "asc" && <CheckIcon className="ml-auto size-3.5" />}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => applySort("desc")}>
+                      <ArrowDownIcon className="size-3.5" />
+                      {t("sort.desc")}
+                      {sorted && sort?.dir === "desc" && <CheckIcon className="ml-auto size-3.5" />}
+                    </DropdownMenuItem>
+                    {sorted && (
+                      <DropdownMenuItem className="text-text-tertiary" onClick={() => setSort(null)}>
+                        {t("sort.clear")}
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
+                {filter && filter.options.length > 0 && (
+                  <>
+                    {sortKey != null && <DropdownMenuSeparator />}
+                    <DropdownMenuLabel className="text-text-tertiary text-xs">{t("filterBy")}</DropdownMenuLabel>
+                    {filter.options.map((o) => (
+                      <DropdownMenuCheckboxItem
+                        key={o.value}
+                        checked={filter.selected.includes(o.value)}
+                        onCheckedChange={() => filter.onToggle(o.value)}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {filter.colored ? (
+                          <span
+                            className={tagClassName(
+                              o.value,
+                              "rounded-full border px-2 py-0.5 text-[11px] leading-none",
+                            )}
+                          >
+                            {o.label}
+                          </span>
+                        ) : (
+                          o.label
+                        )}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    {hasFilter && (
+                      <DropdownMenuItem className="text-text-tertiary" onClick={filter.onClear}>
+                        {t("clearColumnFilter")}
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
-    ) : (
-      <div className="space-y-2">
-        <Label>{label}</Label>
-        {control}
-      </div>
-    );
+    </TableHead>
+  );
+}
 
-  switch (schedule.type) {
-    case "once":
-      return field(
-        t("form.dateTime"),
-        <Input
-          type="datetime-local"
-          value={schedule.at}
-          onChange={(e) => onChange({ type: "once", at: e.target.value })}
-          className={inline ? "h-8 w-52" : undefined}
-        />,
-      );
-    case "daily":
-      return field(
-        t("form.time"),
-        <Input
-          type="time"
-          value={schedule.time}
-          onChange={(e) => onChange({ type: "daily", time: e.target.value })}
-          className={inline ? "h-8 w-28" : undefined}
-        />,
-      );
-    case "weekly":
-      return (
-        <>
-          {field(
-            t("form.time"),
-            <Input
-              type="time"
-              value={schedule.time}
-              onChange={(e) => onChange({ ...schedule, time: e.target.value })}
-              className={inline ? "h-8 w-28" : undefined}
-            />,
-          )}
-          {field(
-            t("form.days"),
-            <div className="flex flex-wrap gap-1">
-              {weekdays.map((dayKey, i) => {
-                const dayNum = i + 1;
-                const active = schedule.days.includes(dayNum);
-                return (
-                  <Button
-                    key={dayKey}
-                    type="button"
-                    size="xs"
-                    variant={active ? "default" : "outline"}
-                    onClick={() => {
-                      const days = active
-                        ? schedule.days.filter((d) => d !== dayNum)
-                        : [...schedule.days, dayNum].sort();
-                      onChange({ ...schedule, days });
-                    }}
-                  >
-                    {t(`days.${dayKey}`)}
-                  </Button>
-                );
-              })}
-            </div>,
-          )}
-        </>
-      );
-    case "interval":
-      return (
-        <>
-          {field(
-            t("form.startTime"),
-            <Input
-              type="time"
-              value={schedule.start}
-              onChange={(e) => onChange({ ...schedule, start: e.target.value })}
-              className={inline ? "h-8 w-28" : undefined}
-            />,
-          )}
-          {field(
-            t("form.minutes"),
-            <Input
-              type="number"
-              min={1}
-              value={schedule.minutes}
-              onChange={(e) => onChange({ ...schedule, minutes: Number(e.target.value) || 60 })}
-              className={inline ? "h-8 w-20" : undefined}
-            />,
-          )}
-        </>
-      );
-    case "cron":
-      return field(
-        t("form.cronExpression"),
-        <Input
-          value={schedule.expr}
-          onChange={(e) => onChange({ type: "cron", expr: e.target.value })}
-          placeholder={t("form.cronPlaceholder")}
-          className={cn("font-mono text-xs", inline && "h-8 w-40")}
-        />,
-      );
-  }
+/** A bordered chip with the agent's icon + name (Figma Agent cell). */
+function AgentChip({ agent }: { agent?: AgentPreset }) {
+  const t = useTranslations("schedules");
+  if (!agent) return <span className="text-text-tertiary text-xs">{t("noAgent")}</span>;
+  const Icon = agentIcon(agent.binary);
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-border-cards px-2 py-1 text-text-secondary text-xs">
+      <Icon className="size-3.5 text-icon-primary" />
+      {agent.name}
+    </span>
+  );
 }

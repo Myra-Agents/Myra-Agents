@@ -33,7 +33,7 @@
     },
     "upcoming": {
       "title": "À venir aujourd'hui",
-      "empty": "Aucune planification prévue aujourd'hui."
+      "empty": "Aucune patrouille prévue aujourd'hui."
     },
     "recent": {
       "title": "Historique des exécutions",
@@ -64,11 +64,13 @@
   },
   "nav": {
     "newCard": "Nouvelle tâche",
+    "back": "Précédent",
+    "forward": "Suivant",
     "home": "Accueil",
     "workspace": "Espace de travail",
     "configuration": "Configuration",
     "kanban": "Kanban",
-    "schedules": "Planifications",
+    "schedules": "Patrouilles",
     "planner": "Planifier la journée",
     "logs": "Journaux",
     "settings": "Paramètres",
@@ -109,6 +111,7 @@
       "moveToTrash": "Mettre à la corbeille",
       "launchAgent": "Lancer l'agent",
       "cancelAgent": "Annuler l'agent",
+      "stop": "Arrêter",
       "viewLogs": "Voir les logs",
       "answerFeedback": "Répondre au retour",
       "approveReview": "Approuver",
@@ -117,10 +120,20 @@
       "question": "Question",
       "review": "Vérifier",
       "running": "En cours",
+      "stopping": "Arrêt…",
       "waitingForOutput": "En attente de sortie…",
       "agent": "Agent",
       "queued": "En file",
-      "moveTo": "Déplacer vers"
+      "moveTo": "Déplacer vers",
+      "thinkingMessages": [
+        "On réveille l'agent…",
+        "On apprend à coder aux robots…",
+        "On démêle la logique…",
+        "On aligne les pixels…",
+        "On amadoue le compilateur…",
+        "On traque les cas limites…",
+        "On chauffe les neurones…"
+      ]
     },
     "empty": {
       "draft": "Posez vos idées…",
@@ -205,6 +218,7 @@
         "testFailedToast": "{name} a échoué au test de connectivité",
         "blocked": "Ce préréglage a échoué au test — corrige-le ou choisis-en un autre avant de créer.",
         "retry": "Relancer le test",
+        "saveAnyway": "Enregistrer quand même",
         "needPreset": "Sélectionne d’abord un préréglage d’agent",
         "devOnly": "Disponible uniquement dans l’application desktop",
         "generateHint": "Rédige à partir du titre et de la description avec cet agent",
@@ -260,11 +274,11 @@
     }
   },
   "schedules": {
-    "title": "Planifications",
+    "title": "Patrouilles",
     "description": "Configurez les tâches récurrentes et les exécutions automatiques",
-    "addSchedule": "Ajouter une planification",
-    "editSchedule": "Modifier la planification",
-    "noSchedules": "Aucune planification configurée",
+    "addSchedule": "Ajouter une patrouille",
+    "editSchedule": "Modifier la patrouille",
+    "noSchedules": "Aucune patrouille configurée",
     "enabled": "Activée",
     "disabled": "Désactivée",
     "triggerNow": "Déclencher maintenant",
@@ -284,14 +298,14 @@
       "cardDescription": "Description de la tâche",
       "agentPrompt": "Prompt de l'agent",
       "tags": "Étiquettes",
-      "scheduleKind": "Planification",
+      "scheduleKind": "Récurrence",
       "time": "Heure",
       "days": "Jours",
       "minutes": "Minutes",
       "cronExpression": "Expression cron",
       "startTime": "Heure de début",
       "dateTime": "Date et heure",
-      "scheduleName": "Nom de la planification",
+      "scheduleName": "Nom de la patrouille",
       "scheduleNamePlaceholder": "ex. Revue de code quotidienne",
       "description": "Description",
       "cardTitlePlaceholder": "Titre de la tâche générée",
@@ -307,15 +321,18 @@
       "cronNotExpressible": "n/d",
       "typeLabel": "Type"
     },
-    "loading": "Chargement des planifications…",
-    "newSchedule": "Nouvelle planification",
-    "emptyState": "Aucune planification pour le moment. Créez-en une pour commencer.",
+    "loading": "Chargement des patrouilles…",
+    "newSchedule": "Nouvelle patrouille",
+    "emptyState": "Aucune patrouille pour le moment. Créez-en une pour commencer.",
     "next": "Prochaine : {time}",
     "columns": {
       "automation": "Automatisation",
       "source": "Source",
       "tools": "Outils",
-      "created": "Créée"
+      "created": "Créée",
+      "name": "Nom de la patrouille",
+      "agent": "Agent",
+      "nextRun": "Prochaine exécution"
     },
     "status": {
       "active": "Active",
@@ -331,7 +348,10 @@
       "create": "Créer",
       "saving": "Enregistrement…",
       "generate": "Générer",
-      "suggestTags": "Suggérer"
+      "suggestTags": "Suggérer",
+      "editDetails": "Modifier les détails",
+      "duplicate": "Dupliquer",
+      "copyJson": "Copier en JSON"
     },
     "days": {
       "mon": "Lun",
@@ -378,6 +398,64 @@
         "cardTitle": "Passe de tests",
         "description": "Lance la suite de tests et signale les échecs.",
         "prompt": "Lance toute la suite de tests. En cas d'échec, résume les échecs et la cause la plus probable pour chacun."
+      },
+      "sortMyComputer": {
+        "label": "Ranger mon ordinateur",
+        "name": "Ranger mon ordinateur",
+        "cardTitle": "Ranger mon ordinateur",
+        "description": "Laisse l'agent trier un dossier de ton ordinateur — renommer, réorganiser et nettoyer les fichiers.",
+        "prompt": "Trie le dossier dans lequel tu te trouves : analyse son contenu, regroupe les fichiers par type et usage, propose une structure claire, renomme les fichiers avec une convention cohérente, et déplace ou supprime les doublons évidents et les fichiers inutiles."
+      },
+      "add": "Ajouter",
+      "categories": {
+        "personal": "Personnel",
+        "popular": "Populaires",
+        "codeReview": "Revue de code",
+        "security": "Sécurité",
+        "incidents": "Incidents & Triage",
+        "dataResearch": "Données & Recherche"
+      },
+      "prReview": {
+        "label": "Revue de PR",
+        "name": "Revue de PR",
+        "cardTitle": "Revue de PR",
+        "description": "Passez en revue les pull requests ouvertes et résumez ce qui nécessite votre attention.",
+        "prompt": "Passe en revue les pull requests actuellement ouvertes. Pour chacune, résume ce qu'elle modifie, signale les problèmes de justesse, de sécurité ou de style, et indique-moi lesquelles sont prêtes à être fusionnées et lesquelles nécessitent du travail."
+      },
+      "findVulns": {
+        "label": "Trouver les vulnérabilités",
+        "name": "Trouver les vulnérabilités",
+        "cardTitle": "Trouver les vulnérabilités",
+        "description": "Inspectez les pull requests à la recherche de failles exploitables et ne signalez que les découvertes validées avant la fusion.",
+        "prompt": "Analyse les pull requests ouvertes et le code récemment modifié à la recherche de vulnérabilités exploitables (injection, contournement d'authentification, fuite de secrets, désérialisation non sûre). Ne rapporte que les découvertes validées avec le fichier, le risque et un correctif suggéré."
+      },
+      "secretScan": {
+        "label": "Scan de secrets",
+        "name": "Scan de secrets",
+        "cardTitle": "Scan de secrets",
+        "description": "Analysez le dépôt à la recherche de secrets, jetons et identifiants commités.",
+        "prompt": "Analyse le dépôt à la recherche de secrets commités : clés d'API, jetons, mots de passe, clés privées et chaînes de connexion. Liste chaque correspondance avec son fichier et sa ligne, et recommande s'il faut la révoquer et comment la retirer de l'historique."
+      },
+      "incidentTriage": {
+        "label": "Triage d'incidents",
+        "name": "Triage d'incidents",
+        "cardTitle": "Triage d'incidents",
+        "description": "Triez les nouveaux incidents et pics d'erreurs, puis proposez un responsable et une prochaine étape.",
+        "prompt": "Vérifie les nouveaux incidents et pics d'erreurs depuis la dernière exécution. Pour chacun, résume la cause probable à partir des commits et journaux récents, propose un responsable et suggère la première étape de remédiation. Limite chaque incident à quelques lignes."
+      },
+      "errorDigest": {
+        "label": "Synthèse des erreurs",
+        "name": "Synthèse des erreurs",
+        "cardTitle": "Synthèse des erreurs",
+        "description": "Synthèse quotidienne des principales erreurs avec leur fréquence et une cause probable.",
+        "prompt": "Produis une synthèse des principales erreurs des dernières 24 heures : regroupe par message, indique la fréquence et la première/dernière occurrence, et pour les cinq premières donne une cause probable et un correctif suggéré."
+      },
+      "competitorWatch": {
+        "label": "Veille concurrentielle",
+        "name": "Veille concurrentielle",
+        "cardTitle": "Veille concurrentielle",
+        "description": "Résumé hebdomadaire des sorties, tarifs et annonces notables des concurrents.",
+        "prompt": "Résume l'activité notable des concurrents de la semaine écoulée : sorties de produits, changements de tarifs et annonces publiques. Regroupe par concurrent et termine par ce qui est le plus pertinent pour notre feuille de route."
       }
     },
     "agent": {
@@ -394,13 +472,56 @@
       "generateHint": "Rédige à partir du nom et de la description avec cet agent",
       "generateError": "L’agent n’a pas pu générer de résultat",
       "generateEmpty": "L’agent n’a rien renvoyé d’exploitable",
-      "promptMeta": "Rédige un unique prompt de tâche concis (impératif, 2 à 5 phrases) pour une exécution planifiée récurrente nommée « {name} ». Contexte : « {description} ». Donne UNIQUEMENT le texte du prompt que l’agent doit suivre — sans préambule, sans guillemets, sans markdown.",
-      "tagsMeta": "Propose 2 à 5 étiquettes courtes en minuscules pour une tâche planifiée nommée « {name} » décrite comme « {description} ». Donne UNIQUEMENT une liste séparée par des virgules, rien d’autre.",
+      "promptMeta": "Rédige un unique prompt de tâche concis (impératif, 2 à 5 phrases) pour une patrouille récurrente nommée « {name} ». Contexte : « {description} ». Donne UNIQUEMENT le texte du prompt que l’agent doit suivre — sans préambule, sans guillemets, sans markdown.",
+      "tagsMeta": "Propose 2 à 5 étiquettes courtes en minuscules pour une patrouille nommée « {name} » décrite comme « {description} ». Donne UNIQUEMENT une liste séparée par des virgules, rien d’autre.",
       "needContext": "Ajoute d’abord un nom et une description pour donner du contexte à l’agent",
       "previewTitle": "Prompt suggéré — relis avant d’utiliser",
       "previewQuestion": "L’agent a soulevé une question — précise la description puis régénère",
       "useDraft": "Utiliser",
       "dismissDraft": "Ignorer"
+    },
+    "subtitle": "Déployez des patrouilles récurrentes avec des agents IA déclenchés par des événements.",
+    "tags": "Tags",
+    "noTags": "Aucun tag",
+    "search": "Rechercher des patrouilles",
+    "searchPlaceholder": "Rechercher des patrouilles…",
+    "clearSearch": "Effacer la recherche",
+    "clearFilters": "Réinitialiser les filtres",
+    "showing": "{shown} sur {total}",
+    "seeAll": "{shown} sur {total} — Cliquez pour voir toutes les patrouilles",
+    "showLess": "Afficher moins",
+    "emptyFiltered": "Aucune patrouille ne correspond à vos filtres.",
+    "relative": {
+      "now": "Maintenant",
+      "min": "Dans {n} min",
+      "hours": "Dans {n} h",
+      "days": "Dans {n} j"
+    },
+    "sort": {
+      "label": "Trier",
+      "asc": "Croissant",
+      "desc": "Décroissant",
+      "clear": "Réinitialiser le tri"
+    },
+    "filterBy": "Filtrer par",
+    "clearColumnFilter": "Effacer le filtre",
+    "columnMenu": "Options {column}",
+    "browseTemplates": "Parcourir les modèles",
+    "templatesHeading": "Besoin d'idées ? Partez d'un modèle",
+    "duplicateName": "{name} (copie)",
+    "toast": {
+      "duplicated": "« {name} » dupliqué",
+      "copiedJson": "JSON de la patrouille copié",
+      "copyFailed": "Impossible de copier dans le presse-papiers"
+    },
+    "templatesShort": "Modèles",
+    "harnessGate": {
+      "title": "Install an agent to create a patrol",
+      "description": "OpenCode must be installed before you can create or use a patrol.",
+      "continueAnyway": "Continue without installing",
+      "ollamaTitle": "Run agents locally (optional)",
+      "ollamaDescription": "Ollama lets you run open-source models on your machine instead of cloud APIs. Install it separately to use local models with OpenCode.",
+      "ollamaLearnMore": "Ollama documentation"
     }
   },
   "planner": {
@@ -419,6 +540,201 @@
     "optional": "facultatif",
     "generatedTasks": "Tâches générées ({selected}/{total} sélectionnées)",
     "createCards": "Créer {count, plural, one {# tâche} other {# tâches}}"
+  },
+  "runs": {
+    "title": "Opérations",
+    "subtitle": "Liste toutes les tâches en cours",
+    "loading": "Chargement…",
+    "empty": "Aucun run actif pour l’instant.",
+    "tags": "Tags",
+    "noTags": "Aucun tag",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "showing": "Affichage de {shown} sur {total}",
+    "needsYouHint": "« Needs you » liste les tâches où vous devez guider l’Agent. L’idée est de réduire les tâches « Needs you » pour que les Agents puissent tourner sans vous.",
+    "archiveHint": "Les opérations « Done » sont archivées automatiquement chaque nuit à minuit ({timezone}).",
+    "view": {
+      "list": "Liste",
+      "kanban": "Kanban"
+    },
+    "kanban": {
+      "running": "En cours",
+      "waitingOutput": "En attente de la sortie…",
+      "question": "Question",
+      "answer": "Répondre",
+      "emptyColumn": "Aucune tâche",
+      "dropHere": "Déposer ici",
+      "dropBlocked": "Déplacement impossible",
+      "edit": "Modifier",
+      "trash": "Mettre à la corbeille",
+      "archive": "Archiver",
+      "trashed": "Déplacé vers la corbeille",
+      "archived": "Archivé",
+      "undo": "Annuler",
+      "stop": "Arrêter",
+      "stopped": "Opération arrêtée."
+    },
+    "summary": {
+      "backlog": {
+        "label": "Backlog",
+        "sub": "Prochaines tâches"
+      },
+      "running": {
+        "label": "En cours",
+        "sub": "En progression"
+      },
+      "needsYou": {
+        "label": "Needs you",
+        "sub": "Retour - Revue"
+      },
+      "done": {
+        "label": "Terminé",
+        "sub": "Tâche terminée"
+      }
+    },
+    "footer": "Affichage de {shown} sur {total} — voir tout",
+    "columns": {
+      "task": "Tâche",
+      "triggered": "Déclenché",
+      "status": "Statut",
+      "duration": "Durée",
+      "agent": "Agent"
+    },
+    "rowMenu": {
+      "viewLogs": "Voir les logs",
+      "openKanban": "Ouvrir dans le Kanban",
+      "clearSearch": "Effacer la recherche",
+      "view": "Voir",
+      "edit": "Modifier",
+      "viewOperation": "Voir l'opération",
+      "editPatrol": "Modifier la patrouille",
+      "stop": "Arrêter"
+    },
+    "emptyFiltered": "Aucun run dans ce statut.",
+    "searchPlaceholder": "Rechercher tâche, agent, statut…",
+    "noResults": "Aucun run ne correspond à la recherche.",
+    "sort": {
+      "label": "Trier",
+      "asc": "Croissant",
+      "desc": "Décroissant",
+      "clear": "Effacer le tri"
+    },
+    "filterBy": "Filtrer par",
+    "clearColumnFilter": "Effacer le filtre",
+    "columnMenu": "Options {column}",
+    "clearFilters": "Effacer les filtres",
+    "columnsLabel": "Afficher les colonnes",
+    "resetColumns": "Réinitialiser les colonnes",
+    "scrollDown": "Défiler vers le bas",
+    "scrollUp": "Défiler vers le haut",
+    "filteredHidden": "{hidden, plural, =0 {Filtré} one {# exécution masquée} other {# exécutions masquées}}"
+  },
+  "history": {
+    "title": "Historique",
+    "subtitle": "Liste les exécutions passées, analyse la discussion de l'agent",
+    "loading": "Chargement…",
+    "empty": "Aucune exécution passée pour l'instant.",
+    "noResults": "Aucune exécution ne correspond à votre recherche.",
+    "search": "Rechercher",
+    "searchPlaceholder": "Rechercher une tâche…",
+    "clearFilters": "Effacer les filtres",
+    "showing": "Affichage de {shown} sur {total}",
+    "scrollDown": "Défiler vers le bas",
+    "scrollUp": "Défiler vers le haut",
+    "ranges": {
+      "today": "Aujourd'hui",
+      "7d": "7 j",
+      "14d": "14 j",
+      "30d": "30 j",
+      "all": "tout"
+    },
+    "stats": {
+      "total": "Exécutions totales",
+      "success": "Réussies - {range}",
+      "failed": "Échouées - {range}",
+      "tokens": "Tokens utilisés"
+    },
+    "graph1": "Exécutions dans le temps",
+    "graph2": "Taux de réussite",
+    "showStats": "Afficher les stats",
+    "hideStats": "Masquer les stats",
+    "columns": {
+      "task": "Nom de la tâche",
+      "triggered": "Déclenchée",
+      "ended": "Terminée",
+      "duration": "Durée",
+      "agent": "Agent",
+      "result": "Résultat",
+      "usage": "Usage"
+    },
+    "status": {
+      "backlog": "Backlog",
+      "running": "En cours",
+      "needsYou": "Vous devez agir",
+      "done": "Terminée"
+    },
+    "result": {
+      "success": "Réussie",
+      "failed": "Échouée",
+      "canceled": "Annulée",
+      "running": "En cours",
+      "awaitingReview": "À vérifier",
+      "needsYou": "Votre attention"
+    },
+    "archived": "Archivée",
+    "usage": "{tokens} Token",
+    "rowMenu": {
+      "open": "Ouvrir la session",
+      "schedule": "Modifier la patrouille",
+      "viewOperation": "Voir l'opération",
+      "editPatrol": "Modifier la patrouille",
+      "rerun": "Relancer l'opération",
+      "rerunStarted": "Relance de l'opération démarrée"
+    },
+    "sort": {
+      "label": "Trier",
+      "asc": "Croissant",
+      "desc": "Décroissant",
+      "clear": "Effacer le tri"
+    },
+    "filterBy": "Filtrer par",
+    "clearColumnFilter": "Effacer le filtre",
+    "columnMenu": "Options de {column}",
+    "columnsLabel": "Afficher les colonnes",
+    "resetColumns": "Réinitialiser les colonnes"
+  },
+  "agentSession": {
+    "back": "Retour",
+    "settings": "Paramètres",
+    "rerun": "Relancer",
+    "run": "Exécution #{id}",
+    "triggered": "Déclenchée le {date}",
+    "result": {
+      "failed": "Échouée",
+      "success": "Réussie",
+      "running": "En cours",
+      "needsYou": "Votre attention",
+      "stopping": "Arrêt…"
+    },
+    "agentInstruction": "Instruction de l'agent",
+    "model": "Modèle :",
+    "effort": "Effort :",
+    "discussionEmpty": "Aucune sortie d'agent enregistrée pour cette exécution.",
+    "followUp": "Donner suite",
+    "notFound": "Cette exécution est introuvable.",
+    "backToHistory": "Retour à l'historique",
+    "started": "Démarré",
+    "ended": "Terminé",
+    "exitCode": "Code de sortie",
+    "duration": "Durée",
+    "tokens": "Tokens",
+    "cost": "Coût",
+    "openWorkingDir": "Ouvrir le dossier de travail",
+    "loadingLog": "Chargement du journal…",
+    "approved": "Exécution approuvée",
+    "stop": "Arrêter",
+    "stopping": "Arrêt…",
+    "stopped": "Opération arrêtée."
   },
   "logs": {
     "title": "Journaux et historique",
@@ -453,6 +769,7 @@
       "running": "En cours",
       "completed": "Terminé",
       "failed": "Échoué",
+      "needsYou": "Votre attention",
       "needsFeedback": "Retour nécessaire",
       "awaitingReview": "En attente de vérification"
     },
@@ -470,7 +787,11 @@
       "tokens": "Jetons",
       "cost": "Coût",
       "openWorkingDir": "Ouvrir le répertoire",
-      "logs": "Logs"
+      "logs": "Logs",
+      "editPatrol": "Modifier la patrouille",
+      "stop": "Arrêter",
+      "stopping": "Arrêt…",
+      "stopped": "Opération arrêtée."
     },
     "loading": "Chargement…",
     "back": "Retour",
@@ -478,6 +799,29 @@
       "tab": "Conversation",
       "rawTab": "Log brut",
       "thinking": "Raisonnement",
+      "working": "L'agent réfléchit…",
+      "workingMessages": [
+        "La colonie s'active…",
+        "On suit la piste de phéromones…",
+        "Les ouvrières s'affairent…",
+        "Exploration de la fourmilière…",
+        "Transport de miettes vers le nid…",
+        "La reine réfléchit…",
+        "On trace une piste odorante…",
+        "Antennes en éveil…",
+        "Recrutement d'ouvrières…",
+        "On porte une brindille 50× plus grosse…",
+        "Ça grouille dans la fourmilière…",
+        "On creuse de nouvelles galeries…",
+        "Marche en file indienne…",
+        "Les éclaireuses font leur rapport…",
+        "On butine les données…",
+        "On veille sur le couvain…",
+        "La colonie encercle le problème…",
+        "Construction d'un pont de fourmis…",
+        "Regroupement au nid…",
+        "On flaire le bon chemin…"
+      ],
       "input": "Entrée",
       "output": "Sortie",
       "changes": "Modifications",
@@ -785,10 +1129,19 @@
         "french": "Français"
       },
       "pageOptions": {
-        "kanban": "Kanban",
-        "schedules": "Planifications",
-        "planner": "Planificateur",
-        "logs": "Journaux"
+        "operations": "Opérations",
+        "patrols": "Patrouilles",
+        "history": "Historique"
+      },
+      "homeFolder": "Dossier home",
+      "homeFolderHint": "Dossier de base parcouru par le sélecteur de dossiers des patrouilles. Par défaut, votre dossier utilisateur.",
+      "timezone": "Fuseau horaire",
+      "timezoneHint": "Utilisé pour l'automatisation nocturne — les opérations Done sont archivées à minuit dans ce fuseau.",
+      "loaderAnimation": "Animation d'activité",
+      "loaderAnimationHint": "Le logo Myra animé affiché à côté du message de statut pendant qu'un agent tourne.",
+      "loaderOptions": {
+        "shimmer": "Shimmer (discret)",
+        "assemble": "Assemblage (ludique)"
       }
     },
     "data": {
@@ -797,6 +1150,12 @@
       "exportDescription": "Télécharger le tableau actuel au format JSON.",
       "importBoard": "Importer un tableau",
       "importDescription": "Restaurer des tâches depuis un fichier JSON exporté précédemment.",
+      "clearHistory": "Effacer l'historique",
+      "clearHistoryDescription": "Supprimer tous les enregistrements d'exécution et retirer les cartes terminées du tableau Opérations.",
+      "clearHistoryConfirmTitle": "Effacer l'historique ?",
+      "clearHistoryConfirmDescription": "Tous les enregistrements seront définitivement supprimés et chaque carte « Terminé » retirée du tableau Opérations. Cette action est irréversible.",
+      "clearHistoryConfirm": "Effacer",
+      "clearHistoryCancel": "Annuler",
       "clearLogs": "Effacer les logs",
       "clearLogsDescription": "Supprimer les journaux d'exécution après confirmation.",
       "clearLogsConfirm": "Effacer tous les logs ? Cette action est irréversible."
@@ -816,8 +1175,9 @@
       "exportFailed": "Impossible d'exporter le tableau.",
       "imported": "Tableau importé.",
       "importFailed": "Impossible d'importer le tableau.",
+      "historyCleared": "Historique effacé.",
       "logsCleared": "Logs supprimés.",
-      "clearFailed": "Impossible d'effacer les logs."
+      "clearFailed": "Impossible d'effacer."
     }
   },
   "upsell": {
@@ -844,6 +1204,7 @@
       "installFailed": "Échec de l'installation d'Ollama",
       "updateHint": "Votre version d'Ollama est trop ancienne pour lancer les agents de code. Mettez-la à jour pour continuer.",
       "update": "Mettre à jour Ollama",
+      "updateAvailable": "Une nouvelle version d'Ollama est disponible — vous avez {current}, la dernière est {latest}.",
       "openDownloads": "Ouvrir les téléchargements",
       "startDaemon": "Démarrer Ollama",
       "ready": "Ollama est prêt — téléchargez un modèle ci-dessous.",
@@ -911,5 +1272,191 @@
     "selectModel": "Sélectionner un modèle…",
     "effortNeedsModel": "Sélectionnez d'abord un modèle",
     "effortNoVariants": "Ce modèle n'a pas de variantes d'effort"
+  },
+  "scheduleEdit": {
+    "loading": "Chargement de la patrouille…",
+    "discardTitle": "Abandonner les modifications ?",
+    "discardDescription": "Vos modifications non enregistrées seront perdues et ne seront pas prises en compte.",
+    "discardKeepEditing": "Continuer l'édition",
+    "discardConfirm": "Abandonner les modifications",
+    "nameLabel": "Nom de la patrouille",
+    "namePlaceholder": "Nom de la patrouille",
+    "descriptionLabel": "Description de la patrouille",
+    "activateTitle": "Activer cette patrouille ?",
+    "activateDescription": "Cette patrouille est inactive. Activez-la maintenant pour qu'elle s'exécute selon son déclencheur, ou ajoutez-la inactive et activez-la plus tard.",
+    "activateCancel": "Annuler",
+    "activateKeepInactive": "Ajouter inactive",
+    "activateConfirm": "Activer",
+    "runAgainTitle": "Relancer ?",
+    "runAgainDescription": "Cette patrouille a déjà une exécution en cours. En démarrer une autre maintenant la lancera une seconde fois en parallèle.",
+    "runAgainCancel": "Annuler",
+    "runAgainConfirm": "Lancer quand même",
+    "notFound": "Patrouille introuvable.",
+    "backToSchedules": "Retour aux patrouilles",
+    "subtitle": "Déployez des patrouilles récurrentes avec des agents IA déclenchés par des événements.",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "tags": "Tags",
+    "newTag": "+ Nouveau tag",
+    "save": "Enregistrer",
+    "add": "Ajouter",
+    "runNow": "Lancer maintenant",
+    "stopAllRuns": "Tout arrêter",
+    "triggers": "Déclencheurs",
+    "agentInstruction": "Instruction de l’agent",
+    "instructionPlaceholder": "Décrivez ce que l’agent doit faire à chaque exécution…",
+    "model": "Modèle :",
+    "modelDefault": "Par défaut",
+    "effort": "Effort :",
+    "efforts": {
+      "low": "Faible",
+      "medium": "Moyen",
+      "high": "Élevé"
+    },
+    "editTrigger": "Modifier le déclencheur",
+    "time": "Heure",
+    "everyMinutes": "Toutes les (minutes)",
+    "kinds": {
+      "once": "Une fois",
+      "daily": "Quotidien",
+      "weekly": "Hebdomadaire",
+      "interval": "Intervalle",
+      "cron": "Cron"
+    },
+    "tabs": {
+      "settings": "Paramètres",
+      "runs": "Opérations & Historique"
+    },
+    "ranges": {
+      "today": "Aujourd’hui",
+      "7d": "7j",
+      "14d": "14j",
+      "30d": "30j",
+      "all": "tout"
+    },
+    "stats": {
+      "total": "Exécutions totales",
+      "successful": "Réussies - 7j",
+      "failed": "Échouées - 7j",
+      "summary": "Résumé"
+    },
+    "graph1": "Graphique 1",
+    "graph2": "Graphique 2",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "showing": "Affichage de {shown} sur {total}",
+    "rowMenu": "Actions de la ligne",
+    "cols": {
+      "taskName": "Nom de la tâche",
+      "triggered": "Déclenché",
+      "status": "Statut",
+      "duration": "Durée",
+      "result": "Résultat",
+      "agent": "Agent"
+    },
+    "status": {
+      "running": "En cours",
+      "needsYou": "Votre attention",
+      "done": "Terminé",
+      "queued": "En file"
+    },
+    "resultFailed": "Échec",
+    "footer": "Affichage de {shown} sur {total} - Cliquez pour voir toutes les patrouilles",
+    "toast": {
+      "saved": "Patrouille enregistrée",
+      "added": "Patrouille ajoutée",
+      "triggered": "Exécution déclenchée",
+      "stopped": "{count} exécution(s) arrêtée(s)",
+      "undo": "Annuler",
+      "needTrigger": "Ajoute un déclencheur avant d’enregistrer.",
+      "needFolder": "Ajoute un dossier avant d’enregistrer.",
+      "needPrompt": "Ajoute une instruction pour l’agent avant d’enregistrer.",
+      "needFields": "Ajoute {fields} avant d’enregistrer."
+    },
+    "fields": {
+      "trigger": "un déclencheur",
+      "instruction": "une instruction d’agent",
+      "folder": "un dossier"
+    },
+    "addTrigger": "Ajouter un déclencheur",
+    "searchTriggers": "Rechercher des déclencheurs...",
+    "comingSoon": "Bientôt disponible",
+    "noTriggers": "Aucun déclencheur correspondant",
+    "categories": {
+      "scheduled": "Planifié",
+      "github": "GitHub / GitLab",
+      "slack": "Slack",
+      "teams": "Microsoft Teams",
+      "sentry": "Sentry",
+      "linear": "Linear"
+    },
+    "scheduledOptions": {
+      "hourly": "Toutes les heures",
+      "daily": "Quotidien",
+      "weekly": "Hebdomadaire",
+      "custom": "Personnalisé (cron)"
+    },
+    "days": "Jours",
+    "weekdays": {
+      "1": "Lu",
+      "2": "Ma",
+      "3": "Me",
+      "4": "Je",
+      "5": "Ve",
+      "6": "Sa",
+      "7": "Di"
+    },
+    "removeTrigger": "Supprimer le déclencheur",
+    "oneScheduledOnly": "Un seul déclencheur planifié est autorisé. Supprime l’existant pour en ajouter un autre.",
+    "noRepository": "Aucun dépôt",
+    "recents": "Récents",
+    "allRepositories": "Tous les dépôts",
+    "addRepositories": "Ajouter des dépôts",
+    "refresh": "Rafraîchir",
+    "searchRepositories": "Rechercher dépôts, environnements...",
+    "searchBranches": "Rechercher des branches...",
+    "branchDefault": "Par défaut",
+    "branches": "Branches",
+    "useBranch": "Utiliser « {branch} »",
+    "noResults": "Aucun résultat",
+    "noFolder": "Aucun dossier",
+    "selected": "Sélectionnés",
+    "folders": "Dossiers",
+    "noFoldersYet": "Aucun dossier — ajoutez-en un ci-dessous",
+    "addFolders": "Ajouter un/des dossier(s)…",
+    "searchFolders": "Rechercher des dossiers…",
+    "branchCurrent": "Actuelle",
+    "branchLocal": "Locales",
+    "branchOrigin": "Origin",
+    "createBranch": "Créer la branche « {branch} »",
+    "startTime": "Heure de départ",
+    "home": "Dossier home",
+    "selectFolder": "Choisir un dossier",
+    "folderRequired": "Ajoute un dossier dans lequel cette patrouille s’exécutera.",
+    "branchNotGit": "Ce dossier n’est pas un dépôt git.",
+    "branchNeedsFolder": "Choisis d’abord un dossier.",
+    "branchesCount": "{count} branches",
+    "branchPerFolder": "Branche par dossier",
+    "primary": "principal",
+    "changeColor": "Changer la couleur",
+    "colorReset": "Couleur automatique",
+    "addColor": "Ajouter une couleur",
+    "deleteColor": "Supprimer la couleur",
+    "deleteColorTitle": "Supprimer la couleur ?",
+    "deleteColorDescription": "Utilisée par : {patrols}. Les tags retrouveront leur couleur par défaut.",
+    "deleteColorConfirm": "Supprimer",
+    "deleteColorCancel": "Annuler",
+    "removeTag": "Retirer le tag",
+    "tagPlaceholder": "nom du tag…",
+    "agentPreset": "Preset d’agent",
+    "override": "Override",
+    "tested": "testé",
+    "testFailed": "test échoué",
+    "untested": "non testé",
+    "overridden": "modifié",
+    "resetOverrides": "Réinitialiser",
+    "cancel": "Annuler",
+    "createTag": "Créer « {tag} »",
+    "createTagHint": "Tape un nom pour créer un nouveau tag"
   }
 }

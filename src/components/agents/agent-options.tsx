@@ -240,6 +240,14 @@ export function AgentOptions({
   const modelDef = featuredValues.find((def) => def.optionsRpc === "list_models");
   const modelValue = modelDef ? flagValue(flags, modelDef) : "";
 
+  // Opening the picker requests a fetch — and clears any prior failure so a
+  // transient error (e.g. the CLI not yet warm at app start) doesn't pin the
+  // empty fallback forever. The effect refetches once `modelsFailed` is reset.
+  const requestModels = () => {
+    setModelsFailed(false);
+    setModelsRequested(true);
+  };
+
   // Reset the fetched models/flags when the preset's binary changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: binary is the reset trigger
   useEffect(() => {
@@ -363,7 +371,7 @@ export function AgentOptions({
                     cloudValue={value}
                     cost={modelsResult?.cost}
                     cloudFailed={modelsFailed}
-                    onCloudOpen={() => setModelsRequested(true)}
+                    onCloudOpen={requestModels}
                     onCloudSelect={(v) => setModelFlag(def, v)}
                     launchVia={launchVia}
                     ollamaModel={ollamaModel}
@@ -380,7 +388,7 @@ export function AgentOptions({
                       models={modelsResult?.models ?? null}
                       cost={modelsResult?.cost}
                       failed={modelsFailed}
-                      onOpen={() => setModelsRequested(true)}
+                      onOpen={requestModels}
                     />
                     {value !== "" && <ModelCostHint cost={modelsResult?.cost?.[value]} />}
                   </>

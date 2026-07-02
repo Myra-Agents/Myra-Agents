@@ -404,6 +404,11 @@ export function UnifiedModelPicker({
     setOpen(false);
   };
   const selectLocal = (name: string) => {
+    // Drop the cloud `--model` (and its dependent `--variant`) — a local launch
+    // gets its model from `ollamaModel`, so a stale `--model` flag would linger
+    // in the preset and surface in the test command. Mirrors how `selectCloud`
+    // clears `ollamaModel`.
+    onCloudSelect("");
     onOllamaModelChange(name);
     onLaunchViaChange("ollama");
     setOpen(false);
@@ -432,7 +437,9 @@ export function UnifiedModelPicker({
           <Command>
             <CommandInput placeholder={t("searchModels")} />
             <CommandList className="max-h-[min(20rem,var(--radix-popover-content-available-height))]">
-              <CommandEmpty>{cloudModels === null ? t("loadingModels") : t("noModelFound")}</CommandEmpty>
+              <CommandEmpty>
+                {cloudModels === null && !cloudFailed ? t("loadingModels") : t("noModelFound")}
+              </CommandEmpty>
 
               {!cloudFailed && (cloudModels?.length ?? 0) > 0 && (
                 <CommandGroup heading={t("local.cloudGroup")}>

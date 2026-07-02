@@ -1,12 +1,14 @@
 "use client";
 
-import { DownloadIcon, Loader2Icon, PlayIcon, RefreshCwIcon } from "lucide-react";
+import { serverUpdateState } from "@myra/shared";
+import { ArrowUpCircleIcon, DownloadIcon, Loader2Icon, PlayIcon, RefreshCwIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { DaemonStatus, LocalModelManager } from "@/components/agents/ollama-local-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLatestOllamaVersion } from "@/hooks/use-latest-ollama-version";
 import { useOllama } from "@/hooks/use-ollama";
 import { openExternal } from "@/lib/tauri";
 import { OLLAMA_INSTALL_INFO } from "@/types/settings";
@@ -20,21 +22,38 @@ export function LocalModelsPanel() {
   const t = useTranslations("agents");
   const ollama = useOllama();
   const { status, loading, busy, install, serve, refresh } = ollama;
+  const { latest: latestVersion, refresh: refreshLatest } = useLatestOllamaVersion();
   const ready = Boolean(status?.installed && status.running && status.launchCapable);
+  // `status.version` is the raw `ollama --version` line (e.g. "ollama version is
+  // 0.30.10"), not a bare semver — pull the X.Y.Z out before comparing.
+  const currentVersion = status?.version?.match(/\d+\.\d+(?:\.\d+)?/)?.[0] ?? null;
+  // Only flag an upgrade once Ollama is recent enough to be `launchCapable` — a
+  // too-old install is already handled by its own "update required" branch below.
+  const outdated =
+    Boolean(status?.installed) &&
+    status?.launchCapable === true &&
+    serverUpdateState(currentVersion, latestVersion) === "outdated";
 
   const runInstall = async () => {
     try {
       await install();
+      // Pick up the new version on the next "latest" comparison.
+      void refreshLatest(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("local.installFailed"));
     }
+  };
+
+  const onRefresh = () => {
+    void refresh();
+    void refreshLatest(true);
   };
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base">{t("local.panelTitle")}</CardTitle>
-        <Button variant="ghost" size="icon-xs" title={t("local.refresh")} onClick={() => void refresh()}>
+        <Button variant="ghost" size="icon-xs" title={t("local.refresh")} onClick={onRefresh}>
           <RefreshCwIcon className="size-3.5" />
         </Button>
       </CardHeader>
@@ -49,6 +68,30 @@ export function LocalModelsPanel() {
         ) : (
           <>
             <DaemonStatus ollama={ollama} />
+
+            {outdated && (
+              <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-amber-700 text-xs dark:text-amber-500">
+                <div className="flex items-start gap-2">
+                  <ArrowUpCircleIcon className="mt-px size-3.5 shrink-0" />
+                  <span>
+                    {t("local.updateAvailable", {
+                      current: currentVersion ?? "?",
+                      latest: latestVersion ?? "?",
+                    })}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 pl-5.5">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openExternal(OLLAMA_INSTALL_INFO.docsUrl)}
+                  >
+                    {t("local.openDownloads")}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {!status?.installed ? (
               <div className="flex flex-wrap gap-2">
