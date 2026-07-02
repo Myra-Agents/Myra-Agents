@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-07-02
+
 ### Fixed
 
 - **macOS release appearance** — release binaries were built against the macOS 14.5 SDK, so macOS 26 rendered them with the legacy compatibility appearance (smaller traffic lights, old materials) unlike local dev builds. Release CI now builds on the macOS 26 image and asserts the linked SDK is 26+.
