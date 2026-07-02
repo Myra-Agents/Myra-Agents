@@ -148,3 +148,39 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+  # Only after ALL platform builds succeed (so every binary is attached) publish
+  # the draft the matrix created: mark it latest and replace tauri-action's stub
+  # body with this version's CHANGELOG section. Keeps the draft as the mid-build
+  # safety gate while removing the manual publish + notes step for every release.
+  finalize:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (at the released tag)
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Publish release with CHANGELOG notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          NOTES_FILE="$RUNNER_TEMP/notes.md"
+          # Extract the `## [VERSION]` block from CHANGELOG (drop the header line
+          # itself and the trailing `---` separator).
+          awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 { f=1; next }
+            f && /^## \[/ { exit }
+            f { print }
+          ' CHANGELOG.md | sed '/^---$/d' > "$NOTES_FILE" || true
+          if [ -s "$NOTES_FILE" ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --draft=false --latest --notes-file "$NOTES_FILE"
+          else
+            echo "No CHANGELOG section for $VERSION — publishing with existing notes."
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi
