@@ -9,6 +9,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
 
+import { AppUpdateBootstrap } from "./_components/app-update-bootstrap";
 import { GlobalShortcuts } from "./_components/global-shortcuts";
 import { HEADER_ACTIONS_ID } from "./_components/header-actions";
 import { HeaderBreadcrumb } from "./_components/header-breadcrumb";
@@ -48,6 +49,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       }
     >
       <GlobalShortcuts />
+      {/* Desktop-only silent update probe → toast on a newer signed build. */}
+      <AppUpdateBootstrap />
       <TrayActionListener />
       {/* Silent re-fetch of board + schedules on every route change. */}
       <RefreshOnNavigate />

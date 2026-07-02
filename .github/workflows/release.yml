@@ -147,6 +147,16 @@ jobs:
           # native rows where the target already equals the host triple.
           MYRA_SERVER_TRIPLE: ${{ matrix.target }}
           #
+          # Updater signing. tauri-action signs the update artifacts with this
+          # minisign key and auto-generates + uploads `latest.json` to the release
+          # (its includeUpdaterJson default), which the app's updater plugin polls
+          # at releases/latest/download/latest.json. The matching PUBLIC key is
+          # committed in tauri.conf.json (plugins.updater.pubkey). Keep them in
+          # sync — a mismatch fails signature verification on every update. Empty
+          # (forks without the secret) → no updater artifacts, install still works.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          #
           # macOS code signing + notarization. The certificate is imported into a
           # dedicated keychain by the "Import Apple signing certificate" step above
           # (works headless on the self-hosted runner via set-key-partition-list);
