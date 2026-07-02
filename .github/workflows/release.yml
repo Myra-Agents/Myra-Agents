@@ -23,7 +23,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-14 # Apple Silicon
+          # macos-26 (Tahoe image, SDK 26.x) — the linked SDK decides how macOS
+          # renders the app: binaries linked against an older SDK get the legacy
+          # "compatibility" appearance on macOS 26 (smaller traffic lights, old
+          # materials), visibly different from local dev builds. Keep this image
+          # (and the self-hosted x64 Mac) on the same SDK major as dev machines.
+          - platform: macos-26 # Apple Silicon
             target: aarch64-apple-darwin
           # GitHub retired its Intel macOS hosted runner; x86_64 is built on our
           # self-hosted Apple Silicon Mac (label `myra-x64`, see runner.sh in the
@@ -45,6 +50,16 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           submodules: recursive
+
+      # Guard: the macOS SDK we link against must match what dev machines use,
+      # or the released app renders with the legacy compatibility appearance on
+      # current macOS (e.g. smaller traffic lights). Fail fast on image drift.
+      - name: Assert macOS SDK >= 26
+        if: runner.os == 'macOS'
+        run: |
+          SDK="$(xcrun --show-sdk-version)"
+          echo "macOS SDK: $SDK"
+          [ "${SDK%%.*}" -ge 26 ] || { echo "::error::SDK $SDK too old — bump the runner image/Xcode (need 26+)"; exit 1; }
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -148,3 +163,39 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+  # Only after ALL platform builds succeed (so every binary is attached) publish
+  # the draft the matrix created: mark it latest and replace tauri-action's stub
+  # body with this version's CHANGELOG section. Keeps the draft as the mid-build
+  # safety gate while removing the manual publish + notes step for every release.
+  finalize:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (at the released tag)
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Publish release with CHANGELOG notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          NOTES_FILE="$RUNNER_TEMP/notes.md"
+          # Extract the `## [VERSION]` block from CHANGELOG (drop the header line
+          # itself and the trailing `---` separator).
+          awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 { f=1; next }
+            f && /^## \[/ { exit }
+            f { print }
+          ' CHANGELOG.md | sed '/^---$/d' > "$NOTES_FILE" || true
+          if [ -s "$NOTES_FILE" ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --draft=false --latest --notes-file "$NOTES_FILE"
+          else
+            echo "No CHANGELOG section for $VERSION — publishing with existing notes."
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi
