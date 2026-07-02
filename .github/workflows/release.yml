@@ -71,6 +71,12 @@ jobs:
         with:
           workspaces: src-tauri -> target
           key: ${{ matrix.target }}
+          # `myra-x64` is a self-hosted (persistent) Mac, not an ephemeral VM.
+          # rust-cache's default `cache-bin: true` cleans `~/.cargo/bin` on save,
+          # which deletes the developer's real `rustup` binary and breaks local
+          # cargo after every release. Keep it off so CI never touches the host's
+          # toolchain proxies.
+          cache-bin: false
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
