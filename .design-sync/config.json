@@ -1,0 +1,9 @@
+{
+  "projectId": "5d9566ce-249b-43fc-8cca-bd9a21d030ea",
+  "shape": "package",
+  "pkg": "myra-agents",
+  "globalName": "MyraUI",
+  "srcDir": "ui",
+  "tsconfig": "../../tsconfig.json",
+  "cssEntry": "ds-compiled.css"
+}
