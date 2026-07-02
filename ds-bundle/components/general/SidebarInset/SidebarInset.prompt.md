@@ -1,0 +1,1 @@
+SidebarInset from myra-agents. Use via `window.MyraUI.SidebarInset` (bundle loaded from the root `_ds_bundle.js`).

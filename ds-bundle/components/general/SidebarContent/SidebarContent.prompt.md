@@ -1,0 +1,1 @@
+SidebarContent from myra-agents. Use via `window.MyraUI.SidebarContent` (bundle loaded from the root `_ds_bundle.js`).
