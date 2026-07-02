@@ -925,6 +925,7 @@
         "description": "Exécutez le serveur Myra sur cet ordinateur et connectez-vous-y directement en localhost — sans hub ni connexion Internet.",
         "installedRunning": "Installé et actif sur le port {port}",
         "installedStopped": "Installé (version {version}) — arrêté",
+        "serverVersion": "Serveur v{version}",
         "notInstalled": "Pas encore configuré — un serveur temporaire tourne pour cette session.",
         "secured": "Protégé par un jeton d'accès local",
         "setUp": "Configurer le serveur local",

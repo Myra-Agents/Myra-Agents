@@ -925,6 +925,7 @@
         "description": "Run Myra's server on this computer and connect to it directly over localhost — no hub or internet needed.",
         "installedRunning": "Installed and running on port {port}",
         "installedStopped": "Installed (version {version}) — not running",
+        "serverVersion": "Server v{version}",
         "notInstalled": "Not set up yet — running a temporary server for this session.",
         "secured": "Secured with a local access token",
         "setUp": "Set up local server",

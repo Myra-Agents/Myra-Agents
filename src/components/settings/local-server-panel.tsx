@@ -1,6 +1,14 @@
 "use client";
 
-import { ArrowUpCircleIcon, CheckCircle2Icon, HardDriveDownloadIcon, LockIcon, ServerIcon } from "lucide-react";
+import { stripServerTag } from "@myra/shared";
+import {
+  ArrowUpCircleIcon,
+  CheckCircle2Icon,
+  HardDriveDownloadIcon,
+  LockIcon,
+  ServerIcon,
+  TagIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -69,6 +77,10 @@ export function LocalServerPanel() {
             ) : (
               <p className="text-muted-foreground">{t("notInstalled")}</p>
             )}
+            <p className="mt-0.5 flex items-center gap-1 text-muted-foreground text-xs">
+              <TagIcon className="size-3" />
+              {t("serverVersion", { version: stripServerTag(status?.version ?? status?.embeddedVersion ?? "?") })}
+            </p>
             {installed && (
               <p className="mt-0.5 flex items-center gap-1 text-muted-foreground text-xs">
                 <LockIcon className="size-3" />
