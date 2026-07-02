@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { AgentOptions } from "@/components/agents/agent-options";
 import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
+import { AppUpdatePanel } from "@/components/settings/app-update-panel";
 import { LocalModelsPanel } from "@/components/settings/local-models-panel";
 // User connection disabled — hub status, remote access and cloud sync are off.
 // import { HubStatusCard } from "@/components/settings/hub-status-card";
@@ -741,6 +742,8 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <AppUpdatePanel />
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-6">

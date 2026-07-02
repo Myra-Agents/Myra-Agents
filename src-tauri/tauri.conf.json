@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Myra Agents",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "com.myra-agents.app",
   "build": {
     "frontendDist": "../out",
@@ -14,6 +14,12 @@
       "desktop": {
         "schemes": ["myra"]
       }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/Myra-Agents/Myra-Agents/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgyQUEzNjNDRUZGRkFGQzEKUldUQnIvL3ZQRGFxZ2dhNnZMMVRRemhsNFk4R2tYRTVGc2c3UjBINWcvdDhhdWo5OEJKeHVTdHIK"
     }
   },
   "app": {
@@ -41,6 +47,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "externalBin": ["binaries/myra-server"],
     "resources": ["Assets.car"],
     "icon": [

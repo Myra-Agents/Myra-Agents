@@ -1142,6 +1142,21 @@
       "loaderOptions": {
         "shimmer": "Shimmer (subtle)",
         "assemble": "Assemble (playful)"
+      },
+      "appUpdate": {
+        "title": "App updates",
+        "description": "Update Myra Agents to the latest version, installed and verified automatically.",
+        "current": "Current version {version}",
+        "available": "Version {version} is available",
+        "upToDate": "You're on the latest version.",
+        "check": "Check for updates",
+        "checking": "Checking…",
+        "checkFailed": "Couldn't check for updates. Please try again later.",
+        "view": "View",
+        "install": "Download & install",
+        "installing": "Downloading update…",
+        "installingPct": "Downloading update… {pct}%",
+        "installFailed": "Update failed. Please try again."
       }
     },
     "data": {
