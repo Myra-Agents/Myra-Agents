@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MyraThinking } from "@/components/ui/myra-thinking";
 import { useConnections } from "@/hooks/use-connections";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { tagClassName } from "@/lib/kanban-tags";
@@ -24,6 +25,8 @@ const CONVERSATION_STATUSES = new Set(["in_progress", "waiting_feedback", "await
 
 interface KanbanCardProps {
   card: KanbanCard;
+  /** Stop was clicked; show an instant "Stopping…" state until the backend confirms. */
+  isCancelling?: boolean;
   onEdit: () => void;
   onTrash: () => void;
   onReview: () => void;
@@ -41,6 +44,7 @@ interface KanbanCardProps {
 
 export function KanbanCardComponent({
   card,
+  isCancelling = false,
   onEdit,
   onTrash,
   onReview,
@@ -161,14 +165,29 @@ export function KanbanCardComponent({
         {/* Queued: waiting for a free concurrency slot */}
         {!isOverlay && card.agentQueued && card.status !== "in_progress" && (
           <div className="flex items-center gap-1.5 pl-4 pt-2 border-t">
-            <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600">{t("queued")}</span>
+            <span
+              className={cn("size-2 rounded-full animate-pulse", isCancelling ? "bg-muted-foreground" : "bg-amber-500")}
+            />
+            <span
+              className={cn(
+                "text-[10px] font-semibold uppercase tracking-wider",
+                isCancelling ? "text-muted-foreground" : "text-amber-600",
+              )}
+            >
+              {isCancelling ? t("stopping") : t("queued")}
+            </span>
           </div>
         )}
 
         {/* In progress: live timer + logs */}
         {!isOverlay && card.status === "in_progress" && (
-          <InProgressBlock card={card} logLines={logLines} onViewLogs={onViewLogs} stop={stop} />
+          <InProgressBlock
+            card={card}
+            logLines={logLines}
+            onViewLogs={onViewLogs}
+            stop={stop}
+            isCancelling={isCancelling}
+          />
         )}
 
         {/* Waiting feedback */}
@@ -262,9 +281,10 @@ interface InProgressBlockProps {
   logLines?: string[];
   onViewLogs?: () => void;
   stop: (fn: () => void) => (e: React.MouseEvent) => void;
+  isCancelling?: boolean;
 }
 
-function InProgressBlock({ card, logLines, onViewLogs, stop }: InProgressBlockProps) {
+function InProgressBlock({ card, logLines, onViewLogs, stop, isCancelling = false }: InProgressBlockProps) {
   const t = useTranslations("kanban.card");
   const [elapsed, setElapsed] = useState("0s");
 
@@ -293,10 +313,24 @@ function InProgressBlock({ card, logLines, onViewLogs, stop }: InProgressBlockPr
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-60" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+            {!isCancelling && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-60" />
+            )}
+            <span
+              className={cn(
+                "relative inline-flex rounded-full h-2 w-2",
+                isCancelling ? "bg-muted-foreground animate-pulse" : "bg-orange-500",
+              )}
+            />
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-orange-600">{t("running")}</span>
+          <span
+            className={cn(
+              "text-[10px] font-semibold uppercase tracking-wider",
+              isCancelling ? "text-muted-foreground" : "text-orange-600",
+            )}
+          >
+            {isCancelling ? t("stopping") : t("running")}
+          </span>
         </div>
         <span className="text-[10px] tabular-nums text-muted-foreground">{elapsed}</span>
       </div>
@@ -313,7 +347,7 @@ function InProgressBlock({ card, logLines, onViewLogs, stop }: InProgressBlockPr
           ))}
         </div>
       ) : (
-        <p className="text-[11px] text-muted-foreground italic">{t("waitingForOutput")}</p>
+        <MyraThinking messages={t.raw("thinkingMessages") as string[]} />
       )}
 
       {onViewLogs && (

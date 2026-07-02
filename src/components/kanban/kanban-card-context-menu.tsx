@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import {
+  CircleStopIcon,
   ClipboardCheckIcon,
   MessageSquareIcon,
   MoveRightIcon,
@@ -31,6 +32,7 @@ interface KanbanCardContextMenuProps {
   columnLabel: (status: KanbanStatus) => string;
   onEdit: () => void;
   onLaunch: () => void;
+  onStop: () => void;
   onMove: (status: KanbanStatus) => void;
   onReview: () => void;
   onViewLogs?: () => void;
@@ -52,6 +54,7 @@ export function KanbanCardContextMenu({
   columnLabel,
   onEdit,
   onLaunch,
+  onStop,
   onMove,
   onReview,
   onViewLogs,
@@ -62,6 +65,10 @@ export function KanbanCardContextMenu({
 
   const inFlight = card.status === "in_progress" || Boolean(card.agentRunId) || card.agentQueued;
   const canLaunch = Boolean(card.agentPrompt) && !inFlight;
+  // Stop only when a run is actually active — `in_progress` or waiting for a
+  // slot. `agentRunId` lingers on done/feedback cards (its last run), so it
+  // can't gate this or Stop would show on cards whose process already exited.
+  const isRunning = card.status === "in_progress" || Boolean(card.agentQueued);
   const needsReview = card.status === "waiting_feedback" || card.status === "awaiting_review";
   const moveTargets = COLUMN_STATUSES.filter(
     (status) => status !== card.status && status !== "trashed" && isTransitionAllowed(card.status, status),
@@ -99,6 +106,14 @@ export function KanbanCardContextMenu({
           <ContextMenuItem onSelect={onLaunch}>
             <ZapIcon />
             {t("launchAgent")}
+          </ContextMenuItem>
+        )}
+
+        {/* Stop a live run (in progress or queued for a slot). */}
+        {isRunning && (
+          <ContextMenuItem onSelect={onStop}>
+            <CircleStopIcon />
+            {t("stop")}
           </ContextMenuItem>
         )}
 

@@ -1,4 +1,5 @@
-import { Calendar, House, Kanban, type LucideIcon, ScrollText } from "lucide-react";
+// House, ScrollText icons parked — Home/Logs nav entries commented out below.
+import { Activity, History, type LucideIcon, Route } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -15,6 +16,12 @@ export interface NavMainItem {
   icon?: LucideIcon;
   /** Longer hover hint shown in the sidebar tooltip. */
   description?: string;
+  /**
+   * Extra path prefixes that should also light this item — for detail routes
+   * that live outside the item's own `url` (e.g. the run detail at `/logs`
+   * belongs to "Operations"/`/runs`).
+   */
+  matchPaths?: string[];
   subItems?: NavSubItem[];
   comingSoon?: boolean;
   newTab?: boolean;
@@ -34,12 +41,12 @@ export const sidebarItems: NavGroup[] = [
     // Personal section — no label, always visible (Linear's Inbox / My issues row).
     id: 1,
     items: [
-      {
-        title: "Home",
-        url: "/",
-        icon: House,
-        description: "Your overview — recent activity and what needs attention across boards.",
-      },
+      // {
+      //   title: "Home",
+      //   url: "/",
+      //   icon: House,
+      //   description: "Your overview — recent activity and what needs attention across boards.",
+      // },
       // {
       //   title: "Inbox",
       //   url: "/inbox",
@@ -55,18 +62,23 @@ export const sidebarItems: NavGroup[] = [
   {
     // Workspace scope — everything org/app-wide.
     id: 2,
-    label: "Workspace",
     items: [
       {
-        title: "Kanban",
-        url: "/kanban",
-        icon: Kanban,
-        description: "Track your agents' tasks across columns — drag cards to move work along.",
+        // Temporary "Runs" view from the new UI refactor (Figma) — live overview
+        // of running tasks with status summary cards. Remove/merge once the
+        // redesign lands fully.
+        title: "Operations",
+        url: "/runs",
+        icon: Activity,
+        description: "Live overview of running tasks — counts by status and the active run list.",
+        // The run detail opens on `/logs`; keep Operations lit while it's shown.
+        matchPaths: ["/logs"],
+        isNew: true,
       },
       {
-        title: "Schedules",
+        title: "Patrols",
         url: "/schedules",
-        icon: Calendar,
+        icon: Route,
         description: "Set up recurring and cron-triggered runs so agents fire on their own.",
       },
       // Day Planner is parked for now — re-enable with the ClipboardList icon import.
@@ -76,11 +88,21 @@ export const sidebarItems: NavGroup[] = [
       //   icon: ClipboardList,
       // },
       {
-        title: "Logs",
-        url: "/logs",
-        icon: ScrollText,
-        description: "Inspect run history and detailed execution output for every agent.",
+        // "History" view from the new UI refactor (Figma `history` + `agent-session`)
+        // — past runs of every schedule (succeeded or failed) with stats, plus a
+        // per-run agent-session detail at `/history/run`.
+        title: "History",
+        url: "/history",
+        icon: History,
+        description: "Past runs of every patrol — stats and per-run agent discussion, succeeded or failed.",
+        isNew: true,
       },
+      // {
+      //   title: "Logs",
+      //   url: "/logs",
+      //   icon: ScrollText,
+      //   description: "Inspect run history and detailed execution output for every agent.",
+      // },
       // {
       //   title: "Views",
       //   url: "/views",

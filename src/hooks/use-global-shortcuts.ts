@@ -16,13 +16,12 @@ function isEditableTarget(target: EventTarget | null): boolean {
  * App-wide (in-app) keyboard shortcuts. Detection lives here once; the actions
  * are executed by KanbanPage via the shortcut store nonces.
  *
- *  - Mod+N  → new task (routes to /kanban first so it works from any page)
+ *  - Mod+N  → new patrol (ad-hoc cards are gone; creation is patrol-only now)
  *  - Mod+F  → focus the board card-search input
  *  - Mod+.  → cancel the agent of the card currently open in the modal
  */
 export function useGlobalShortcuts(): void {
   const router = useRouter();
-  const requestNewCard = useShortcutStore((s) => s.requestNewCard);
   const requestFocusSearch = useShortcutStore((s) => s.requestFocusSearch);
   const requestCancel = useShortcutStore((s) => s.requestCancel);
 
@@ -35,8 +34,7 @@ export function useGlobalShortcuts(): void {
       const key = e.key.toLowerCase();
       if (key === "n") {
         e.preventDefault();
-        router.push("/kanban");
-        requestNewCard();
+        router.push("/schedules/edit/?new=1");
       } else if (key === "f") {
         e.preventDefault();
         requestFocusSearch();
@@ -48,5 +46,5 @@ export function useGlobalShortcuts(): void {
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [router, requestNewCard, requestFocusSearch, requestCancel]);
+  }, [router, requestFocusSearch, requestCancel]);
 }

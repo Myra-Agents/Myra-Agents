@@ -10,6 +10,7 @@ export type AppEvent =
   | "card_created"
   | "card_moved"
   | "agent_launch"
+  | "agent_cancel"
   | "agent_run_completed"
   | "agent_run_failed"
   | "schedule_created"

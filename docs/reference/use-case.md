@@ -1,0 +1,13 @@
+Schedule:
+- Up to date check -> make sur my softwares are up to date and make sure its still works and don't break what I already have (mapping the dependancies of what I have on those softwares and make sure it still works)
+- Prune check -> is there anything to prune on my computer ? run GrandPerspective, any software might worth uninstalling because of long time last opened
+- Antivirus -> Is there anything suspicious on my computer ?
+- Daily news
+- Scrum daily
+- #1 Dreaming on past sessions (Find out what lessons can be learned)
+- Purge worktrees
+- Purge git branches
+- Self improve frontend based on posthog A/B testing
+- Surveille la prod et regarde les logs s'il y a un crash (sentry / posthog) ou un downtime (uptime)
+- Build in public skill (invoked each new feature/release)
+- Prune old code (deprecated ones)

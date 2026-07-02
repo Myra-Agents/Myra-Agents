@@ -48,6 +48,9 @@ interface KanbanBoardProps {
   onOpenConversation: (card: KanbanCard) => void;
   onBulkAddTag: (card: KanbanCard, tag: string) => Promise<void>;
   onBulkLaunch: (card: KanbanCard) => Promise<void>;
+  onStopCard: (card: KanbanCard) => void | Promise<void>;
+  /** Cards whose Stop was clicked but not yet confirmed by the backend. */
+  cancellingIds?: Set<string>;
   onViewLogs?: (card: KanbanCard) => void;
   logsByCard?: Map<string, string[]>;
   getSchedule?: (id: string | undefined) => ScheduledTask | undefined;
@@ -85,6 +88,8 @@ export function KanbanBoard({
   onOpenConversation,
   onBulkAddTag,
   onBulkLaunch,
+  onStopCard,
+  cancellingIds,
   onViewLogs,
   logsByCard,
   getSchedule,
@@ -697,6 +702,8 @@ export function KanbanBoard({
               onReviewCard={onReviewCard}
               onOpenConversation={onOpenConversation}
               onLaunchCard={onBulkLaunch}
+              onStopCard={onStopCard}
+              cancellingIds={cancellingIds}
               onMoveCard={onMoveCard}
               columnLabel={getColumnLabel}
               selectedIds={selectedIds}

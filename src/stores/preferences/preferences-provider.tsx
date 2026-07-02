@@ -4,13 +4,16 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 import { type StoreApi, useStore } from "zustand";
 
+import { MYRA_LOADER_VARIANTS } from "@/components/ui/myra-loader";
 import { type FontKey, fontRegistry } from "@/lib/fonts/registry";
+import { getLocalStorageValue } from "@/lib/local-storage.client";
 import {
   CONTENT_LAYOUT_VALUES,
   NAVBAR_STYLE_VALUES,
   SIDEBAR_COLLAPSIBLE_VALUES,
   SIDEBAR_VARIANT_VALUES,
 } from "@/lib/preferences/layout";
+import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { THEME_MODE_VALUES, THEME_PRESET_VALUES } from "@/lib/preferences/theme";
 import { applyThemeMode, subscribeToSystemTheme } from "@/lib/preferences/theme-utils";
 
@@ -40,6 +43,9 @@ function readDomState(): Partial<PreferencesState> {
     navbarStyle: getSafeValue(root.getAttribute("data-navbar-style"), NAVBAR_STYLE_VALUES),
     sidebarVariant: getSafeValue(root.getAttribute("data-sidebar-variant"), SIDEBAR_VARIANT_VALUES),
     sidebarCollapsible: getSafeValue(root.getAttribute("data-sidebar-collapsible"), SIDEBAR_COLLAPSIBLE_VALUES),
+    // loader_variant persists to localStorage (not SSR-critical), so hydrate it here.
+    loaderVariant:
+      getSafeValue(getLocalStorageValue("loader_variant"), MYRA_LOADER_VARIANTS) ?? PREFERENCE_DEFAULTS.loader_variant,
   };
 }
 

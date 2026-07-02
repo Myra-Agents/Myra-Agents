@@ -10,9 +10,14 @@ import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
 
 import { GlobalShortcuts } from "./_components/global-shortcuts";
+import { HEADER_ACTIONS_ID } from "./_components/header-actions";
+import { HeaderBreadcrumb } from "./_components/header-breadcrumb";
+import { NavHistoryControls } from "./_components/nav-history-controls";
+import { RefreshOnNavigate } from "./_components/refresh-on-navigate";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
+import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 import { TrayActionListener } from "./_components/tray-action-listener";
 import {
   HeaderLeftControls,
@@ -44,6 +49,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
     >
       <GlobalShortcuts />
       <TrayActionListener />
+      {/* Silent re-fetch of board + schedules on every route change. */}
+      <RefreshOnNavigate />
       {/* Single dialog instance; triggered from either the sidebar or top-bar SearchButton. */}
       <SearchDialog />
       <AppSidebar variant={variant} collapsible={collapsible} />
@@ -64,16 +71,23 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
             "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
           )}
         >
-          <div className="flex h-full w-full items-center gap-2 px-3">
+          <div className="flex h-full w-full items-center gap-2 pl-3">
             <div className="flex items-center gap-2">
               <MacHeaderControlsSpacer />
               <HeaderLeftControls />
+              <NavHistoryControls />
             </div>
             <WindowDragRegion />
-            <div className="flex items-center gap-2">
+            {/* Centered breadcrumb — flanked by drag regions so it stays centered. */}
+            <HeaderBreadcrumb />
+            <WindowDragRegion />
+            <div className="flex items-center gap-2 pr-3">
+              {/* Per-page action slot (e.g. Runs' List/Kanban toggle) portals here. */}
+              <div id={HEADER_ACTIONS_ID} className="flex items-center gap-2" />
+              <ThemeSwitcher className="text-icon-primary hover:text-foreground" />
               {/* <LayoutControls /> */}
-              <WindowControls />
             </div>
+            <WindowControls />
           </div>
         </header>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

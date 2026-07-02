@@ -11,6 +11,7 @@
  * Others are flexible and can use any persistence.
  */
 
+import type { MyraLoaderVariant } from "@/components/ui/myra-loader";
 import type { FontKey } from "@/lib/fonts/registry";
 
 import type { ContentLayout, NavbarStyle, SidebarCollapsible, SidebarVariant } from "./layout";
@@ -29,6 +30,7 @@ export type PreferenceValueMap = {
   navbar_style: NavbarStyle;
   sidebar_variant: SidebarVariant;
   sidebar_collapsible: SidebarCollapsible;
+  loader_variant: MyraLoaderVariant;
 };
 
 export type PreferenceKey = keyof PreferenceValueMap;
@@ -73,6 +75,7 @@ export const PREFERENCE_DEFAULTS: PreferenceValueMap = {
   navbar_style: "sticky",
   sidebar_variant: "sidebar",
   sidebar_collapsible: "offcanvas",
+  loader_variant: "shimmer",
 };
 
 /**
@@ -87,4 +90,5 @@ export const PREFERENCE_PERSISTENCE: PreferencePersistenceConfig = {
   navbar_style: "client-cookie",
   sidebar_variant: "client-cookie", // layout-critical → cannot be "localStorage"
   sidebar_collapsible: "client-cookie", // layout-critical → cannot be "localStorage"
+  loader_variant: "localStorage", // pure UI choice, not SSR-critical
 };

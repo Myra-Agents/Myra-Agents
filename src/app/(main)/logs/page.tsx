@@ -4,7 +4,15 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { ChevronLeftIcon, ExternalLinkIcon, FileIcon, FolderIcon, ListFilterIcon, SearchIcon } from "lucide-react";
+import {
+  CircleStopIcon,
+  ExternalLinkIcon,
+  FileIcon,
+  FolderIcon,
+  ListFilterIcon,
+  SearchIcon,
+  SquarePenIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -32,6 +40,8 @@ import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
 import { parseTranscript } from "@/lib/conversation/parse";
 import { invokeOn } from "@/lib/tauri";
+import { useBoardStore } from "@/stores/board-store";
+import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import type { AgentRun, KanbanCard, KanbanStatus } from "@/types/kanban";
 
 interface RunArtifact {
@@ -43,8 +53,8 @@ interface RunArtifact {
 
 function LogsPageInner() {
   const t = useTranslations("logs");
-  const { cards, loading, moveCard, addRevisionNote, answerFeedback } = useKanban();
   const router = useRouter();
+  const { cards, loading, moveCard, addRevisionNote, answerFeedback, cancelAgent, cancellingIds } = useKanban();
   const searchParams = useSearchParams();
   const deepLinkCardId = searchParams.get("card");
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
@@ -52,12 +62,15 @@ function LogsPageInner() {
   const [loadingLog, setLoadingLog] = useState(false);
   const [artifacts, setArtifacts] = useState<RunArtifact[]>([]);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<AgentRun["status"] | "all">("all");
+  // `needs_you` is a virtual filter covering both human-attention run states
+  // (needs_feedback + awaiting_review), shown as a single "Needs you" option.
+  const [statusFilter, setStatusFilter] = useState<AgentRun["status"] | "needs_you" | "all">("all");
   const [automationFilter, setAutomationFilter] = useState<string>("all");
 
-  const transcript = useMemo(
-    () => (selectedRun ? parseTranscript(logContent, selectedRun.run) : { entries: [], structured: false }),
-    [logContent, selectedRun],
+  // The run detail is reached from the Operations list — surface it as
+  // "Operations › {run title}" in the top bar (the path is `/logs`).
+  useBreadcrumbOverride(
+    selectedRun ? { label: selectedRun.card.title, parent: { label: "Operations", href: "/runs" } } : null,
   );
 
   const allRuns = useMemo(
@@ -83,6 +96,74 @@ function LogsPageInner() {
     }
     return ids;
   }, [allRuns]);
+
+  // ── Live log streaming for the open run ──────────────────────────────────
+  // The detail fetches the log once on open; new lines then arrive via
+  // `agent-log-appended` (board store `logs`) and are appended past the fetch
+  // baseline so the conversation grows live without a manual reload.
+  const liveLogs = useBoardStore((s) => s.logs);
+  const liveLogsRef = useRef(liveLogs);
+  liveLogsRef.current = liveLogs;
+  const logBaselineRef = useRef(0);
+  const selCardId = selectedRun?.card.id;
+
+  // Tell the backend to stream this card's run log while the detail is open —
+  // `agent-log-appended` is gated to watched cards. Cleared on close/unmount.
+  useEffect(() => {
+    if (!selCardId) return;
+    void connectionManager.setLogWatch([selCardId]);
+    return () => {
+      void connectionManager.setLogWatch([]);
+    };
+  }, [selCardId]);
+
+  // Is the open run still executing? (the card's live status is the truth.)
+  const selRunning = useMemo(() => {
+    if (!selectedRun) return false;
+    const liveCard = cards.find((c) => c.id === selectedRun.card.id) ?? selectedRun.card;
+    return displayRunStatus(liveCard, selectedRun.run, latestRunIds.has(selectedRun.run.id)) === "running";
+  }, [selectedRun, cards, latestRunIds]);
+
+  // Always keep the streamed tail merged onto the snapshot (not just while
+  // running) — otherwise the live lines would vanish the instant the run ends,
+  // falling back to the partial open-time snapshot. By construction the tail is
+  // the lines *after* the fetch baseline, so there's no overlap with logContent.
+  const liveLines = selCardId ? (liveLogs.get(selCardId) ?? []) : [];
+  const liveTail = liveLines.slice(logBaselineRef.current).join("\n");
+  const effectiveLog = useMemo(() => {
+    if (!liveTail) return logContent;
+    return [logContent ?? "", liveTail].filter(Boolean).join("\n");
+  }, [logContent, liveTail]);
+
+  const transcript = useMemo(
+    () => (selectedRun ? parseTranscript(effectiveLog, selectedRun.run) : { entries: [], structured: false }),
+    [effectiveLog, selectedRun],
+  );
+
+  // When the open run finishes, re-fetch the authoritative complete log: the
+  // live tail is capped (500 lines) and the final result footer lands in the
+  // file, so this both repairs long runs and yields the canonical transcript.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    const ended = wasRunning.current && !selRunning;
+    wasRunning.current = selRunning;
+    if (!ended || !selectedRun) return;
+    const { connId, entityId } = parseGlobalId(selectedRun.card.id);
+    const cardId = selectedRun.card.id;
+    void invokeOn<string>(connId, "get_run_log", { cardId: entityId, runId: selectedRun.run.id })
+      .then((log) => {
+        logBaselineRef.current = (liveLogsRef.current.get(cardId) ?? []).length;
+        setLogContent(log);
+      })
+      .catch(() => undefined);
+  }, [selRunning, selectedRun]);
+
+  // Keep the live view pinned to the latest output while the run is executing.
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const selEntryCount = transcript.entries.length;
+  useEffect(() => {
+    if (selRunning && selEntryCount) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [selRunning, selEntryCount]);
 
   // Success/failure counts over the last 24h and 7d, for the summary cards.
   const stats = useMemo(() => {
@@ -116,12 +197,18 @@ function LogsPageInner() {
 
   const filteredRuns = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return allRuns.filter(
-      ({ card, run }) =>
-        (statusFilter === "all" || displayRunStatus(card, run, latestRunIds.has(run.id)) === statusFilter) &&
+    return allRuns.filter(({ card, run }) => {
+      const ds = displayRunStatus(card, run, latestRunIds.has(run.id));
+      const statusMatch =
+        statusFilter === "all" ||
+        ds === statusFilter ||
+        (statusFilter === "needs_you" && (ds === "needs_feedback" || ds === "awaiting_review"));
+      return (
+        statusMatch &&
         (automationFilter === "all" || card.title === automationFilter) &&
-        (q === "" || card.title.toLowerCase().includes(q)),
-    );
+        (q === "" || card.title.toLowerCase().includes(q))
+      );
+    });
   }, [allRuns, query, statusFilter, automationFilter, latestRunIds]);
 
   const activeFilters = (statusFilter !== "all" ? 1 : 0) + (automationFilter !== "all" ? 1 : 0);
@@ -134,6 +221,8 @@ function LogsPageInner() {
       const { connId, entityId } = parseGlobalId(card.id);
       try {
         const log = await invokeOn<string>(connId, "get_run_log", { cardId: entityId, runId: run.id });
+        // Snapshot fetched: only append live lines streamed from here on.
+        logBaselineRef.current = (liveLogsRef.current.get(card.id) ?? []).length;
         setLogContent(log);
       } catch (e) {
         setLogContent(t("details.errorLoading", { error: String(e) }));
@@ -202,19 +291,6 @@ function LogsPageInner() {
     return (
       <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              // Arrived via a card deep-link (?card=…): return to the previous
-              // page (the board). Otherwise just clear back to the runs list.
-              if (deepLinkCardId) router.back();
-              else setSelectedRun(null);
-            }}
-          >
-            <ChevronLeftIcon className="size-4" />
-            {t("back")}
-          </Button>
           <h2 className="truncate font-semibold text-sm">{selectedRun.card.title}</h2>
           <RunStatusBadge status={displayStatus} />
         </div>
@@ -248,13 +324,49 @@ function LogsPageInner() {
               {t("details.cost")}: ${selectedRun.run.cost.toFixed(2)}
             </span>
           )}
+          {selectedRun.card.workingDir && (
+            <span className="inline-flex items-center gap-1" title={selectedRun.card.workingDir}>
+              <FolderIcon className="size-3" />
+              <span className="max-w-[22ch] truncate font-mono align-bottom">{selectedRun.card.workingDir}</span>
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Stop the live run (only while it's actually running). */}
+          {(displayStatus === "running" || cancellingIds.has(liveCard.id)) && (
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={cancellingIds.has(liveCard.id)}
+              onClick={async () => {
+                try {
+                  await cancelAgent(liveCard.id);
+                  toast.success(t("details.stopped"));
+                } catch (e) {
+                  toast.error(String(e));
+                }
+              }}
+            >
+              <CircleStopIcon className="size-3.5" />
+              {cancellingIds.has(liveCard.id) ? t("details.stopping") : t("details.stop")}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => openWorkingDir(selectedRun.card.id)}>
             <FolderIcon className="size-3.5" />
             {t("details.openWorkingDir")}
           </Button>
+          {selectedRun.card.linkedTaskId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => router.push(`/schedules/edit/?id=${encodeURIComponent(selectedRun.card.linkedTaskId!)}`)}
+            >
+              <SquarePenIcon className="size-3" />
+              {t("details.editPatrol")}
+            </Button>
+          )}
           {logArtifact && (
             <Button
               variant="ghost"
@@ -275,7 +387,10 @@ function LogsPageInner() {
             {loadingLog ? (
               <p className="text-muted-foreground text-sm">{t("details.loadingLog")}</p>
             ) : (
-              <ConversationView transcript={transcript} />
+              <>
+                <ConversationView transcript={transcript} thinking={selRunning} />
+                <div ref={bottomRef} />
+              </>
             )}
           </ScrollArea>
         </div>
@@ -365,8 +480,7 @@ function LogsPageInner() {
                   <DropdownMenuRadioItem value="running">{t("status.running")}</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="completed">{t("status.completed")}</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="failed">{t("status.failed")}</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="needs_feedback">{t("status.needsFeedback")}</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="awaiting_review">{t("status.awaitingReview")}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="needs_you">{t("status.needsYou")}</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
@@ -466,8 +580,10 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
 
 const STATUS_DOT: Record<AgentRun["status"], string> = {
   running: "bg-blue-500",
-  needs_feedback: "bg-amber-500",
-  awaiting_review: "bg-violet-500",
+  // Both human-attention states share one "Needs you" identity (label + color),
+  // matching the Operations page.
+  needs_feedback: "bg-task-status-needs-you",
+  awaiting_review: "bg-task-status-needs-you",
   completed: "bg-emerald-500",
   failed: "bg-destructive",
 };
@@ -476,8 +592,8 @@ function StatusDot({ status }: { status: AgentRun["status"] }) {
   const t = useTranslations("logs");
   const labels: Record<AgentRun["status"], string> = {
     running: t("status.running"),
-    needs_feedback: t("status.needsFeedback"),
-    awaiting_review: t("status.awaitingReview"),
+    needs_feedback: t("status.needsYou"),
+    awaiting_review: t("status.needsYou"),
     completed: t("status.completed"),
     failed: t("status.failed"),
   };
@@ -534,8 +650,8 @@ function RunStatusBadge({ status }: { status: AgentRun["status"] }) {
     { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
   > = {
     running: { label: t("status.running"), variant: "default" },
-    needs_feedback: { label: t("status.needsFeedback"), variant: "secondary" },
-    awaiting_review: { label: t("status.awaitingReview"), variant: "outline" },
+    needs_feedback: { label: t("status.needsYou"), variant: "outline" },
+    awaiting_review: { label: t("status.needsYou"), variant: "outline" },
     completed: { label: t("status.completed"), variant: "default" },
     failed: { label: t("status.failed"), variant: "destructive" },
   };

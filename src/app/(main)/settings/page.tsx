@@ -1,15 +1,14 @@
 "use client";
 
-import { type ChangeEvent, useCallback, useRef, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import { isTauri } from "@tauri-apps/api/core";
+import { buildAgentCommand } from "@myra/shared";
 import {
   CheckCircle2Icon,
   CopyIcon,
   DownloadIcon,
   FlaskConicalIcon,
   Loader2Icon,
-  PaletteIcon,
   PlusIcon,
   SaveIcon,
   SettingsIcon,
@@ -24,7 +23,6 @@ import { toast } from "sonner";
 import { AgentOptions } from "@/components/agents/agent-options";
 import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
-import { ConnectionsPanel } from "@/components/settings/connections-panel";
 import { LocalModelsPanel } from "@/components/settings/local-models-panel";
 // User connection disabled — hub status, remote access and cloud sync are off.
 // import { HubStatusCard } from "@/components/settings/hub-status-card";
@@ -49,6 +47,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MyraLoader, type MyraLoaderVariant } from "@/components/ui/myra-loader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -58,13 +57,20 @@ import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
 import { loadTestResult, persistTestResult, type StoredTestResult } from "@/lib/agent-test-store";
+import {
+  DEFAULT_PAGE,
+  type DefaultPage,
+  getDefaultPageSetting,
+  setDefaultPageSetting,
+} from "@/lib/default-page.client";
+import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import type { AgentPreset, AppSettings } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
 
-type DataAction = "export" | "import" | "clear";
+type DataAction = "export" | "import" | "clear" | "clearHistory";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
@@ -78,6 +84,22 @@ const EXEC_FIELDS = new Set<keyof AgentPreset>([
   "ollamaModel",
   "useWorktree",
 ]);
+
+/**
+ * Every IANA timezone the runtime knows, for the preferences picker (drives the
+ * nightly archive's "midnight"). Falls back to a small common set on the rare
+ * runtime without `Intl.supportedValuesOf`.
+ */
+const TIMEZONES: string[] = (() => {
+  try {
+    const fn = (Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+    const zones = fn?.("timeZone");
+    if (zones?.length) return zones;
+  } catch {
+    // fall through to the static fallback
+  }
+  return ["UTC", "Europe/Paris", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo"];
+})();
 
 interface AgentPresetCardProps {
   preset: AgentPreset;
@@ -126,7 +148,10 @@ function AgentPresetCard({
       await invoke("test_agent", {
         binary: preset.binary,
         argsTemplate: preset.argsTemplate,
-        workingDir: preset.workingDir ?? null,
+        flags: preset.flags ?? [],
+        launchVia: preset.launchVia ?? "direct",
+        ollamaModel: preset.ollamaModel ?? "",
+        workingDir: null,
       });
       const result: StoredTestResult = { status: "passed", ts: Date.now() };
       persistTestResult(preset.id, "passed");
@@ -141,7 +166,7 @@ function AgentPresetCard({
       setTestState("failed");
     }
     setTimeout(() => setTestState("idle"), 3000);
-  }, [preset.id, preset.binary, preset.argsTemplate, preset.workingDir, onSave]);
+  }, [preset.id, preset.binary, preset.argsTemplate, preset.flags, preset.launchVia, preset.ollamaModel, onSave]);
   // Gate only when we *can* install it (known binary) and a check confirmed it's missing.
   const gated = !configureAnyway && bin.missing && Boolean(bin.installInfo);
   // Until the first check resolves we don't know fields-or-gate — show a loading
@@ -156,7 +181,7 @@ function AgentPresetCard({
           <AgentStatusBadge {...bin} />
           {storedResult && (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+              className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium text-[10px] ${
                 storedResult.status === "passed"
                   ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                   : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
@@ -225,7 +250,7 @@ function AgentPresetCard({
           </div>
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">{t("agents.advancedArgs")}</Label>
+              <Label className="text-muted-foreground text-xs">{t("agents.advancedArgs")}</Label>
               <Switch checked={showAdvancedArgs} onCheckedChange={setShowAdvancedArgs} className="scale-75" />
             </div>
             {showAdvancedArgs && (
@@ -240,16 +265,6 @@ function AgentPresetCard({
                 <p className="text-muted-foreground text-xs">{t("agents.advancedArgsHint")}</p>
               </div>
             )}
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">{t("agents.workingDir")}</Label>
-            <WorkingDirField
-              value={preset.workingDir ?? ""}
-              onChange={(value) => onUpdate(idx, { workingDir: value || undefined })}
-              placeholder={t("agents.workingDirPlaceholder")}
-              inputClassName="h-7"
-              compact
-            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t("agents.options")}</Label>
@@ -272,14 +287,33 @@ function AgentPresetCard({
                 {t("agents.testCommand")}
               </span>
             </summary>
-            <p className="mt-1 rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] break-all">
-              {[
-                preset.binary,
-                (preset.argsTemplate ?? "{prompt}").replace("{prompt}", '"hello"'),
-                ...(preset.flags ?? []),
-              ]
-                .filter(Boolean)
-                .join(" ")}
+            <p className="mt-1 break-all rounded-md bg-muted px-2 py-1.5 font-mono text-[11px]">
+              {(() => {
+                // Mirror exactly what `test_agent` runs: flags appended + the
+                // `ollama launch` wrapping for local presets. Falls back to a
+                // best-effort string if the template is mid-edit (no {prompt}).
+                try {
+                  const { binary, args } = buildAgentCommand(
+                    preset.binary,
+                    preset.argsTemplate ?? "{prompt}",
+                    "hello",
+                    {
+                      flags: preset.flags ?? [],
+                      launchVia: preset.launchVia ?? "direct",
+                      ollamaModel: preset.ollamaModel ?? "",
+                    },
+                  );
+                  return [binary, ...args].filter(Boolean).join(" ");
+                } catch {
+                  return [
+                    preset.binary,
+                    (preset.argsTemplate ?? "{prompt}").replace("{prompt}", "hello"),
+                    ...(preset.flags ?? []),
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                }
+              })()}
             </p>
           </details>
           {storedResult?.status === "failed" && storedResult.reason && testState === "idle" && (
@@ -340,11 +374,37 @@ export default function SettingsPage() {
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
+  const loaderVariant = usePreferencesStore((state) => state.loaderVariant);
+  const setLoaderVariant = usePreferencesStore((state) => state.setLoaderVariant);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
   const [dataAction, setDataAction] = useState<DataAction | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Home folder is stored app-locally (not in server-persisted AppSettings) and
+  // saved immediately on change. Empty = the OS home directory.
+  const [homeFolder, setHomeFolderState] = useState("");
+  const [osHome, setOsHome] = useState("");
+  useEffect(() => {
+    setHomeFolderState(getHomeFolderSetting());
+    void osHomeDir().then(setOsHome);
+  }, []);
+  const updateHomeFolder = useCallback((v: string) => {
+    setHomeFolderState(v);
+    setHomeFolderSetting(v);
+  }, []);
+
+  // Default landing page is stored app-locally too (pure client navigation
+  // preference; the sidecar AppSettings round-trip would drop/reject it).
+  const [defaultPage, setDefaultPageState] = useState<DefaultPage>(DEFAULT_PAGE);
+  useEffect(() => {
+    setDefaultPageState(getDefaultPageSetting());
+  }, []);
+  const updateDefaultPage = useCallback((v: DefaultPage) => {
+    setDefaultPageState(v);
+    setDefaultPageSetting(v);
+  }, []);
 
   const current = draft ?? settings;
 
@@ -407,6 +467,16 @@ export default function SettingsPage() {
     void persistPreference("theme_mode", nextTheme);
   };
 
+  const handleTimezoneChange = (timezone: string) => {
+    update({ timezone });
+  };
+
+  const handleLoaderVariantChange = (variant: string) => {
+    const next = variant as MyraLoaderVariant;
+    setLoaderVariant(next);
+    void persistPreference("loader_variant", next);
+  };
+
   const handleExportBoard = useCallback(async () => {
     setDataAction("export");
 
@@ -450,6 +520,20 @@ export default function SettingsPage() {
     },
     [t],
   );
+
+  const handleClearRunHistory = useCallback(async () => {
+    setDataAction("clearHistory");
+
+    try {
+      await invoke("clear_run_history");
+      toast.success(t("feedback.historyCleared"));
+    } catch (clearError) {
+      console.error("Failed to clear run history:", clearError);
+      toast.error(getErrorMessage(clearError, t("feedback.clearFailed")));
+    } finally {
+      setDataAction(null);
+    }
+  }, [t]);
 
   const handleClearLogs = useCallback(async () => {
     if (!window.confirm(t("data.clearLogsConfirm"))) {
@@ -589,20 +673,14 @@ export default function SettingsPage() {
 
                 <div className="space-y-2">
                   <Label>{t("preferences.defaultPage")}</Label>
-                  <Select
-                    value={current.defaultHomePage}
-                    onValueChange={(value) => update({ defaultHomePage: value as AppSettings["defaultHomePage"] })}
-                  >
+                  <Select value={defaultPage} onValueChange={(value) => updateDefaultPage(value as DefaultPage)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="kanban">{t("preferences.pageOptions.kanban")}</SelectItem>
-                      <SelectItem value="schedules">{t("preferences.pageOptions.schedules")}</SelectItem>
-                      {/* Day Planner is parked for now.
-                      <SelectItem value="planner">{t("preferences.pageOptions.planner")}</SelectItem>
-                      */}
-                      <SelectItem value="logs">{t("preferences.pageOptions.logs")}</SelectItem>
+                      <SelectItem value="operations">{t("preferences.pageOptions.operations")}</SelectItem>
+                      <SelectItem value="patrols">{t("preferences.pageOptions.patrols")}</SelectItem>
+                      <SelectItem value="history">{t("preferences.pageOptions.history")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -620,13 +698,46 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    {t("preferences.loaderAnimation")}
+                    <MyraLoader size={16} variant={loaderVariant} className="text-primary" />
+                  </Label>
+                  <Select value={loaderVariant} onValueChange={handleLoaderVariantChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="shimmer">{t("preferences.loaderOptions.shimmer")}</SelectItem>
+                      <SelectItem value="assemble">{t("preferences.loaderOptions.assemble")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">{t("preferences.loaderAnimationHint")}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("preferences.timezone")}</Label>
+                  <Select value={current.timezone ?? "Europe/Paris"} onValueChange={handleTimezoneChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {TIMEZONES.map((tz) => (
+                        <SelectItem key={tz} value={tz}>
+                          {tz}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-muted-foreground text-xs">{t("preferences.timezoneHint")}</p>
+                </div>
               </div>
 
-              <div className="rounded-lg border border-dashed px-4 py-3 text-muted-foreground text-sm">
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <PaletteIcon className="size-4 text-muted-foreground" />
-                  {t("preferences.themeDescription")}
-                </div>
+              <div className="space-y-2">
+                <Label>{t("preferences.homeFolder")}</Label>
+                <WorkingDirField value={homeFolder} onChange={updateHomeFolder} placeholder={osHome || "~"} />
+                <p className="text-muted-foreground text-xs">{t("preferences.homeFolderHint")}</p>
               </div>
             </CardContent>
           </Card>
@@ -791,6 +902,33 @@ export default function SettingsPage() {
                   <UploadIcon className="size-4" />
                   {dataAction === "import" ? t("actions.importing") : t("data.importBoard")}
                 </Button>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="font-medium">{t("data.clearHistory")}</p>
+                  <p className="text-muted-foreground text-sm">{t("data.clearHistoryDescription")}</p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={dataAction !== null}>
+                      <Trash2Icon className="size-4" />
+                      {dataAction === "clearHistory" ? t("actions.clearing") : t("data.clearHistory")}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("data.clearHistoryConfirmTitle")}</AlertDialogTitle>
+                      <AlertDialogDescription>{t("data.clearHistoryConfirmDescription")}</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t("data.clearHistoryCancel")}</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => void handleClearRunHistory()}>
+                        {t("data.clearHistoryConfirm")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
 
               <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">

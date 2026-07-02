@@ -10,7 +10,7 @@ value: myra
   --foreground: #26251e;
   --card: #ffffff;
   --card-foreground: #26251e;
-  --popover: #dadada;
+  --popover: #fcfcfc;
   --popover-foreground: #26251e;
   --primary: #26251e;
   --primary-foreground: #f7f7f4;
@@ -51,6 +51,20 @@ value: myra
   --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  /* Figma "Theme" semantic tokens — light (derived from the dark export). */
+  --text-primary: #26251ef0;
+  --text-secondary: #26251eb2;
+  --text-tertiary: #26251e7a;
+  /* Opaque icon ink composited over the warm-paper surface (no stroke doubling). */
+  --icon-primary: #43423c;
+  --icon-tertiary: #65645e;
+  --card-background: #fcfcfc;
+  --card-background-secondary: #ebeae4;
+  --border-cards: #26251e0f;
+  --task-status-backlog: #888780;
+  --task-status-running: #ff6900;
+  --task-status-needs-you: #7f77dd;
+  --task-status-done: #639922;
 }
 
 .dark:root[data-theme-preset="myra"] {
@@ -81,7 +95,7 @@ value: myra
   --chart-3: #ebcb8b;
   --chart-4: #b48ead;
   --chart-5: #d08770;
-  --sidebar: #141414;
+  --sidebar: #1b1d1e;
   --sidebar-foreground: #e4e4e4;
   --sidebar-primary: #0097f5;
   --sidebar-primary-foreground: #e4e4e4f0;
@@ -97,4 +111,18 @@ value: myra
   --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  /* Figma "Theme" semantic tokens — dark (verbatim from the export). */
+  --text-primary: #e4e4e4f0;
+  --text-secondary: #e4e4e4b2;
+  --text-tertiary: #e4e4e47a;
+  /* Opaque icon ink composited over the dark surface (no stroke doubling). */
+  --icon-primary: #c7c7c7;
+  --icon-tertiary: #a6a6a6;
+  --card-background: #181818;
+  --card-background-secondary: #1f1f1f;
+  --border-cards: #e4e4e40a;
+  --task-status-backlog: #888780;
+  --task-status-running: #ff6900;
+  --task-status-needs-you: #7f77dd;
+  --task-status-done: #639922;
 }

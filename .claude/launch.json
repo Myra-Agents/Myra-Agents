@@ -3,9 +3,29 @@
   "configurations": [
     {
       "name": "myra-app-dev",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "n=$(ls -d \"$HOME/.nvm/versions/node/v2\"*/bin 2>/dev/null | sort -V | tail -1); [ -n \"$n\" ] && export PATH=\"$n:$PATH\"; exec bun run dev"
+      ],
       "port": 1420
+    },
+    {
+      "name": "myra-app-preview",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "n=$(ls -d \"$HOME/.nvm/versions/node/v2\"*/bin 2>/dev/null | sort -V | tail -1); [ -n \"$n\" ] && export PATH=\"$n:$PATH\"; exec bun x next dev -p \"${PORT:-1421}\""
+      ],
+      "port": 1421,
+      "autoPort": true
+    },
+    {
+      "name": "myra-out-static",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd out && exec python3 -m http.server 4319"],
+      "port": 4319,
+      "autoPort": true
     }
   ]
 }

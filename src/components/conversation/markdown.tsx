@@ -2,21 +2,20 @@
 
 // Tiny dependency-free markdown renderer for agent conversation text. Handles
 // the subset coding agents actually emit: fenced code blocks, inline code,
-// bold, headings, and bullet/numbered lists. Not a full CommonMark parser — by
-// design, to avoid pulling react-markdown + remark into the bundle.
+// bold (may wrap code), headings, bullet/numbered lists, and GFM tables. Not a
+// full CommonMark parser — by design, to avoid pulling react-markdown + remark
+// into the bundle.
 
 import { Fragment, type ReactNode } from "react";
 
 import { CopyButton } from "./copy-button";
 
-/** Inline spans: `code`, **bold**, *italic*. */
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  // Split on inline code first (highest precedence), then bold/italic inside.
-  const parts = text.split(/(`[^`]+`)/g);
-  parts.forEach((part, i) => {
+/** Inline code spans inside a run of (non-bold) text. */
+function renderCode(text: string, keyPrefix: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  text.split(/(`[^`]+`)/g).forEach((part, i) => {
     if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
-      nodes.push(
+      out.push(
         <code
           key={`${keyPrefix}-c${i}`}
           className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em] text-foreground"
@@ -24,21 +23,27 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
           {part.slice(1, -1)}
         </code>,
       );
-      return;
+    } else if (part) {
+      out.push(<Fragment key={`${keyPrefix}-t${i}`}>{part}</Fragment>);
     }
-    // Bold then italic.
-    const bold = part.split(/(\*\*[^*]+\*\*)/g);
-    bold.forEach((seg, j) => {
-      if (seg.startsWith("**") && seg.endsWith("**") && seg.length > 2) {
-        nodes.push(
-          <strong key={`${keyPrefix}-b${i}-${j}`} className="font-semibold">
-            {seg.slice(2, -2)}
-          </strong>,
-        );
-      } else if (seg) {
-        nodes.push(<Fragment key={`${keyPrefix}-t${i}-${j}`}>{seg}</Fragment>);
-      }
-    });
+  });
+  return out;
+}
+
+/** Inline spans: **bold** (may wrap `code`), then `code`. */
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  // Split on bold first so **…** spanning an inline-code chunk stays intact.
+  text.split(/(\*\*[^*]+\*\*)/g).forEach((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 2) {
+      nodes.push(
+        <strong key={`${keyPrefix}-b${i}`} className="font-semibold">
+          {renderCode(part.slice(2, -2), `${keyPrefix}-b${i}`)}
+        </strong>,
+      );
+    } else if (part) {
+      nodes.push(...renderCode(part, `${keyPrefix}-s${i}`));
+    }
   });
   return nodes;
 }
@@ -93,7 +98,60 @@ function renderText(text: string, keyPrefix: string): ReactNode[] {
     list = null;
   };
 
-  lines.forEach((line, i) => {
+  // GFM table helpers: a header row, a `|---|---|` separator, then body rows.
+  const isRow = (l: string) => l.includes("|") && l.trim() !== "";
+  const isSep = (l: string) => /^\s*\|?[\s:|-]*-[\s:|-]*\|?\s*$/.test(l) && l.includes("-");
+  const splitRow = (l: string) => {
+    let s = l.trim();
+    if (s.startsWith("|")) s = s.slice(1);
+    if (s.endsWith("|")) s = s.slice(0, -1);
+    return s.split("|").map((c) => c.trim());
+  };
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Table: a pipe row immediately followed by a separator row.
+    if (isRow(line) && i + 1 < lines.length && isSep(lines[i + 1])) {
+      flushList();
+      const header = splitRow(line);
+      const rows: string[][] = [];
+      let j = i + 2;
+      while (j < lines.length && isRow(lines[j]) && !isSep(lines[j])) {
+        rows.push(splitRow(lines[j]));
+        j++;
+      }
+      out.push(
+        <div key={`${keyPrefix}-tw${i}`} className="my-2 overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr>
+                {header.map((c, ci) => (
+                  <th key={ci} className="border border-border bg-muted/40 px-2 py-1 text-left font-semibold">
+                    {renderInline(c, `${keyPrefix}-th${i}-${ci}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri}>
+                  {header.map((_, ci) => (
+                    <td key={ci} className="border border-border px-2 py-1 align-top">
+                      {renderInline(r[ci] ?? "", `${keyPrefix}-td${i}-${ri}-${ci}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      );
+      i = j;
+      continue;
+    }
+
     const heading = /^(#{1,3})\s+(.*)$/.exec(line);
     const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
     const numbered = /^\s*\d+\.\s+(.*)$/.exec(line);
@@ -104,7 +162,8 @@ function renderText(text: string, keyPrefix: string): ReactNode[] {
         list = { ordered: false, items: [] };
       }
       list.items.push(bullet[1]);
-      return;
+      i++;
+      continue;
     }
     if (numbered) {
       if (!list?.ordered) {
@@ -112,7 +171,8 @@ function renderText(text: string, keyPrefix: string): ReactNode[] {
         list = { ordered: true, items: [] };
       }
       list.items.push(numbered[1]);
-      return;
+      i++;
+      continue;
     }
     flushList();
 
@@ -125,15 +185,20 @@ function renderText(text: string, keyPrefix: string): ReactNode[] {
           {renderInline(heading[2], `${keyPrefix}-hi${i}`)}
         </p>,
       );
-      return;
+      i++;
+      continue;
     }
-    if (line.trim() === "") return;
+    if (line.trim() === "") {
+      i++;
+      continue;
+    }
     out.push(
       <p key={`${keyPrefix}-p${i}`} className="my-1 leading-relaxed">
         {renderInline(line, `${keyPrefix}-pi${i}`)}
       </p>,
     );
-  });
+    i++;
+  }
   flushList();
   return out;
 }

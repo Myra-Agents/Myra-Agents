@@ -48,6 +48,28 @@ Frontend-only (no Tauri, browser localStorage stand-in backend kicks in):
 bun run dev            # next dev -p 1420
 ```
 
+**Test against a REAL sidecar from a plain browser** (no Tauri window needed —
+screen-capture tooling can't see the raw dev binary, so this is the way to verify
+end-to-end). `tauri:dev` already spawns + supervises the `myra-server` sidecar;
+pin it to a known port and tell the frontend where it is, so `localhost:1420` in
+any browser drives the same backend the webview would:
+
+```bash
+MYRA_DEV_PORT=4319 NEXT_PUBLIC_MYRA_SERVER_URL=http://127.0.0.1:4319 bun run tauri:dev
+# or, from the workspace root:  ./dev.sh app   (does exactly this, port 4319)
+```
+
+`MYRA_DEV_PORT` pins the Rust shell's *ephemeral* sidecar (the random-free-port
+fallback in `start_local_backend`, `src-tauri/src/lib.rs`); a persistent service
+already on 4319 is adopted instead. `NEXT_PUBLIC_MYRA_SERVER_URL` makes the
+ConnectionManager seed its LOCAL connection at that real HTTP backend — and it
+overrides any stale offline registry persisted in `localStorage` (else
+`invoke()` falls back to the browser stand-in and you get
+`[Dev Mode] Tauri backend not available`). Verify: `curl
+http://127.0.0.1:4319/healthz` and `POST /rpc/<cmd>` should both answer (CORS is
+open). Without these vars, a plain `bun run dev` browser stays on the offline
+localStorage stand-in.
+
 Verification gates (run before declaring done):
 
 ```bash
@@ -140,9 +162,37 @@ Agents.log` on macOS (`log:default` permission in `capabilities/default.json`).
   (`http://127.0.0.1:<port>`), and optionally remote/cloud connections.
 - In a plain browser (no Tauri) `invoke` throws `[Dev Mode]…`;
   `src/lib/browser-backend.ts` provides a localStorage-backed stand-in for the
-  kanban/schedule/settings commands so the UI is usable in `bun run dev`.
+  kanban/schedule/settings commands so the UI is usable in `bun run dev`. To
+  drive a **real** sidecar from the browser instead, set
+  `NEXT_PUBLIC_MYRA_SERVER_URL` (see "Test against a REAL sidecar" above).
 - Live updates are push-based events (e.g. `agent-log-appended`,
   `agent-result-changed`, `schedules-updated`), not polling.
+
+## Debugging — where the evidence is
+
+A user-visible bug usually has evidence on both sides of the bridge — check the
+frontend **and** the sidecar before concluding. Read the logs directly; don't
+ask the user to eyeball a console.
+
+- **App log file (Rust shell + sidecar):**
+  `~/Library/Logs/com.myra-agents.app/Myra Agents.log` (macOS). Sidecar
+  (server) output is under the `myra-server` target. Also goes to **stdout**
+  when launched via `bun run tauri:dev`, and into the **webview devtools
+  console**. Emit from Rust with `log::` macros, never `println!` (see Logging
+  above).
+- **Frontend:** webview devtools console (right-click → Inspect, or the log
+  Webview target). Network/RPC failures surface as `[Dev Mode]…` throws in a
+  plain browser.
+- **Dev instance:** find the running dev build with `pgrep -fl "target/debug/app"`;
+  a live process with no window is normal — relaunch `tauri:dev` for a fresh one.
+- **Agent runs / board state** live in the **server**, not here:
+  `~/.myra-agents/agent-runs/{runId}.log` is the per-run exec log; board /
+  schedules / settings are JSON there too. See `server`'s `CLAUDE.md` for the
+  full layout.
+
+```bash
+tail -f ~/Library/Logs/com.myra-agents.app/"Myra Agents.log"
+```
 
 ## Repo Conventions
 
@@ -154,8 +204,9 @@ Agents.log` on macOS (`log:default` permission in `capabilities/default.json`).
 - Shared types: canonical definitions live in `@myra/shared`
   (`packages/shared`, a submodule). `src/types/*` re-export from it. Rust structs
   use `#[serde(rename_all = "camelCase")]`; mirror field names exactly in `src/types/`.
-- Agent presets: configured in Settings (`binary`, `argsTemplate`, optional
-  `workingDir`). `argsTemplate` **must contain `{prompt}`**.
+- Agent presets: configured in Settings (`binary`, `argsTemplate`, flags).
+  `argsTemplate` **must contain `{prompt}`**. The working directory is **per
+  card** (mandatory on each card), not a preset field.
 
 ## Server sidecar
 
