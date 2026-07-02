@@ -790,6 +790,7 @@
       "logs": "Logs",
       "editPatrol": "Modifier la patrouille",
       "stop": "Arrêter",
+      "stopping": "Arrêt…",
       "stopped": "Opération arrêtée."
     },
     "loading": "Chargement…",

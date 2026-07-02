@@ -7,8 +7,6 @@ import { useRouter } from "next/navigation";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-import { useShortcutStore } from "@/stores/shortcut-store";
-
 /** Payload of the `tray-navigate` event emitted by the tray popover's `open_main`. */
 interface TrayNavigate {
   path: string;
@@ -23,7 +21,6 @@ interface TrayNavigate {
  */
 export function TrayActionListener() {
   const router = useRouter();
-  const requestNewSchedule = useShortcutStore((s) => s.requestNewSchedule);
 
   useEffect(() => {
     // The tray only exists in the desktop shell; in a plain browser the Tauri
@@ -32,12 +29,11 @@ export function TrayActionListener() {
     let unlisten: (() => void) | undefined;
     void listen<TrayNavigate>("tray-navigate", ({ payload }) => {
       router.push(payload.path);
-      if (payload.newSchedule) requestNewSchedule();
     }).then((un) => {
       unlisten = un;
     });
     return () => unlisten?.();
-  }, [router, requestNewSchedule]);
+  }, [router]);
 
   return null;
 }

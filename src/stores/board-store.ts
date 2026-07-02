@@ -346,8 +346,14 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 // lifetime (connectionManager listeners are process-global anyway).
 
 let liveUnsubs: Array<() => void> = [];
+// Serialise concurrent subscribeLive calls so rapid topology changes (e.g. hub
+// reconnecting while the local server restarts) never leave two active listener
+// sets running in parallel. Each call chains onto the previous one; once the
+// prior subscribe has fully resolved its unsubs are in place before the new one
+// tears them down.
+let subscribeChain: Promise<void> = Promise.resolve();
 
-async function subscribeLive() {
+async function doSubscribeLive() {
   for (const off of liveUnsubs) off();
   liveUnsubs = [];
   const store = useBoardStore.getState();
@@ -383,7 +389,12 @@ async function subscribeLive() {
     liveUnsubs.push(offLog);
   } catch (e) {
     console.error("Failed to subscribe agent-log-appended:", e);
+    captureError(e, { where: "boardStore.subscribeLive.log" });
   }
+}
+
+function subscribeLive(): void {
+  subscribeChain = subscribeChain.then(doSubscribeLive);
 }
 
 /** Start the board's data load + live subscriptions exactly once. Idempotent —

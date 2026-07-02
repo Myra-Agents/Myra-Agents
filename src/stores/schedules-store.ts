@@ -129,8 +129,9 @@ export const useSchedulesStore = create<SchedulesState>((set, get) => ({
 // ── Live wiring (subscribed once for the whole app) ──────────────────────────
 
 let liveUnsubs: Array<() => void> = [];
+let subscribeChain: Promise<void> = Promise.resolve();
 
-async function subscribeLive() {
+async function doSubscribeLive() {
   for (const off of liveUnsubs) off();
   liveUnsubs = [];
   try {
@@ -141,6 +142,10 @@ async function subscribeLive() {
   } catch (e) {
     console.error("Failed to subscribe schedules-updated:", e);
   }
+}
+
+function subscribeLive(): void {
+  subscribeChain = subscribeChain.then(doSubscribeLive);
 }
 
 /** Start the schedules data load + live subscription exactly once. Idempotent. */

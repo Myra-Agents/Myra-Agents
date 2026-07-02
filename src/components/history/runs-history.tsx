@@ -686,8 +686,12 @@ function Cols({ columns }: { columns: ColumnDef[] }) {
 
 /** Stable "now" for the lifetime of the view (static export has no server time). */
 function useNow(): number {
-  const [now, setNow] = useState(0);
-  useEffect(() => setNow(Date.now()), []);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   return now;
 }
 

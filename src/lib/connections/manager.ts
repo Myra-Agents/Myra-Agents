@@ -107,7 +107,10 @@ class ConnectionManager {
       if (SERVER_URL) {
         const local = this.defaultLocal();
         this.entries.set(local.id, { connection: local, transport: this.buildTransport(local) });
-        this.primaryConnId = LOCAL_ID;
+        // Preserve the user's chosen primary when it still exists in entries (e.g.
+        // a remote hub set as primary must not be silently downgraded to LOCAL just
+        // because a build-time SERVER_URL is also configured).
+        this.primaryConnId = this.entries.has(persisted.primaryId) ? persisted.primaryId : LOCAL_ID;
         return;
       }
       this.primaryConnId = this.entries.has(persisted.primaryId)

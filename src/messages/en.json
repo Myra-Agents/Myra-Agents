@@ -790,6 +790,7 @@
       "logs": "Logs",
       "editPatrol": "Edit patrol",
       "stop": "Stop",
+      "stopping": "Stopping…",
       "stopped": "Operation stopped."
     },
     "loading": "Loading…",

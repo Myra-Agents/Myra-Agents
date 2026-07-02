@@ -54,7 +54,7 @@ interface RunArtifact {
 function LogsPageInner() {
   const t = useTranslations("logs");
   const router = useRouter();
-  const { cards, loading, moveCard, addRevisionNote, answerFeedback, cancelAgent } = useKanban();
+  const { cards, loading, moveCard, addRevisionNote, answerFeedback, cancelAgent, cancellingIds } = useKanban();
   const searchParams = useSearchParams();
   const deepLinkCardId = searchParams.get("card");
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
@@ -334,10 +334,11 @@ function LogsPageInner() {
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Stop the live run (only while it's actually running). */}
-          {displayStatus === "running" && (
+          {(displayStatus === "running" || cancellingIds.has(liveCard.id)) && (
             <Button
               variant="destructive"
               size="sm"
+              disabled={cancellingIds.has(liveCard.id)}
               onClick={async () => {
                 try {
                   await cancelAgent(liveCard.id);
@@ -348,7 +349,7 @@ function LogsPageInner() {
               }}
             >
               <CircleStopIcon className="size-3.5" />
-              {t("details.stop")}
+              {cancellingIds.has(liveCard.id) ? t("details.stopping") : t("details.stop")}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={() => openWorkingDir(selectedRun.card.id)}>
