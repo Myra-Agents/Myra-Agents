@@ -799,6 +799,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
+        // Self-update: check GitHub Releases for a newer signed build, then
+        // download + verify + install + relaunch. Driven from the frontend via
+        // the JS updater/process plugins (Settings → Preferences + a silent
+        // launch check). Desktop only — the updater plugin is a no-op elsewhere.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .menu(build_app_menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "new_schedule" => navigate_main(app, "/schedules", true),

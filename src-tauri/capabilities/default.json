@@ -22,6 +22,8 @@
     "log:default",
     "opener:allow-open-url",
     "opener:allow-default-urls",
+    "updater:default",
+    "process:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [
