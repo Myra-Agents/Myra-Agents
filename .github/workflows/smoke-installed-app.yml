@@ -252,15 +252,29 @@ jobs:
           if [ -n "${RELEASE_TAG:-}" ]; then TAG="$RELEASE_TAG"
           elif [ -n "${INPUT_VERSION:-}" ] && [ "$INPUT_VERSION" != latest ]; then TAG="$INPUT_VERSION"
           else TAG=""; fi
+          # Parse everything with curl + grep/sed, NOT /usr/bin/python3: on macOS
+          # that python is a Command Line Tools stub that aborts with an
+          # xcode-select prompt when CLT isn't installed on the runner, which
+          # silently broke this whole job. curl/grep/sed are all base-OS.
           case "$(uname -m)" in arm64) ARCH=aarch64 ;; *) ARCH=x64 ;; esac
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
-          url="$api/latest"; [ -n "$TAG" ] && url="$api/tags/$TAG"
-          json=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: myra-ci" "$url")
-          tag=$(printf '%s' "$json" | /usr/bin/python3 -c 'import sys,json;print(json.load(sys.stdin)["tag_name"])')
-          dl=$(printf '%s' "$json" | /usr/bin/python3 -c "import sys,json;a=[x for x in json.load(sys.stdin)['assets'] if x['name'].endswith('_${ARCH}.dmg')];print(a[0]['browser_download_url'] if a else '')")
-          [ -n "$dl" ] || { echo "no _${ARCH}.dmg asset in $tag"; exit 1; }
-          dmg="$RUNNER_TEMP/myra.dmg"; curl -fsSL -o "$dmg" "$dl"
-          echo "DMG=$dmg" >> "$GITHUB_ENV"; echo "TAG=$tag" >> "$GITHUB_ENV"
+          # Resolve "latest" to a concrete tag via the releases/latest redirect
+          # (final URL is .../releases/tag/<TAG>) — no JSON tooling needed.
+          if [ -z "$TAG" ]; then
+            TAG=$(curl -fsS -o /dev/null -w '%{url_effective}' -L \
+              "https://github.com/${GITHUB_REPOSITORY}/releases/latest" | sed 's#.*/tag/##')
+          fi
+          [ -n "$TAG" ] || { echo "could not resolve release tag"; exit 1; }
+          # Find the arch's .dmg asset URL by suffix (robust to the name prefix),
+          # scraping browser_download_url out of the release JSON with grep/sed.
+          dl=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "User-Agent: myra-ci" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" \
+             | grep -o '"browser_download_url": *"[^"]*"' \
+             | sed 's/.*"\(https[^"]*\)"/\1/' \
+             | grep "_${ARCH}\.dmg$" | head -1)
+          [ -n "$dl" ] || { echo "no _${ARCH}.dmg asset in $TAG"; exit 1; }
+          dmg="$RUNNER_TEMP/myra.dmg"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -o "$dmg" "$dl"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"; echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "downloaded $dl"
 
       - name: Mount + extract + verify bundle
