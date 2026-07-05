@@ -298,7 +298,12 @@ jobs:
           set -euo pipefail
           pkill myra-server 2>/dev/null || true; sleep 1
           log="$RUNNER_TEMP/sidecar.log"
-          nohup "$APP/Contents/MacOS/myra-server" >"$log" 2>&1 &
+          # No nohup: on the headless LaunchDaemon runner it dies with
+          # "can't detach from console: Inappropriate ioctl for device" (no
+          # controlling TTY to detach from), so the sidecar never launches.
+          # Redirecting all three fds (incl. stdin </dev/null) is enough to
+          # background it; cleanup kills it, so SIGHUP-immunity isn't needed.
+          "$APP/Contents/MacOS/myra-server" >"$log" 2>&1 </dev/null &
           for i in $(seq 1 15); do sleep 2; grep -qE 'http://127\.0\.0\.1:[0-9]+' "$log" && break; done
           echo "::group::sidecar.log"; cat "$log"; echo "::endgroup::"
           pgrep -f 'Myra.app/Contents/MacOS/myra-server' >/dev/null || { echo "sidecar not running"; exit 1; }
