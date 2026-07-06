@@ -7,8 +7,8 @@ import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { columnConfigFor } from "@/lib/kanban-column-config";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
-import { COLUMN_CONFIG } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
 
 import { KanbanCardComponent } from "./kanban-card";
@@ -58,7 +58,7 @@ export function KanbanColumn({
   invalidDropCardId,
 }: KanbanColumnProps) {
   const t = useTranslations("kanban");
-  const config = COLUMN_CONFIG[status];
+  const config = columnConfigFor(status);
   const { setNodeRef, isOver } = useDroppable({ id: status, data: { type: "column", status } });
   const cardIds = cards.map((c) => c.id);
   const emptyHints: Record<KanbanStatus, string> = {
