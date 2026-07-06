@@ -29,14 +29,14 @@ import { AgentOptions } from "@/components/agents/agent-options";
 import { AgentInstallGate, AgentStatusBadge, useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { AppUpdatePanel } from "@/components/settings/app-update-panel";
+import { ConnectionsPanel } from "@/components/settings/connections-panel";
+import { HubStatusCard } from "@/components/settings/hub-status-card";
 import { LocalModelsPanel } from "@/components/settings/local-models-panel";
-// User connection disabled — hub status, remote access and cloud sync are off.
-// import { HubStatusCard } from "@/components/settings/hub-status-card";
+import { LocalServerPanel } from "@/components/settings/local-server-panel";
+import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 // Integrations, Plugins and Sync are parked for now — restore the imports with their tabs below.
 // import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
-// import { LocalServerPanel } from "@/components/settings/local-server-panel";
 // import { PluginsPanel } from "@/components/settings/plugins-panel";
-// import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
 // import { SyncPanel } from "@/components/settings/sync-panel";
 import {
   AlertDialog,
@@ -58,7 +58,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-// import { useEntitlement } from "@/hooks/use-entitlement"; // user connection disabled
+import { useEntitlement } from "@/hooks/use-entitlement";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -376,7 +376,7 @@ function AgentPresetCard({
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  // const { isPro } = useEntitlement(); // user connection disabled
+  const { isPro } = useEntitlement();
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
@@ -680,11 +680,12 @@ export default function SettingsPage() {
           <TabsTrigger value="data">{t("tabs.data")}</TabsTrigger>
         </TabsList>
 
-        {/* Hub tab hidden — no remote enabled for now.
         <TabsContent value="hub" className="space-y-6">
+          {isPro && <HubStatusCard />}
           <ConnectionsPanel />
+          {isTauri() && <LocalServerPanel />}
+          {isTauri() && isPro && <RemoteAccessPanel />}
         </TabsContent>
-        */}
 
         <TabsContent value="preferences" className="space-y-6">
           <Card>

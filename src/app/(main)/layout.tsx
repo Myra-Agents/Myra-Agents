@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 
 import { AppSidebar } from "@/app/(main)/_components/sidebar/app-sidebar";
-// User connection disabled — auth bootstrap + remote-access consent are off.
-// import { AuthBootstrap } from "@/components/auth-bootstrap";
+import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { RequirePro } from "@/components/require-pro";
-// import { RemoteAccessConsent } from "@/components/settings/remote-access-consent";
+import { RemoteAccessConsent } from "@/components/settings/remote-access-consent";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
@@ -103,7 +102,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
           <RequirePro>{children}</RequirePro>
         </div>
       </SidebarInset>
-      {/* User connection disabled — <AuthBootstrap /> and <RemoteAccessConsent /> removed. */}
+      <AuthBootstrap />
+      <RemoteAccessConsent />
     </SidebarProvider>
   );
 }

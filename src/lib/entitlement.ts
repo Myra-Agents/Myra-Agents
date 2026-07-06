@@ -1,5 +1,4 @@
-// User connection disabled — tier/role no longer come from a hub session.
-// import { getAccount, isAuthenticated } from "@/lib/auth/session";
+import { getAccount, isAuthenticated } from "@/lib/auth/session";
 
 export type Tier = "free" | "pro";
 export type Role = "admin" | "member";
@@ -19,17 +18,18 @@ function envTier(): Tier | undefined {
 }
 
 /**
- * The single seam where tier/role is decided. The hub-session source is
- * commented out with the rest of the user-connection feature, so tier/role/orgId
- * now come from build-time env only (`NEXT_PUBLIC_MYRA_TIER` / `_ROLE` / `_ORG_ID`),
- * else `free` — the local-only board. To restore session-driven entitlement,
- * re-enable the auth read below (see git history).
+ * The single seam where tier/role is decided. With a real auth session, the
+ * tier/role/orgId come straight from the hub-issued session claims (the account
+ * record, set by Clerk org claims + manual tier). With no session it falls back
+ * to the env override (desktop/local testing), else `free` — so free desktop
+ * keeps its local-only board. Real billing later only changes how the account
+ * record's `tier` is set, not this resolver.
  */
 export function resolveEntitlement(): Entitlement {
-  // const account = isAuthenticated() ? getAccount() : null;
-  // if (account) {
-  //   return { tier: account.tier, isPro: account.tier === "pro", role: account.role, orgId: account.orgId };
-  // }
+  const account = isAuthenticated() ? getAccount() : null;
+  if (account) {
+    return { tier: account.tier, isPro: account.tier === "pro", role: account.role, orgId: account.orgId };
+  }
   const tier: Tier = envTier() ?? "free";
   const role: Role = process.env.NEXT_PUBLIC_MYRA_ROLE === "admin" ? "admin" : "member";
   const orgId = process.env.NEXT_PUBLIC_MYRA_ORG_ID?.trim() || undefined;

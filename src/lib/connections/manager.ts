@@ -2,15 +2,14 @@ import { HUB_ROUTES } from "@myra/shared";
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 
 import { parseGlobalId } from "@/lib/aggregate/global-id";
-// User connection disabled — the managed cloud hub (auth-derived) is off.
-// import {
-//   getAccount,
-//   getValidSessionToken,
-//   isAuthConfigured,
-//   isAuthenticated,
-//   refresh as refreshSession,
-//   subscribe as subscribeAuth,
-// } from "@/lib/auth/session";
+import {
+  getAccount,
+  getValidSessionToken,
+  isAuthConfigured,
+  isAuthenticated,
+  refresh as refreshSession,
+  subscribe as subscribeAuth,
+} from "@/lib/auth/session";
 import { browserTransport } from "@/lib/transport/browser";
 import { createHttpTransport } from "@/lib/transport/http";
 import { createHubClient, type HubClient } from "@/lib/transport/hub";
@@ -21,8 +20,7 @@ import type { Connection, ConnectionEntry, ConnectionStatus, HubRegistration } f
 
 /** The managed cloud hub's fixed id — its auth is owned by `lib/auth/session`. */
 const CLOUD_HUB_ID = "cloud";
-// User connection disabled — the managed cloud hub URL is unused.
-// const CLOUD_HUB_URL = process.env.NEXT_PUBLIC_MYRA_HUB_URL?.replace(/\/$/, "") || "";
+const CLOUD_HUB_URL = process.env.NEXT_PUBLIC_MYRA_HUB_URL?.replace(/\/$/, "") || "";
 
 /** Optional server URL baked at build time — seeds the local connection at a real Node server. */
 const SERVER_URL = process.env.NEXT_PUBLIC_MYRA_SERVER_URL?.trim();
@@ -78,9 +76,10 @@ class ConnectionManager {
 
   constructor() {
     this.loadRegistry();
-    // User connection disabled — the auth-derived cloud hub is no longer synced.
-    // this.syncCloudHub();
-    // subscribeAuth(() => this.syncCloudHub());
+    // The cloud hub is derived from auth state, never persisted — sync it now
+    // and whenever the session changes (login / logout / refresh).
+    this.syncCloudHub();
+    subscribeAuth(() => this.syncCloudHub());
   }
 
   // --- registry persistence -------------------------------------------------
@@ -400,34 +399,30 @@ class ConnectionManager {
    * Reconcile the managed cloud hub with the auth session: add it (with a
    * dynamic-token client that refreshes on 401) when signed in, drop it when
    * signed out. Never persisted — auth is the single source of truth.
-   *
-   * User connection disabled — the whole cloud-hub sync is commented out. Restore
-   * it (and the auth imports above) from git history to bring back the managed
-   * cloud hub.
    */
-  // private syncCloudHub(): void {
-  //   const shouldHave = CLOUD_HUB_URL.length > 0 && isAuthConfigured() && isAuthenticated();
-  //   const has = this.hubs.has(CLOUD_HUB_ID);
-  //   if (shouldHave && !has) {
-  //     const reg: HubRegistration = {
-  //       id: CLOUD_HUB_ID,
-  //       label: getAccount()?.email ?? "Myra Cloud",
-  //       baseUrl: CLOUD_HUB_URL,
-  //       token: "",
-  //     };
-  //     const client = createHubClient(CLOUD_HUB_URL, {
-  //       getToken: () => getValidSessionToken(),
-  //       onUnauthorized: () => refreshSession(),
-  //     });
-  //     this.hubs.set(CLOUD_HUB_ID, { reg, client });
-  //     this.hubsReady = undefined; // force re-expand on the next fan-out
-  //     this.expandHub(CLOUD_HUB_ID)
-  //       .then(() => this.emitTopology())
-  //       .catch((e) => console.error("[ConnectionManager] cloud hub expand failed:", e));
-  //   } else if (!shouldHave && has) {
-  //     this.removeHub(CLOUD_HUB_ID);
-  //   }
-  // }
+  private syncCloudHub(): void {
+    const shouldHave = CLOUD_HUB_URL.length > 0 && isAuthConfigured() && isAuthenticated();
+    const has = this.hubs.has(CLOUD_HUB_ID);
+    if (shouldHave && !has) {
+      const reg: HubRegistration = {
+        id: CLOUD_HUB_ID,
+        label: getAccount()?.email ?? "Myra Cloud",
+        baseUrl: CLOUD_HUB_URL,
+        token: "",
+      };
+      const client = createHubClient(CLOUD_HUB_URL, {
+        getToken: () => getValidSessionToken(),
+        onUnauthorized: () => refreshSession(),
+      });
+      this.hubs.set(CLOUD_HUB_ID, { reg, client });
+      this.hubsReady = undefined; // force re-expand on the next fan-out
+      this.expandHub(CLOUD_HUB_ID)
+        .then(() => this.emitTopology())
+        .catch((e) => console.error("[ConnectionManager] cloud hub expand failed:", e));
+    } else if (!shouldHave && has) {
+      this.removeHub(CLOUD_HUB_ID);
+    }
+  }
 
   /** Registered hubs (one URL+token that expands into N instance connections). */
   listHubs(): HubRegistration[] {
