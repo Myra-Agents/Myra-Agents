@@ -1,6 +1,6 @@
 # Mission
 
-> ## Free everyone from repetitive work.
+> ## Free yourself from repetitive work.
 
 Anyone should be able to hand off the repetitive tasks they no longer want to
 do — and have them done, on their own, around the clock.
@@ -21,11 +21,11 @@ today, as a developer-first product, and will evolve as the audience widens.
 
 | Layer | Line | Scope |
 |-------|------|-------|
-| **Mission** | Free everyone from repetitive work. | The why — the world we're after. Outlives the product. |
+| **Mission** | Free yourself from repetitive work. | The why — the world we're after. Outlives the product. |
 | **Positioning** | Your AI workforce, running 24/7. | The what — how Myra presents today. |
-| **Tagline** | Delegate what you'd rather not do. · Agents that work while you sleep. | The hook. |
+| **Tagline** | Delegate the repetitive work. · Agents that work while you sleep. | The hook. |
 
-These nest, they don't compete: the *workforce* is **how**; freeing you from
+These nest, they don't compete: the *workforce* is **how**; freeing yourself from
 repetitive work is **why**.
 
 ## How we know we're winning

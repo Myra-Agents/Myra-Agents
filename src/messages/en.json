@@ -543,7 +543,7 @@
   },
   "runs": {
     "title": "Operations",
-    "subtitle": "Lists all the running tasks",
+    "subtitle": "Lists all the running agents",
     "loading": "Loading…",
     "empty": "No active runs yet.",
     "tags": "Tags",
@@ -551,7 +551,7 @@
     "search": "Search",
     "filter": "Filter",
     "showing": "Showing {shown} of {total}",
-    "needsYouHint": "“Needs you” lists the tasks where you need to steer the Agent. The idea is to reduce the “Needs you” tasks so the Agents can run without you.",
+    "needsYouHint": "“Needs you” lists the agents where you need to steer the Agent. The idea is to reduce the “Needs you” agents so the Agents can run without you.",
     "archiveHint": "“Done” operations are archived automatically every night at midnight ({timezone}).",
     "view": {
       "list": "List",
