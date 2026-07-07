@@ -8,6 +8,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-08
+
+### Added
+
+- **Run-started toasts** — launching or replying to a run now shows a toast with a link to the started operation; scheduler-materialized runs are toasted too.
+- **Suggest patrol change from run feedback** — a run's feedback can propose an edit to its patrol/schedule.
+- **Auto-test installed agents** — never-tested installed agents are exercised automatically so their availability is known before first use.
+- **Launch at login** — a Settings toggle to start Myra Agents automatically when you log in.
+- **Template breadcrumb** — the header breadcrumb now carries a Template segment.
+
+### Fixed
+
+- **PostHog in dev/test** — analytics capture is disabled in dev and test builds (no noise in the project from local runs).
+- **Reply relaunches the agent** — replying to a run now relaunches the agent (pairs with the sidecar's optional resume-on-launch).
+- **Windows tray popover** — renders correctly on Windows.
+- **Schedules branch listing** — no longer freezes the UI while listing branches.
+- **Windows app icon** — enlarged the glyph in `icon.ico`.
+
+### Changed
+
+- Removed the auto-resume toggles from agent settings.
+- Bundles the **myra-server v0.10.0** sidecar (per-patrol default run home dir, optional resume on `launch_agent`).
+
 ## [0.3.1] — 2026-07-02
 
 ### Fixed
