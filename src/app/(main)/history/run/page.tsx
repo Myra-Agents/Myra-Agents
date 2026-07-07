@@ -53,7 +53,7 @@ function AgentSessionScreen() {
   const cardId = params.get("card") ?? "";
   const runId = params.get("run") ?? "";
 
-  const { cards, moveCard, addRevisionNote, answerFeedback, cancelAgent } = useKanban();
+  const { cards, moveCard, addRevisionNote, answerFeedback, launchAgent, cancelAgent } = useKanban();
   // Live updates are global now (the board store self-subscribes to
   // `agent-result-changed` + `agent-log-appended`): the card's status flips the
   // instant a run finishes/asks for feedback, and the run log streams in via the
@@ -325,7 +325,7 @@ function AgentSessionScreen() {
           </ScrollArea>
         </div>
 
-        {/* Review footer — renders only when the card still awaits the user. */}
+        {/* Review footer — reply/approve on runs that finished or await the user. */}
         <ReviewComposer
           status={card.status}
           question={card.agentQuestion}
@@ -334,10 +334,15 @@ function AgentSessionScreen() {
             toast.success(t("approved"));
           }}
           onRevise={async (note) => {
+            // Store the note, then relaunch so the reply actually reaches the
+            // agent (resume = continue the previous session where supported).
+            // No local toast: the global run-start toast (#239) covers it.
             await addRevisionNote(card.id, note);
+            await launchAgent(card.id, undefined, { resume: true });
           }}
           onAnswer={async (answer) => {
             await answerFeedback(card.id, answer);
+            await launchAgent(card.id, undefined, { resume: true });
           }}
           onReopen={async () => {
             await moveCard(card.id, "awaiting_review");
@@ -352,6 +357,10 @@ function AgentSessionScreen() {
                   )
               : undefined
           }
+          onFollowUp={async (note) => {
+            await addRevisionNote(card.id, note);
+            await launchAgent(card.id, undefined, { resume: true });
+          }}
         />
       </div>
     </>

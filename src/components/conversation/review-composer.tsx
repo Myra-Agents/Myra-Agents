@@ -1,10 +1,11 @@
 "use client";
 
-// Inline reply box shown at the bottom of a run's conversation when it's
-// waiting on the user — mirroring how you'd answer Claude. Two modes:
-//   awaiting_review  → approve, or send a revision note for rework
+// Inline reply box shown at the bottom of a run's conversation — mirroring how
+// you'd answer Claude. Three modes:
+//   awaiting_review  → approve, or send a revision note for rework (relaunches)
 //   waiting_feedback → answer the agent's question (relaunches the run)
-// Wraps the same actions the Kanban review/feedback modals use.
+//   done             → follow-up reply that reopens + relaunches the run
+// The relaunch itself is owned by the caller (onRevise/onAnswer/onFollowUp).
 
 import { useState } from "react";
 
@@ -28,9 +29,20 @@ interface Props {
    * Omit to hide (no source patrol, or no change was requested).
    */
   onSuggestPatrol?: () => void;
+  /** Reply on a finished (done) run: relaunches the agent with the message. */
+  onFollowUp: (note: string) => Promise<void>;
 }
 
-export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer, onReopen, onSuggestPatrol }: Props) {
+export function ReviewComposer({
+  status,
+  question,
+  onApprove,
+  onRevise,
+  onAnswer,
+  onReopen,
+  onSuggestPatrol,
+  onFollowUp,
+}: Props) {
   const t = useTranslations("logs.conversation.review");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,29 +57,51 @@ export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer
     }
   };
 
-  // Approved/done run: keep a permanent way to reverse the decision.
+  // Approved/done run: keep a permanent way to reverse the decision, plus a
+  // follow-up reply box so the conversation can always be picked back up.
   if (status === "done") {
     return (
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-2 border-t pt-3">
-        <CheckCircle2Icon className="size-4 text-green-600 dark:text-green-400" />
-        <span className="text-muted-foreground text-sm">{t("approvedState")}</span>
-        <div className="ml-auto flex items-center gap-2">
-          {onSuggestPatrol && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              title={t("suggestPatrolHint")}
-              onClick={onSuggestPatrol}
-            >
-              <LightbulbIcon className="size-4" />
-              {t("suggestPatrol")}
+      <div className="mx-auto w-full max-w-3xl border-t pt-3">
+        <div className="mb-2 flex items-center gap-2">
+          <CheckCircle2Icon className="size-4 text-green-600 dark:text-green-400" />
+          <span className="text-muted-foreground text-sm">{t("approvedState")}</span>
+          <div className="ml-auto flex items-center gap-2">
+            {onSuggestPatrol && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                title={t("suggestPatrolHint")}
+                onClick={onSuggestPatrol}
+              >
+                <LightbulbIcon className="size-4" />
+                {t("suggestPatrol")}
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => run(onReopen)}>
+              <RotateCcwIcon className="size-4" />
+              {t("reopen")}
             </Button>
-          )}
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => run(onReopen)}>
-            <RotateCcwIcon className="size-4" />
-            {t("reopen")}
+          </div>
+        </div>
+        <Textarea
+          data-ph-no-capture
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={t("followUpPlaceholder")}
+          rows={3}
+          disabled={busy}
+        />
+        <div className="mt-2 flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy || !text.trim()}
+            onClick={() => run(() => onFollowUp(text.trim()))}
+          >
+            <SendIcon className="size-4" />
+            {busy ? t("sending") : t("send")}
           </Button>
         </div>
       </div>

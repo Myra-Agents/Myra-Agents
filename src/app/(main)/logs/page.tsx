@@ -55,7 +55,8 @@ interface RunArtifact {
 function LogsPageInner() {
   const t = useTranslations("logs");
   const router = useRouter();
-  const { cards, loading, moveCard, addRevisionNote, answerFeedback, cancelAgent, cancellingIds } = useKanban();
+  const { cards, loading, moveCard, addRevisionNote, answerFeedback, launchAgent, cancelAgent, cancellingIds } =
+    useKanban();
   const searchParams = useSearchParams();
   const deepLinkCardId = searchParams.get("card");
   const [selectedRun, setSelectedRun] = useState<{ card: KanbanCard; run: AgentRun } | null>(null);
@@ -409,10 +410,15 @@ function LogsPageInner() {
             toast.success(t("conversation.review.approved"));
           }}
           onRevise={async (note) => {
+            // Store the note, then relaunch so the reply actually reaches the
+            // agent (resume = continue the previous session where supported).
+            // No local toast: the global run-start toast (#239) covers it.
             await addRevisionNote(liveCard.id, note);
+            await launchAgent(liveCard.id, undefined, { resume: true });
           }}
           onAnswer={async (answer) => {
             await answerFeedback(liveCard.id, answer);
+            await launchAgent(liveCard.id, undefined, { resume: true });
           }}
           onReopen={async () => {
             await moveCard(liveCard.id, "awaiting_review");
@@ -427,6 +433,10 @@ function LogsPageInner() {
                   )
               : undefined
           }
+          onFollowUp={async (note) => {
+            await addRevisionNote(liveCard.id, note);
+            await launchAgent(liveCard.id, undefined, { resume: true });
+          }}
         />
       </div>
     );
