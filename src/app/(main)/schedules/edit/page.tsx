@@ -15,6 +15,7 @@ import {
   FolderIcon,
   GitBranchIcon,
   HomeIcon,
+  LightbulbIcon,
   MessageSquareIcon,
   PlayIcon,
   PlusIcon,
@@ -239,6 +240,13 @@ function ScheduleEditScreen() {
   }, []);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  // Suggestion handed over from a run's review footer (`?suggest=<note>`): the
+  // "Request changes" feedback the user sent during an operation of this patrol.
+  // Shown as a banner offering to fold it into the agent instruction; dismissal
+  // is keyed on the note so a later navigation with a new note shows again.
+  const suggestParam = (params.get("suggest") ?? "").trim();
+  const [dismissedSuggest, setDismissedSuggest] = useState<string | null>(null);
+  const suggestNote = suggestParam && dismissedSuggest !== suggestParam ? suggestParam : "";
   // Confirm dialog shown when cancelling with unsaved edits.
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   // Activate-prompt shown when adding a template patrol that is still inactive.
@@ -554,10 +562,7 @@ function ScheduleEditScreen() {
   // Stoppable = a run that's actually executing (in_progress) or queued to run
   // (backlog, `agentQueued`). "Needs you" (waiting_feedback / awaiting_review)
   // has no live process to kill, so it never shows Stop all.
-  const runningRuns = useMemo(
-    () => runs.filter((c) => c.status === "in_progress" || c.agentQueued),
-    [runs],
-  );
+  const runningRuns = useMemo(() => runs.filter((c) => c.status === "in_progress" || c.agentQueued), [runs]);
 
   // Tag vocabulary suggested in the editor — every distinct tag used across cards.
   const tagSuggestions = useMemo(() => {
@@ -592,6 +597,23 @@ function ScheduleEditScreen() {
     }
     doRunNow();
   }, [task, runningRuns, doRunNow]);
+
+  // Fold the run feedback into the agent instruction as an addendum the user
+  // can then rework — marks the draft dirty so Save lights up.
+  const applySuggestion = useCallback(() => {
+    if (!suggestNote) return;
+    setDraft((d) =>
+      d
+        ? { ...d, agentPrompt: d.agentPrompt.trim() ? `${d.agentPrompt.trimEnd()}\n\n${suggestNote}` : suggestNote }
+        : d,
+    );
+    setDismissedSuggest(suggestParam);
+    selectTab("settings");
+    // setTimeout (not rAF) so it runs after the Settings tab mounts.
+    setTimeout(() => {
+      document.getElementById("agent-instruction-input")?.scrollIntoView({ block: "center" });
+    }, 0);
+  }, [suggestNote, suggestParam, selectTab]);
 
   if (loading && !task) {
     return <div className="flex h-full items-center justify-center text-sm text-text-tertiary">{t("loading")}</div>;
@@ -858,6 +880,35 @@ function ScheduleEditScreen() {
         onDeleteCustomColor={requestDeleteCustomColor}
         t={t}
       />
+
+      {/* Patrol-change suggestion — handed over from a finished run where the
+          user requested changes. Apply appends it to the agent instruction. */}
+      {suggestNote && !draftMode && (
+        <div className="mt-4 flex flex-col gap-2 rounded-xl border border-border-cards bg-card-background p-4">
+          <div className="flex items-center gap-2">
+            <LightbulbIcon className="size-4 text-text-secondary" />
+            <span className="font-medium text-[12px] text-text-primary">{t("suggestion.title")}</span>
+          </div>
+          <p className="whitespace-pre-wrap text-[12px] text-text-secondary">{suggestNote}</p>
+          <p className="text-[11px] text-text-tertiary">{t("suggestion.hint")}</p>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={applySuggestion}
+              className="rounded-md bg-foreground px-2 py-0.5 font-medium text-[11px] text-background transition-colors hover:bg-foreground/90"
+            >
+              {t("suggestion.apply")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDismissedSuggest(suggestParam)}
+              className="rounded-md border border-border px-2 py-0.5 font-medium text-[11px] text-text-secondary transition-colors hover:bg-muted/40 hover:text-text-primary"
+            >
+              {t("suggestion.dismiss")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Settings / Runs & History tabs. The Runs tab is hidden in template/blank
           mode — a not-yet-created schedule has no run history. */}

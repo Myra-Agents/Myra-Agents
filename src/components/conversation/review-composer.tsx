@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 
-import { CheckCircle2Icon, CheckIcon, RotateCcwIcon, SendIcon } from "lucide-react";
+import { CheckCircle2Icon, CheckIcon, LightbulbIcon, RotateCcwIcon, SendIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,15 @@ interface Props {
   onRevise: (note: string) => Promise<void>;
   onAnswer: (answer: string) => Promise<void>;
   onReopen: () => Promise<void>;
+  /**
+   * Shown on a finished (done) run whose card collected "Request changes"
+   * feedback — offers to fold that feedback back into the source patrol.
+   * Omit to hide (no source patrol, or no change was requested).
+   */
+  onSuggestPatrol?: () => void;
 }
 
-export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer, onReopen }: Props) {
+export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer, onReopen, onSuggestPatrol }: Props) {
   const t = useTranslations("logs.conversation.review");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,17 +51,25 @@ export function ReviewComposer({ status, question, onApprove, onRevise, onAnswer
       <div className="mx-auto flex w-full max-w-3xl items-center gap-2 border-t pt-3">
         <CheckCircle2Icon className="size-4 text-green-600 dark:text-green-400" />
         <span className="text-muted-foreground text-sm">{t("approvedState")}</span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="ml-auto"
-          disabled={busy}
-          onClick={() => run(onReopen)}
-        >
-          <RotateCcwIcon className="size-4" />
-          {t("reopen")}
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          {onSuggestPatrol && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              title={t("suggestPatrolHint")}
+              onClick={onSuggestPatrol}
+            >
+              <LightbulbIcon className="size-4" />
+              {t("suggestPatrol")}
+            </Button>
+          )}
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => run(onReopen)}>
+            <RotateCcwIcon className="size-4" />
+            {t("reopen")}
+          </Button>
+        </div>
       </div>
     );
   }

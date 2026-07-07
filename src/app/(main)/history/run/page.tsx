@@ -20,6 +20,7 @@ import { useSettings } from "@/hooks/use-settings";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
 import { parseTranscript } from "@/lib/conversation/parse";
+import { requestChangeNotes } from "@/lib/conversation/request-changes";
 import { effortOf } from "@/lib/history/past-runs";
 import { invokeOn } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -185,6 +186,12 @@ function AgentSessionScreen() {
     );
   }
 
+  // "Request changes" feedback collected on this card. When the finished run
+  // came from a patrol, the review footer offers to fold it back into the
+  // patrol's definition (the edit page picks it up via `?suggest=`).
+  const requestChanges = requestChangeNotes(card);
+  const patrolId = schedule?.id ?? card.linkedTaskId;
+
   const onRerun = async () => {
     if (!schedule) return;
     try {
@@ -333,6 +340,16 @@ function AgentSessionScreen() {
           onReopen={async () => {
             await moveCard(card.id, "awaiting_review");
           }}
+          onSuggestPatrol={
+            patrolId && requestChanges.length > 0
+              ? () =>
+                  router.push(
+                    `/schedules/edit/?id=${encodeURIComponent(patrolId)}&suggest=${encodeURIComponent(
+                      requestChanges.join("\n\n"),
+                    )}`,
+                  )
+              : undefined
+          }
         />
       </div>
     </>

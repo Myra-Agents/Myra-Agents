@@ -835,6 +835,8 @@
         "approved": "Approuvé — déplacé vers Terminé",
         "approvedState": "Vous avez approuvé cette exécution",
         "reopen": "Rouvrir pour révision",
+        "suggestPatrol": "Suggérer une modification de la patrouille",
+        "suggestPatrolHint": "Vous avez demandé des changements pendant cette exécution — reportez ce retour dans la patrouille elle-même.",
         "requestChanges": "Demander des changements",
         "revisePlaceholder": "Décrivez ce qui doit changer, puis Demander des changements — ou approuvez directement…",
         "answerPlaceholder": "Tapez votre réponse ici…",
@@ -1291,6 +1293,12 @@
   },
   "scheduleEdit": {
     "loading": "Chargement de la patrouille…",
+    "suggestion": {
+      "title": "Changement demandé pendant une exécution",
+      "hint": "Vous avez demandé des changements sur une opération de cette patrouille. Si l’agent a besoin de la même correction à chaque fois, intégrez-la à l’instruction pour que les prochaines exécutions soient bonnes du premier coup.",
+      "apply": "Ajouter à l’instruction",
+      "dismiss": "Ignorer"
+    },
     "discardTitle": "Abandonner les modifications ?",
     "discardDescription": "Vos modifications non enregistrées seront perdues et ne seront pas prises en compte.",
     "discardKeepEditing": "Continuer l'édition",
