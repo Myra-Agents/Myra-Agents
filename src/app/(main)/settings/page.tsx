@@ -795,33 +795,6 @@ export default function SettingsPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <Label>{t("agents.autoResume")}</Label>
-                    <p className="text-muted-foreground text-xs">{t("agents.autoResumeHint")}</p>
-                  </div>
-                  <Switch
-                    checked={current.autoResumeInterrupted !== false}
-                    onCheckedChange={(checked) => update({ autoResumeInterrupted: checked })}
-                  />
-                </div>
-                {current.autoResumeInterrupted !== false && (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs">{t("agents.autoResumeRetries")}</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={current.autoResumeMaxRetries ?? 2}
-                      onChange={(event) =>
-                        update({ autoResumeMaxRetries: Math.max(0, Number(event.target.value) || 0) })
-                      }
-                      className="h-8 w-20"
-                    />
-                  </div>
-                )}
-              </div>
-
               <Separator />
 
               {current.agents.map((preset, idx) => (
