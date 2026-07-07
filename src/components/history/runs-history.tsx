@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type HistoryColumnId, TOGGLEABLE_COLUMNS, useHistoryColumns } from "@/hooks/use-history-columns";
+import { useRunStartedToast } from "@/hooks/use-run-started-toast";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import {
@@ -74,6 +75,7 @@ export function RunsHistory({
   const now = useNow();
   const { settings } = useSettings();
   const { schedules, triggerNow } = useSchedules();
+  const showRunStarted = useRunStartedToast();
   const { hidden, toggleColumn, resetColumns } = useHistoryColumns();
 
   // Resolve the agent preset a run used (falls back to the default agent).
@@ -251,8 +253,8 @@ export function RunsHistory({
     const schedule = schedules.find((s) => s.id === linked || s.id.endsWith(`:${linked}`) || s.id.endsWith(linked));
     if (!schedule) return;
     try {
-      await triggerNow(schedule.id);
-      toast.success(t("rowMenu.rerunStarted"));
+      const runId = await triggerNow(schedule.id);
+      showRunStarted(runId, t("rowMenu.rerunStarted"));
     } catch (e) {
       toast.error(String(e));
     }

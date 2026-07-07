@@ -51,9 +51,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useRunStartedToast } from "@/hooks/use-run-started-toast";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
@@ -205,6 +205,7 @@ export default function SchedulesPage() {
   const router = useRouter();
   const { schedules, loading, error, createSchedule, deleteSchedule, toggleEnabled, triggerNow } = useSchedules();
   const { settings } = useSettings();
+  const showRunStarted = useRunStartedToast();
 
   const agentById = useMemo(() => new Map(settings.agents.map((p) => [p.id, p])), [settings.agents]);
 
@@ -271,12 +272,13 @@ export default function SchedulesPage() {
     async (id: string) => {
       setTriggering(id);
       try {
-        await triggerNow(id);
+        const runId = await triggerNow(id);
+        showRunStarted(runId);
       } finally {
         setTriggering(null);
       }
     },
-    [triggerNow],
+    [triggerNow, showRunStarted],
   );
 
   // Clone a schedule onto its owning server, disabled, with a "(copy)" name.

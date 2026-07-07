@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useKanban } from "@/hooks/use-kanban";
+import { useRunStartedToast } from "@/hooks/use-run-started-toast";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
@@ -59,6 +60,7 @@ function AgentSessionScreen() {
   const logs = useBoardStore((s) => s.logs);
   const { schedules, triggerNow } = useSchedules();
   const { settings } = useSettings();
+  const showRunStarted = useRunStartedToast();
 
   const card = useMemo(() => cards.find((c) => c.id === cardId), [cards, cardId]);
   const run: AgentRun | undefined = useMemo(
@@ -188,8 +190,8 @@ function AgentSessionScreen() {
   const onRerun = async () => {
     if (!schedule) return;
     try {
-      await triggerNow(schedule.id);
-      toast.success(t("rerun"));
+      const newRunId = await triggerNow(schedule.id);
+      showRunStarted(newRunId);
     } catch (e) {
       toast.error(String(e));
     }
