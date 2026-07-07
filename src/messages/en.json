@@ -844,6 +844,7 @@
         "requestChanges": "Request changes",
         "revisePlaceholder": "Describe what needs to change, then Request changes — or just Approve…",
         "answerPlaceholder": "Type your answer here…",
+        "followUpPlaceholder": "Reply to the agent — your message relaunches the run…",
         "send": "Send",
         "sending": "Sending…"
       }

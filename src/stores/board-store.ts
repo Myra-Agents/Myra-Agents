@@ -102,7 +102,7 @@ interface BoardState {
   restoreCard: (id: string, status?: KanbanStatus) => Promise<KanbanCard | null>;
   addRevisionNote: (id: string, note: string) => Promise<KanbanCard | null>;
   answerFeedback: (id: string, answer: string) => Promise<KanbanCard | null>;
-  launchAgent: (cardId: string, workingDir?: string) => Promise<LaunchResult>;
+  launchAgent: (cardId: string, workingDir?: string, opts?: { resume?: boolean }) => Promise<LaunchResult>;
   cancelAgent: (cardId: string) => Promise<boolean>;
 }
 
@@ -314,11 +314,13 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     return card;
   },
 
-  launchAgent: async (cardId, workingDir) => {
+  launchAgent: async (cardId, workingDir, opts) => {
     const { connId, entityId } = parseGlobalId(cardId);
     try {
+      // `resume: true` relaunches as a continuation of the previous agent
+      // session (reply to a finished run). Older servers ignore the field.
       const result = await connectionManager.invokeOne<LaunchResult>(connId, "launch_agent", {
-        input: { cardId: entityId, workingDir: workingDir ?? null },
+        input: { cardId: entityId, workingDir: workingDir ?? null, resume: opts?.resume ?? false },
       });
       const now = new Date().toISOString();
       commitCards(
