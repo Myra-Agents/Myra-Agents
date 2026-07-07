@@ -819,6 +819,13 @@ pub fn run() {
         // launch check). Desktop only — the updater plugin is a no-op elsewhere.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // Launch at login: toggled from Settings → Preferences via the JS
+        // autostart plugin (enable/disable/isEnabled). macOS uses a per-user
+        // LaunchAgent; Windows/Linux use the platform-native registry/desktop entry.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .menu(build_app_menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "new_schedule" => navigate_main(app, "/schedules", true),

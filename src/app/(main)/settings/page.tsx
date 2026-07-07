@@ -4,6 +4,11 @@ import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "reac
 
 import { buildAgentCommand } from "@myra/shared";
 import {
+  disable as disableAutostart,
+  enable as enableAutostart,
+  isEnabled as isAutostartEnabled,
+} from "@tauri-apps/plugin-autostart";
+import {
   CheckCircle2Icon,
   CopyIcon,
   DownloadIcon,
@@ -66,7 +71,7 @@ import {
 } from "@/lib/default-page.client";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
-import { invoke } from "@/lib/tauri";
+import { invoke, isTauri } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import type { AgentPreset, AppSettings } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
@@ -407,6 +412,36 @@ export default function SettingsPage() {
     setDefaultPageSetting(v);
   }, []);
 
+  // Launch-at-login lives in the OS (LaunchAgent / registry / desktop entry),
+  // not in AppSettings — the autostart plugin's isEnabled() is the source of
+  // truth, and toggling applies immediately. Desktop only (Tauri).
+  const [openAtLogin, setOpenAtLogin] = useState(false);
+  useEffect(() => {
+    if (!isTauri()) return;
+    void isAutostartEnabled()
+      .then(setOpenAtLogin)
+      .catch(() => {
+        // Leave the toggle off if the OS state can't be read.
+      });
+  }, []);
+  const toggleOpenAtLogin = useCallback(
+    async (checked: boolean) => {
+      setOpenAtLogin(checked);
+      try {
+        if (checked) {
+          await enableAutostart();
+        } else {
+          await disableAutostart();
+        }
+        setOpenAtLogin(await isAutostartEnabled());
+      } catch (toggleError) {
+        setOpenAtLogin(!checked);
+        toast.error(getErrorMessage(toggleError, t("feedback.saveFailed")));
+      }
+    },
+    [t],
+  );
+
   const current = draft ?? settings;
 
   const update = useCallback(
@@ -740,6 +775,16 @@ export default function SettingsPage() {
                 <WorkingDirField value={homeFolder} onChange={updateHomeFolder} placeholder={osHome || "~"} />
                 <p className="text-muted-foreground text-xs">{t("preferences.homeFolderHint")}</p>
               </div>
+
+              {isTauri() && (
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <Label>{t("preferences.openAtLogin")}</Label>
+                    <p className="text-muted-foreground text-xs">{t("preferences.openAtLoginHint")}</p>
+                  </div>
+                  <Switch checked={openAtLogin} onCheckedChange={(checked) => void toggleOpenAtLogin(checked)} />
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -1143,6 +1143,8 @@
         "shimmer": "Shimmer (subtle)",
         "assemble": "Assemble (playful)"
       },
+      "openAtLogin": "Open at login",
+      "openAtLoginHint": "Start Myra Agents automatically when you log in to your computer.",
       "appUpdate": {
         "title": "App updates",
         "description": "Update Myra Agents to the latest version, installed and verified automatically.",

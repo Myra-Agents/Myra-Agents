@@ -24,6 +24,7 @@
     "opener:allow-default-urls",
     "updater:default",
     "process:default",
+    "autostart:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [
