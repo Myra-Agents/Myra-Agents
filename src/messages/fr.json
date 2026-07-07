@@ -1312,6 +1312,7 @@
     "subtitle": "Déployez des patrouilles récurrentes avec des agents IA déclenchés par des événements.",
     "active": "Actif",
     "inactive": "Inactif",
+    "templateCrumb": "Modèle",
     "tags": "Tags",
     "newTag": "+ Nouveau tag",
     "save": "Enregistrer",

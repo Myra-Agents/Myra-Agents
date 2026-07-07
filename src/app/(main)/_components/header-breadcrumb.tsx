@@ -47,8 +47,10 @@ export function HeaderBreadcrumb() {
   const override = useBreadcrumbStore((s) => s.override);
 
   const segments = path.split("/").filter(Boolean);
-  // Build cumulative crumbs: /a/b → [{/a}, {/a/b}].
-  const crumbs = segments.map((_, i) => {
+  // Build cumulative crumbs: /a/b → [{/a}, {/a/b}]. A crumb without a url
+  // renders as plain text (non-clickable) — used for section labels that have
+  // no route of their own (e.g. "Template").
+  const crumbs: { url?: string; label: string }[] = segments.map((_, i) => {
     const url = `/${segments.slice(0, i + 1).join("/")}`;
     return { url, label: titleFor(url) };
   });
@@ -69,6 +71,11 @@ export function HeaderBreadcrumb() {
       leaf.label = override.label;
       if (override.href) leaf.url = override.href;
     }
+    // An optional section crumb slots in right before the leaf — e.g. the
+    // template editor shows "Patrols › Template › {name}".
+    if (override.section) {
+      crumbs.splice(crumbs.length - 1, 0, { url: override.section.href, label: override.section.label });
+    }
   }
 
   return (
@@ -87,10 +94,12 @@ export function HeaderBreadcrumb() {
               <BreadcrumbItem>
                 {isLast ? (
                   <BreadcrumbPage className="text-text-primary">{crumb.label}</BreadcrumbPage>
-                ) : (
+                ) : crumb.url ? (
                   <BreadcrumbLink href={crumb.url} className="text-text-tertiary hover:text-text-secondary">
                     {crumb.label}
                   </BreadcrumbLink>
+                ) : (
+                  <span className="text-text-tertiary">{crumb.label}</span>
                 )}
               </BreadcrumbItem>
               {!isLast && <BreadcrumbSeparator className="text-icon-tertiary" />}
