@@ -120,7 +120,7 @@ fn get_or_create_popover(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         return Ok(win);
     }
 
-    let win = WebviewWindowBuilder::new(app, POPOVER_LABEL, WebviewUrl::App("tray/".into()))
+    let builder = WebviewWindowBuilder::new(app, POPOVER_LABEL, WebviewUrl::App("tray/".into()))
         .title("Myra")
         .inner_size(POPOVER_W, POPOVER_H)
         .decorations(false)
@@ -131,8 +131,16 @@ fn get_or_create_popover(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .minimizable(false)
         .maximizable(false)
         .visible(false)
-        .focused(false)
-        .build()?;
+        .focused(false);
+
+    // Windows draws a rectangular DWM drop shadow/border around undecorated
+    // windows, which outlines the transparent area as a visible square. The
+    // CSS card has its own border, so drop the native shadow there. (macOS
+    // keeps it: the shadow hugs the drawn content, like a real popover.)
+    #[cfg(target_os = "windows")]
+    let builder = builder.shadow(false);
+
+    let win = builder.build()?;
 
     let dismiss = win.clone();
     win.on_window_event(move |event| {
@@ -182,6 +190,10 @@ fn toggle_popover(app: &AppHandle, rect: Rect) {
 
     position_popover(&win, rect);
     let _ = win.show();
+    // Windows can drop the always-on-top flag while the window is hidden,
+    // leaving the popover stacked behind the taskbar on reopen — re-assert it.
+    #[cfg(target_os = "windows")]
+    let _ = win.set_always_on_top(true);
     let _ = win.set_focus();
 }
 
@@ -189,20 +201,30 @@ fn toggle_popover(app: &AppHandle, rect: Rect) {
 /// below the menu bar (macOS) or lifted above the taskbar (icon in the lower
 /// half of its monitor — Windows). Clamped to the monitor that holds the icon.
 fn position_popover(win: &WebviewWindow, rect: Rect) {
-    let scale = win.scale_factor().unwrap_or(1.0);
-    let icon_pos = rect.position.to_physical::<f64>(scale);
-    let icon_size = rect.size.to_physical::<f64>(scale);
+    // The tray rect is reported in physical pixels on macOS and Windows; the
+    // fallback scale only matters for the (unused) logical variant.
+    let fallback_scale = win.scale_factor().unwrap_or(1.0);
+    let icon_pos = rect.position.to_physical::<f64>(fallback_scale);
+    let icon_size = rect.size.to_physical::<f64>(fallback_scale);
 
-    let win_w = POPOVER_W * scale;
-    let win_h = POPOVER_H * scale;
-    let gap = 6.0 * scale;
+    // Windows can report an empty rect for the tray icon (e.g. when it lives
+    // in the hidden-icons overflow flyout) — anchor to the cursor instead.
+    #[cfg(target_os = "windows")]
+    let icon_pos = if icon_size.width <= 0.0 || icon_size.height <= 0.0 {
+        win.app_handle()
+            .cursor_position()
+            .map(|c| tauri::PhysicalPosition::new(c.x, c.y))
+            .unwrap_or(icon_pos)
+    } else {
+        icon_pos
+    };
 
     let icon_cx = icon_pos.x + icon_size.width / 2.0;
-    let mut x = icon_cx - win_w / 2.0;
+    let icon_cy = icon_pos.y + icon_size.height / 2.0;
 
     // Find the monitor containing the icon (fall back to the window's current /
-    // primary monitor). Clamp X into it, and decide above/below by which half
-    // of the monitor the icon sits in.
+    // primary monitor). Clamp into it, and decide above/below by which half of
+    // it the icon sits in.
     let monitor = win
         .available_monitors()
         .ok()
@@ -219,19 +241,45 @@ fn position_popover(win: &WebviewWindow, rect: Rect) {
         .or_else(|| win.current_monitor().ok().flatten())
         .or_else(|| win.primary_monitor().ok().flatten());
 
+    // Scale from the icon's monitor, not the (still hidden) window: the window
+    // is created on the primary monitor, so its scale factor is wrong whenever
+    // the tray sits on a differently scaled display.
+    let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(fallback_scale);
+    // Prefer the real window size — the tray page shrinks the window to its
+    // content height, so POPOVER_H is only an upper bound.
+    let (win_w, win_h) = win
+        .outer_size()
+        .map(|s| (s.width as f64, s.height as f64))
+        .unwrap_or((POPOVER_W * scale, POPOVER_H * scale));
+    let gap = 6.0 * scale;
+
+    let mut x = icon_cx - win_w / 2.0;
     let mut y = icon_pos.y + icon_size.height + gap;
+
     if let Some(m) = monitor {
-        let mp = m.position();
-        let msz = m.size();
-        let min_x = mp.x as f64 + 8.0 * scale;
-        let max_x = mp.x as f64 + msz.width as f64 - win_w - 8.0 * scale;
+        // Clamp to the work area (excludes the Windows taskbar / macOS Dock &
+        // menu bar) so the popover never opens underneath the taskbar.
+        let wa = m.work_area();
+        let wa_x = wa.position.x as f64;
+        let wa_y = wa.position.y as f64;
+        let wa_w = wa.size.width as f64;
+        let wa_h = wa.size.height as f64;
+        let margin = 8.0 * scale;
+
+        let min_x = wa_x + margin;
+        let max_x = wa_x + wa_w - win_w - margin;
         if max_x >= min_x {
             x = x.clamp(min_x, max_x);
         }
-        // Icon in the lower half → tray is at the bottom; open upward.
-        let mon_mid_y = mp.y as f64 + msz.height as f64 / 2.0;
-        if icon_pos.y > mon_mid_y {
+
+        // Icon in the lower half → tray/taskbar is at the bottom; open upward.
+        if icon_cy > wa_y + wa_h / 2.0 {
             y = icon_pos.y - win_h - gap;
+        }
+        let min_y = wa_y + margin;
+        let max_y = wa_y + wa_h - win_h - margin;
+        if max_y >= min_y {
+            y = y.clamp(min_y, max_y);
         }
     }
 
