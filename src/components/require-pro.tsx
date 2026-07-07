@@ -1,26 +1,13 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
-
-import { isTauri } from "@tauri-apps/api/core";
-
-import { UpsellScreen } from "@/components/upsell-screen";
-import { useEntitlement } from "@/hooks/use-entitlement";
+import type { ReactNode } from "react";
 
 /**
- * Top-level web Pro gate. The desktop app is always allowed (free desktop users
- * keep the local-only board). On the web, free users get the {@link UpsellScreen}
- * instead of the board; Pro users (a logged-in hub session) get it normally.
- *
- * Both `isTauri()` and entitlement (read from localStorage) are only knowable on
- * the client, so the first client render must match the server output (children)
- * to avoid a hydration mismatch — the real gate kicks in after mount.
+ * No paid tiers for now — the app (board, local agents) is fully usable without
+ * an account. Signing in is what unlocks the FREE hosted agents (the hub's LLM
+ * proxy feeds the built-in harness), surfaced contextually where agents run,
+ * not as a wall here. Kept as a seam so a future tier gate has one place to go.
  */
 export function RequirePro({ children }: { children: ReactNode }) {
-  const { isPro } = useEntitlement();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  if (mounted && !isTauri() && !isPro) return <UpsellScreen />;
   return <>{children}</>;
 }

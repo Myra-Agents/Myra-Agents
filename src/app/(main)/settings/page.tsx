@@ -58,7 +58,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEntitlement } from "@/hooks/use-entitlement";
+import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -376,7 +376,8 @@ function AgentPresetCard({
 
 export default function SettingsPage() {
   const t = useTranslations("settings");
-  const { isPro } = useEntitlement();
+  // No tiers for now — signing in is what unlocks the hub (free hosted agents).
+  const { isAuthenticated } = useAuth();
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
@@ -681,10 +682,10 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="hub" className="space-y-6">
-          {isPro && <HubStatusCard />}
+          {isAuthenticated && <HubStatusCard />}
           <ConnectionsPanel />
           {isTauri() && <LocalServerPanel />}
-          {isTauri() && isPro && <RemoteAccessPanel />}
+          {isTauri() && isAuthenticated && <RemoteAccessPanel />}
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-6">

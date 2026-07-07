@@ -18,34 +18,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/use-auth";
 import { useConnections } from "@/hooks/use-connections";
-import { useEntitlement } from "@/hooks/use-entitlement";
 import { useRemoteAccess } from "@/hooks/use-remote-access";
 
 /** Persisted so the prompt doesn't nag on every launch once dismissed. */
 const DISMISS_KEY = "myra.remoteAccessPromptDismissed";
 
 /**
- * Pro desktop first-run consent: proactively offer to make this computer
+ * Signed-in desktop first-run consent: proactively offer to make this computer
  * reachable instead of burying it in Settings — but never silently. Shows once
- * when `isTauri() && isPro && !enrolled && !dismissed`. "Enable" pairs against a
- * registered hub and turns remote access on; with no hub yet it routes to
- * Settings to add one. "Not now" persists the dismissal; the manual Settings
+ * when `isTauri() && isAuthenticated && !enrolled && !dismissed`. "Enable" pairs
+ * against a registered hub and turns remote access on; with no hub yet it routes
+ * to Settings to add one. "Not now" persists the dismissal; the manual Settings
  * panel remains available either way.
  */
 export function RemoteAccessConsent() {
   const t = useTranslations("settings.connections.remote");
   const router = useRouter();
-  const { isPro } = useEntitlement();
+  const { isAuthenticated } = useAuth();
   const { hubs, pairHub } = useConnections();
   const { status, loading, busy, enable } = useRemoteAccess();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!isTauri() || !isPro || loading || !status || status.enrolled) return;
+    if (!isTauri() || !isAuthenticated || loading || !status || status.enrolled) return;
     const dismissed = typeof localStorage !== "undefined" && localStorage.getItem(DISMISS_KEY) === "1";
     if (!dismissed) setOpen(true);
-  }, [isPro, loading, status]);
+  }, [isAuthenticated, loading, status]);
 
   const dismiss = () => {
     try {
