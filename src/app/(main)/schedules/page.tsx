@@ -22,7 +22,6 @@ import {
   PlusIcon,
   SearchIcon,
   ShieldIcon,
-  SparklesIcon,
   TerminalIcon,
   TrashIcon,
   XIcon,
@@ -122,7 +121,6 @@ function ConnectorFlow({ keys }: { keys: ConnectorKey[] }) {
 /** Pick a lucide glyph for an agent binary (no brand marks in lucide). */
 function agentIcon(binary: string) {
   const b = binary.toLowerCase();
-  if (b.includes("myra-embedded")) return SparklesIcon;
   if (b.includes("opencode")) return BotIcon;
   return TerminalIcon;
 }
@@ -209,10 +207,8 @@ export default function SchedulesPage() {
 
   const agentById = useMemo(() => new Map(settings.agents.map((p) => [p.id, p])), [settings.agents]);
 
-  // Harness gate — the default agent must be available before creating a patrol.
-  // (The built-in `myra-embedded` always reports installed, so it never blocks.)
-  const defaultBinary = agentById.get(settings.defaultAgentId)?.binary ?? "opencode";
-  const harness = useBinaryStatus(defaultBinary);
+  // Harness gate — opencode must be installed before creating a patrol.
+  const harness = useBinaryStatus("opencode");
   const [gateOpen, setGateOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
