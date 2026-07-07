@@ -15,6 +15,13 @@ export const PH_ENV: "development" | "production" =
 
 export const IS_DEV_ENV = PH_ENV !== "production";
 
+/**
+ * Master switch. Dev/test builds never send analytics — a key alone is not
+ * enough: production env is required too. Set NEXT_PUBLIC_POSTHOG_DEV_CAPTURE=1
+ * to opt back in when testing the analytics wiring itself.
+ */
+export const PH_ENABLED = Boolean(PH_KEY) && (!IS_DEV_ENV || process.env.NEXT_PUBLIC_POSTHOG_DEV_CAPTURE === "1");
+
 function detectOS(): string {
   if (typeof navigator === "undefined") return "unknown";
   const ua = navigator.userAgent;
