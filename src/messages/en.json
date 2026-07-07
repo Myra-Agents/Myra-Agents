@@ -835,6 +835,8 @@
         "approved": "Approved — moved to Done",
         "approvedState": "You approved this run",
         "reopen": "Reopen for review",
+        "suggestPatrol": "Suggest a patrol change",
+        "suggestPatrolHint": "You requested changes during this run — turn that feedback into an update of the patrol itself.",
         "requestChanges": "Request changes",
         "revisePlaceholder": "Describe what needs to change, then Request changes — or just Approve…",
         "answerPlaceholder": "Type your answer here…",
@@ -1288,6 +1290,12 @@
   },
   "scheduleEdit": {
     "loading": "Loading patrol…",
+    "suggestion": {
+      "title": "Change requested during a run",
+      "hint": "You asked for changes on an operation of this patrol. If the agent keeps needing the same correction, fold it into the instruction so future runs get it right the first time.",
+      "apply": "Add to instruction",
+      "dismiss": "Dismiss"
+    },
     "discardTitle": "Discard changes?",
     "discardDescription": "Your unsaved changes will be lost and won't be applied.",
     "discardKeepEditing": "Keep editing",

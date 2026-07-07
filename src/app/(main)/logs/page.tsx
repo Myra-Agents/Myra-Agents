@@ -39,6 +39,7 @@ import { useKanban } from "@/hooks/use-kanban";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
 import { parseTranscript } from "@/lib/conversation/parse";
+import { requestChangeNotes } from "@/lib/conversation/request-changes";
 import { invokeOn } from "@/lib/tauri";
 import { useBoardStore } from "@/stores/board-store";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
@@ -288,6 +289,11 @@ function LogsPageInner() {
     // status is the source of truth for post-run transitions (e.g. approved → done).
     const displayStatus = displayRunStatus(liveCard, selectedRun.run, latestRunIds.has(selectedRun.run.id));
     const logArtifact = artifacts.find((a) => a.name.endsWith(".log")) ?? artifacts[0];
+    // "Request changes" feedback collected on this card. When the finished run
+    // came from a patrol, the review footer offers to fold it back into the
+    // patrol's definition (the edit page picks it up via `?suggest=`).
+    const requestChanges = requestChangeNotes(liveCard);
+    const patrolId = liveCard.linkedTaskId;
     return (
       <div className="mx-auto flex h-full max-w-4xl flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
@@ -411,6 +417,16 @@ function LogsPageInner() {
           onReopen={async () => {
             await moveCard(liveCard.id, "awaiting_review");
           }}
+          onSuggestPatrol={
+            patrolId && requestChanges.length > 0
+              ? () =>
+                  router.push(
+                    `/schedules/edit/?id=${encodeURIComponent(patrolId)}&suggest=${encodeURIComponent(
+                      requestChanges.join("\n\n"),
+                    )}`,
+                  )
+              : undefined
+          }
         />
       </div>
     );
