@@ -1144,6 +1144,8 @@
         "shimmer": "Shimmer (discret)",
         "assemble": "Assemblage (ludique)"
       },
+      "openAtLogin": "Ouvrir à la connexion",
+      "openAtLoginHint": "Lance Myra Agents automatiquement à l'ouverture de votre session.",
       "appUpdate": {
         "title": "Mises à jour de l'app",
         "description": "Mettez Myra Agents à jour vers la dernière version, installée et vérifiée automatiquement.",
