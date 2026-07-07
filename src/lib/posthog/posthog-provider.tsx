@@ -7,13 +7,13 @@ import { usePathname } from "next/navigation";
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 
-import { appContext, PH_ENV, PH_HOST, PH_KEY } from "./config";
+import { appContext, PH_ENABLED, PH_ENV, PH_HOST, PH_KEY } from "./config";
 
 let started = false;
 
-/** Initialize PostHog once on the client. No-op when no key is configured. */
+/** Initialize PostHog once on the client. No-op without a key or in dev/test builds. */
 function ensureInit() {
-  if (started || !PH_KEY || typeof window === "undefined") return;
+  if (started || !PH_ENABLED || !PH_KEY || typeof window === "undefined") return;
   started = true;
   posthog.init(PH_KEY, {
     api_host: PH_HOST,
@@ -41,7 +41,8 @@ function ensureInit() {
 
 /**
  * Wraps the app with PostHog. Safe to mount unconditionally: without
- * `NEXT_PUBLIC_POSTHOG_KEY` it initializes nothing and just renders children.
+ * `NEXT_PUBLIC_POSTHOG_KEY`, or in a dev/test build, it initializes nothing
+ * and just renders children.
  */
 export function PostHogProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -54,6 +55,6 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
     if (started) posthog.capture("$pageview", { $current_url: pathname, environment: PH_ENV });
   }, [pathname]);
 
-  if (!PH_KEY) return <>{children}</>;
+  if (!PH_ENABLED) return <>{children}</>;
   return <PHProvider client={posthog}>{children}</PHProvider>;
 }
