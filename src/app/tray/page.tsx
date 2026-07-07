@@ -23,6 +23,16 @@ import { cn } from "@/lib/utils";
 /** Re-render cadence for the live "elapsed" counters on running cards. */
 const TICK_MS = 30_000;
 
+/**
+ * Windows detection (webview2 UA). The popover window is transparent on every
+ * platform, but Windows has no macOS-style vibrancy and its native flyouts use
+ * a tighter corner radius — and if transparency is unavailable the corner
+ * cut-outs show as artifacts, so keep them small there.
+ */
+function isWindows(): boolean {
+  return typeof navigator !== "undefined" && /Win/i.test(navigator.userAgent);
+}
+
 /** Fire a Tauri command, swallowing the "not in Tauri" error in browser dev. */
 async function cmd(name: string, args?: Record<string, unknown>): Promise<void> {
   if (!isTauri()) return;
@@ -49,6 +59,11 @@ export default function TrayPopover() {
   // mount so the first client render matches the server HTML (no hydration warning).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // Platform is client-only (userAgent) — resolve it after mount for the same
+  // hydration reason as above.
+  const [isWin, setIsWin] = useState(false);
+  useEffect(() => setIsWin(isWindows()), []);
 
   // Make the window background transparent so the card's rounded corners show
   // the desktop behind them, not an opaque square (the shared root layout sets
@@ -114,7 +129,11 @@ export default function TrayPopover() {
   return (
     <div
       ref={rootRef}
-      className="bg-popover text-popover-foreground border-border flex w-screen flex-col overflow-hidden rounded-[18px] border text-sm"
+      className={cn(
+        "flex w-screen flex-col overflow-hidden border border-border bg-popover text-popover-foreground text-sm",
+        // Windows 11 flyouts use ~8px corners; the macOS popover look is rounder.
+        isWin ? "rounded-lg" : "rounded-[18px]",
+      )}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3.5 pb-2.5">
@@ -194,8 +213,18 @@ export default function TrayPopover() {
 
       {/* Primary actions */}
       <div className="border-border border-t p-2">
-        <ActionRow icon={PlusIcon} label="New Patrol" shortcut="⌘N" onClick={() => openMain("/schedules/edit/?new=1")} />
-        <ActionRow icon={AppWindowIcon} label="Open Myra Agents" shortcut="⌘O" onClick={() => openMain("/")} />
+        <ActionRow
+          icon={PlusIcon}
+          label="New Patrol"
+          shortcut={isWin ? "Ctrl+N" : "⌘N"}
+          onClick={() => openMain("/schedules/edit/?new=1")}
+        />
+        <ActionRow
+          icon={AppWindowIcon}
+          label="Open Myra Agents"
+          shortcut={isWin ? "Ctrl+O" : "⌘O"}
+          onClick={() => openMain("/")}
+        />
       </div>
 
       {/* Footer */}
