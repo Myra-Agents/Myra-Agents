@@ -16,6 +16,7 @@ import { HEADER_ACTIONS_ID } from "./_components/header-actions";
 import { HeaderBreadcrumb } from "./_components/header-breadcrumb";
 import { NavHistoryControls } from "./_components/nav-history-controls";
 import { RefreshOnNavigate } from "./_components/refresh-on-navigate";
+import { RunStartedToasts } from "./_components/run-started-toasts";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
@@ -55,6 +56,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       {/* One-shot auto connectivity test for installed-but-never-tested agents. */}
       <AgentTestBootstrap />
       <TrayActionListener />
+      {/* Global "Operation started" toast for every run start (manual or scheduled). */}
+      <RunStartedToasts />
       {/* Silent re-fetch of board + schedules on every route change. */}
       <RefreshOnNavigate />
       {/* Single dialog instance; triggered from either the sidebar or top-bar SearchButton. */}

@@ -61,6 +61,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useKanban } from "@/hooks/use-kanban";
+import { useRunStartedToast } from "@/hooks/use-run-started-toast";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { loadTestResult } from "@/lib/agent-test-store";
@@ -159,6 +160,7 @@ function ScheduleEditScreen() {
   // in real time without per-page wiring.
   const { cards, cancelAgent } = useKanban();
   const { settings } = useSettings();
+  const showRunStarted = useRunStartedToast();
 
   // "Create from template" mode: opened as `/schedules/edit/?template=<id>` with
   // no real schedule yet. We synthesize a task from the template definition + its
@@ -587,8 +589,8 @@ function ScheduleEditScreen() {
 
   const doRunNow = useCallback(() => {
     if (!task) return;
-    void triggerNow(task.id).then(() => toast.success(t("toast.triggered")));
-  }, [task, triggerNow, t]);
+    void triggerNow(task.id).then((runId) => showRunStarted(runId));
+  }, [task, triggerNow, showRunStarted]);
 
   const runNow = useCallback(() => {
     if (!task) return;

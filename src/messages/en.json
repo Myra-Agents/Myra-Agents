@@ -14,6 +14,10 @@
     "noResults": "No results",
     "version": "Version"
   },
+  "runToast": {
+    "started": "Operation started",
+    "view": "View operation"
+  },
   "home": {
     "title": "Overview",
     "loading": "Loading...",
@@ -1389,7 +1393,6 @@
     "toast": {
       "saved": "Patrol saved",
       "added": "Patrol added",
-      "triggered": "Run triggered",
       "stopped": "Stopped {count} run(s)",
       "undo": "Undo",
       "needTrigger": "Add a trigger before saving.",

@@ -30,6 +30,40 @@ function globalize(card: KanbanCard, connId: string): KanbanCard {
  * unbounded; the authoritative full log is re-fetched via `get_run_log`. */
 const MAX_LINES_PER_CARD = 500;
 
+// ── Run-start detection ──────────────────────────────────────────────────────
+// Every actual run start (manual trigger, scheduler fire, queued dequeue,
+// auto-resume) emits `agent-result-changed` with an in-progress card carrying a
+// fresh `agentRunId`. Run ids are seeded from every `get_cards` snapshot
+// (initial hydration, reconnect, topology change), so listeners fire exactly
+// once per run and never for runs that predate the snapshot.
+
+const seenRunIds = new Set<string>();
+
+/** A run whose `agentRunStartedAt` is older than this is not "just started" —
+ * guards against replayed/stale events delivered after a reconnect. */
+const RUN_START_FRESH_MS = 2 * 60 * 1000;
+
+type RunStartedListener = (card: KanbanCard) => void;
+const runStartedListeners = new Set<RunStartedListener>();
+
+/** Subscribe to "a run just started". Fired only for live `agent-result-changed`
+ * pushes (never for cards learned via `get_cards` snapshots) whose card is
+ * `in_progress` with an unseen, recent `agentRunId`. Cards are globalized. */
+export function onRunStarted(fn: RunStartedListener): () => void {
+  runStartedListeners.add(fn);
+  return () => runStartedListeners.delete(fn);
+}
+
+/** Feed one pushed (already-globalized) card through run-start detection. */
+function detectRunStart(card: KanbanCard) {
+  const runId = card.agentRunId;
+  if (!runId || card.status !== "in_progress" || seenRunIds.has(runId)) return;
+  seenRunIds.add(runId);
+  const startedAt = card.agentRunStartedAt ? Date.parse(card.agentRunStartedAt) : Number.NaN;
+  if (!Number.isNaN(startedAt) && Date.now() - startedAt > RUN_START_FRESH_MS) return;
+  for (const fn of runStartedListeners) fn(card);
+}
+
 interface AgentResultEvent {
   card: KanbanCard;
 }
@@ -118,6 +152,10 @@ export const useBoardStore = create<BoardState>((set, get) => ({
           realError = String(r.error);
         }
       }
+      // Snapshot seeding: runs already in flight at load time (app start,
+      // reconnect, new connection) are known, not "just started" — they must
+      // never fire the run-started listeners.
+      for (const card of merged) if (card.agentRunId) seenRunIds.add(card.agentRunId);
       commitCards(set, get, merged);
       // Only surface an error when every connection failed — partial failure is
       // a first-class state (the survivors' cards still render).
@@ -374,7 +412,11 @@ async function doSubscribeLive() {
           has_question: !!card.agentQuestion,
           duration_ms,
         });
-        store.upsertCard(globalize(card, connId));
+        const globalized = globalize(card, connId);
+        // Push events are the one channel where a *transition* to a running
+        // state is observable — notify run-started listeners before the upsert.
+        detectRunStart(globalized);
+        store.upsertCard(globalized);
       },
     );
     liveUnsubs.push(offResult);
