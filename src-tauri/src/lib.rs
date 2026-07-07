@@ -375,41 +375,50 @@ struct GitBranches {
 
 /// Inspect a folder's git branches. Returns `is_git: false` rather than erroring
 /// when the path is not a git work tree, so the UI degrades cleanly.
+///
+/// `async` + `spawn_blocking` on purpose: a sync Tauri command runs on the main
+/// thread, and `git` can stall (huge repo, cold disk, network mount) — that
+/// froze the whole window when opening a schedule. The git calls stay blocking
+/// `std::process` but execute on a blocking-pool thread instead.
 #[tauri::command]
-fn git_branches(path: String) -> Result<GitBranches, String> {
-    let run = |args: &[&str]| -> Result<String, String> {
-        let out = StdCommand::new("git")
-            .arg("-C")
-            .arg(&path)
-            .args(args)
-            .output()
-            .map_err(|e| e.to_string())?;
-        if !out.status.success() {
-            return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+async fn git_branches(path: String) -> Result<GitBranches, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let run = |args: &[&str]| -> Result<String, String> {
+            let out = StdCommand::new("git")
+                .arg("-C")
+                .arg(&path)
+                .args(args)
+                .output()
+                .map_err(|e| e.to_string())?;
+            if !out.status.success() {
+                return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+            }
+            Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+        };
+
+        // Not a git work tree → graceful empty result.
+        let inside = run(&["rev-parse", "--is-inside-work-tree"]).map(|s| s == "true").unwrap_or(false);
+        if !inside {
+            return Ok(GitBranches { is_git: false, current: None, local: vec![], remote: vec![] });
         }
-        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
-    };
 
-    // Not a git work tree → graceful empty result.
-    let inside = run(&["rev-parse", "--is-inside-work-tree"]).map(|s| s == "true").unwrap_or(false);
-    if !inside {
-        return Ok(GitBranches { is_git: false, current: None, local: vec![], remote: vec![] });
-    }
+        let split = |s: String| {
+            s.lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect::<Vec<_>>()
+        };
+        let current = run(&["rev-parse", "--abbrev-ref", "HEAD"]).ok().filter(|s| !s.is_empty() && s != "HEAD");
+        let local = run(&["for-each-ref", "--format=%(refname:short)", "refs/heads"]).map(split).unwrap_or_default();
+        let mut remote = run(&["for-each-ref", "--format=%(refname:short)", "refs/remotes"]).map(split).unwrap_or_default();
+        // Keep real remote branches (`origin/main`); drop the symbolic remote HEAD,
+        // which `%(refname:short)` collapses to the bare remote name (e.g. `origin`).
+        remote.retain(|r| r.contains('/') && !r.ends_with("/HEAD"));
 
-    let split = |s: String| {
-        s.lines()
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty())
-            .collect::<Vec<_>>()
-    };
-    let current = run(&["rev-parse", "--abbrev-ref", "HEAD"]).ok().filter(|s| !s.is_empty() && s != "HEAD");
-    let local = run(&["for-each-ref", "--format=%(refname:short)", "refs/heads"]).map(split).unwrap_or_default();
-    let mut remote = run(&["for-each-ref", "--format=%(refname:short)", "refs/remotes"]).map(split).unwrap_or_default();
-    // Keep real remote branches (`origin/main`); drop the symbolic remote HEAD,
-    // which `%(refname:short)` collapses to the bare remote name (e.g. `origin`).
-    remote.retain(|r| r.contains('/') && !r.ends_with("/HEAD"));
-
-    Ok(GitBranches { is_git: true, current, local, remote })
+        Ok(GitBranches { is_git: true, current, local, remote })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// The OS user home directory — the schedule folder picker's default base when
@@ -440,23 +449,28 @@ fn list_subfolders(path: String) -> Result<Vec<String>, String> {
 }
 
 /// Create a new local branch (from the current HEAD) in a git work tree.
+/// Async for the same reason as [`git_branches`]: keep git off the main thread.
 #[tauri::command]
-fn git_create_branch(path: String, name: String) -> Result<(), String> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err("branch name is empty".into());
-    }
-    // `--` separates the branch name from option parsing (safety).
-    let out = StdCommand::new("git")
-        .arg("-C")
-        .arg(&path)
-        .args(["branch", "--", name])
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
-    }
-    Ok(())
+async fn git_create_branch(path: String, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("branch name is empty".into());
+        }
+        // `--` separates the branch name from option parsing (safety).
+        let out = StdCommand::new("git")
+            .arg("-C")
+            .arg(&path)
+            .args(["branch", "--", name])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Re-resolve the local backend (kill any ephemeral child first, then adopt the
