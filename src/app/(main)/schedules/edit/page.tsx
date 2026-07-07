@@ -374,6 +374,9 @@ function ScheduleEditScreen() {
             : blankMode
               ? "/schedules/edit/?new=1"
               : `/schedules/edit/?id=${encodeURIComponent(task.id)}`,
+          // Template mode gets an intermediate "Template" crumb (non-clickable:
+          // templates have no route of their own, just a section on /schedules).
+          section: templateMode ? { label: t("templateCrumb") } : undefined,
         }
       : null,
   );

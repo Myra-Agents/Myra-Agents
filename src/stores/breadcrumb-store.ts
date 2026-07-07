@@ -19,6 +19,12 @@ export type BreadcrumbOverride = {
    * lives on `/logs`.
    */
   parent?: { label: string; href: string };
+  /**
+   * Optional intermediate crumb inserted right before the leaf — e.g. the
+   * template editor shows "Patrols › Template › {name}". Without an `href`
+   * the segment renders as plain (non-clickable) text.
+   */
+  section?: { label: string; href?: string };
 };
 
 type BreadcrumbStore = {
@@ -38,12 +44,19 @@ export function useBreadcrumbOverride(override: BreadcrumbOverride | null) {
   const href = override?.href;
   const parentLabel = override?.parent?.label;
   const parentHref = override?.parent?.href;
+  const sectionLabel = override?.section?.label;
+  const sectionHref = override?.section?.href;
   useEffect(() => {
     setOverride(
       label
-        ? { label, href, parent: parentLabel && parentHref ? { label: parentLabel, href: parentHref } : undefined }
+        ? {
+            label,
+            href,
+            parent: parentLabel && parentHref ? { label: parentLabel, href: parentHref } : undefined,
+            section: sectionLabel ? { label: sectionLabel, href: sectionHref } : undefined,
+          }
         : null,
     );
     return () => setOverride(null);
-  }, [label, href, parentLabel, parentHref, setOverride]);
+  }, [label, href, parentLabel, parentHref, sectionLabel, sectionHref, setOverride]);
 }

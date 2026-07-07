@@ -1309,6 +1309,7 @@
     "subtitle": "Deploy recurring patrols with AI agents triggered by events.",
     "active": "Active",
     "inactive": "Inactive",
+    "templateCrumb": "Template",
     "tags": "Tags",
     "newTag": "+ New tag",
     "save": "Save",
