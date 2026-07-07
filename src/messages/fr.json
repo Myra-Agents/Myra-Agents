@@ -1449,6 +1449,7 @@
     "home": "Dossier home",
     "selectFolder": "Choisir un dossier",
     "folderRequired": "Ajoute un dossier dans lequel cette patrouille s’exécutera.",
+    "branchLoading": "Chargement des branches…",
     "branchNotGit": "Ce dossier n’est pas un dépôt git.",
     "branchNeedsFolder": "Choisis d’abord un dossier.",
     "branchesCount": "{count} branches",

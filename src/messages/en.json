@@ -1449,6 +1449,7 @@
     "home": "Home folder",
     "selectFolder": "Select folder",
     "folderRequired": "Add a folder for this patrol to run in.",
+    "branchLoading": "Loading branches…",
     "branchNotGit": "This folder isn't a git repository.",
     "branchNeedsFolder": "Select a folder first.",
     "branchesCount": "{count} branches",

@@ -1862,10 +1862,12 @@ function BranchSelect({
   const effective = value || git?.current || "main";
   const match = (b: string) => !ql || b.toLowerCase().includes(ql);
 
-  // Grey the picker out when there's no folder yet, or the folder isn't a git
-  // work tree — a branch only makes sense inside a repo.
+  // Grey the picker out when there's no folder yet, while the async git probe is
+  // still in flight, or when the folder isn't a git work tree — the picker only
+  // becomes selectable once the branch listing has resolved.
   const noFolder = !repoPath.trim();
-  const disabled = noFolder || (checked && !git);
+  const loading = !noFolder && !checked;
+  const disabled = noFolder || loading || (checked && !git);
 
   const local = (git?.local ?? []).filter(match);
   const remote = (git?.remote ?? []).filter(match);
@@ -1881,7 +1883,9 @@ function BranchSelect({
         <button
           type="button"
           disabled={disabled}
-          title={noFolder ? t("branchNeedsFolder") : disabled ? t("branchNotGit") : undefined}
+          title={
+            noFolder ? t("branchNeedsFolder") : loading ? t("branchLoading") : disabled ? t("branchNotGit") : undefined
+          }
           className={cn(
             "flex items-center gap-1 text-[12px]",
             disabled
@@ -1890,7 +1894,7 @@ function BranchSelect({
           )}
         >
           <GitBranchIcon className="size-3 text-icon-tertiary" />
-          {effective}
+          {loading ? t("branchLoading") : effective}
           <ChevronDownIcon className="size-3.5 text-icon-tertiary" />
         </button>
       </DropdownMenuTrigger>
