@@ -9,6 +9,7 @@
 import type { AgentRun } from "@/types/kanban";
 
 import { cleanLog, parseOpencodeLog } from "./opencode";
+import { parseOpencodeJson } from "./opencode-json";
 import type { ToolResultEntry, Transcript, TranscriptEntry } from "./types";
 
 /** Drop the result-protocol footer we append to every prompt (see
@@ -155,9 +156,29 @@ export function parseTranscript(log: string | null, run: AgentRun): Transcript {
     return { entries, structured: true };
   }
 
-  // opencode / codex terminal log: tagged action stream + markers.
+  // opencode `--format json`: newline-delimited event stream (deduplicated,
+  // structured tool I/O + markdown). Preferred over the TUI-log parser below.
+  const ocJson = log ? parseOpencodeJson(log) : null;
+  if (ocJson?.entries.length) {
+    entries.push(...ocJson.entries);
+    // Terminal result: the final status/summary come from the run (its result
+    // file), enriched with the token/cost totals carried on the JSON stream.
+    if (run.result?.trim() || typeof (ocJson.tokens ?? run.tokens) === "number" || run.status === "failed") {
+      entries.push({
+        kind: "result",
+        summary: run.result?.trim() ?? "",
+        tokens: ocJson.tokens ?? run.tokens,
+        cost: ocJson.cost ?? run.cost,
+        isError: run.status === "failed",
+      });
+    }
+    return { entries, structured: true };
+  }
+
+  // opencode / codex terminal log (legacy `default` format): tagged action
+  // stream + glyph markers. Kept for runs captured before `--format json`.
   const oc = log ? parseOpencodeLog(log) : null;
-  if (oc && oc.length) {
+  if (oc?.length) {
     entries.push(...oc);
     return { entries, structured: true };
   }
