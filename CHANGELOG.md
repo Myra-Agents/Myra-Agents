@@ -8,6 +8,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-09
+
+### Added
+
+- **Continuous session thread** — replying to a finished run now continues the conversation in place: a card's runs render as one continuous thread instead of opening a separate screen per reply.
+
+### Changed
+
+- **OpenCode transcripts from its JSON event stream** — OpenCode runs are now parsed from its `--format json` output (paired with the sidecar). Messages are no longer duplicated, markdown and tool input/output render structurally, and token/cost plus the session id come through the stream.
+
+### Fixed
+
+- **Windows console flashes** — the sidecar no longer pops foreground console windows when it launches agent CLIs, git, or service tooling (paired with the sidecar's `CREATE_NO_WINDOW` fix).
+- **Reply continues the exact session** — a reply resumes the run's own OpenCode session (`-s <id>`) instead of the blind "continue the last session", and queued follow-ups keep the continuation.
+
 ## [0.6.0] — 2026-07-08
 
 ### Added

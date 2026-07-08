@@ -1,5 +1,5 @@
 {
   "repo": "Myra-Agents/Myra-Agents-Server-Dist",
-  "version": "server-v0.10.0",
+  "version": "server-v0.11.0",
   "note": "Pins which pre-built myra-server sidecar binary scripts/build-sidecar.mjs downloads. Bump on each server release; assets are published by the private server repo's release CI to the public Myra-Agents-Server-Dist repo's Releases. Override locally with MYRA_SERVER_VERSION / MYRA_SERVER_REPO / MYRA_SERVER_BASE_URL."
 }
