@@ -20,8 +20,9 @@ import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
-import { parseTranscript } from "@/lib/conversation/parse";
+import { parseTranscript, threadUserTurn } from "@/lib/conversation/parse";
 import { requestChangeNotes } from "@/lib/conversation/request-changes";
+import type { TranscriptEntry } from "@/lib/conversation/types";
 import { effortOf } from "@/lib/history/past-runs";
 import { invokeOn } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,6 @@ function AgentSessionScreen() {
   const router = useRouter();
   const params = useSearchParams();
   const cardId = params.get("card") ?? "";
-  const runId = params.get("run") ?? "";
 
   const { cards, moveCard, addRevisionNote, answerFeedback, launchAgent, cancelAgent } = useKanban();
   // Live updates are global now (the board store self-subscribes to
@@ -64,10 +64,15 @@ function AgentSessionScreen() {
   const showRunStarted = useRunStartedToast();
 
   const card = useMemo(() => cards.find((c) => c.id === cardId), [cards, cardId]);
-  const run: AgentRun | undefined = useMemo(
-    () => card?.runHistory?.find((r) => r.id === runId),
-    [card?.runHistory, runId],
+  // The view renders the card's *entire* conversation — every run in order — so
+  // a reply continues the thread in place instead of opening a fresh run
+  // screen. The latest run drives the header/status/live-tail; the `?run=`
+  // param now only picks which card's conversation to open.
+  const runHistory = useMemo(
+    () => (card?.runHistory ? [...card.runHistory].sort((a, b) => a.startedAt.localeCompare(b.startedAt)) : []),
+    [card?.runHistory],
   );
+  const run: AgentRun | undefined = runHistory[runHistory.length - 1];
 
   // The owning schedule (drives the "Settings" shortcut). Schedule ids are
   // connection-scoped; the card stores the raw task id — match on suffix too.
@@ -80,10 +85,10 @@ function AgentSessionScreen() {
   const modelName = settings.agents.find((a) => a.id === (card?.agentPresetId ?? settings.defaultAgentId))?.name ?? "—";
   const effort = effortOf(card?.agentFlags);
 
-  // Fetch the raw run log (same backend command Logs uses) and parse it into a
-  // chat transcript. Falls back to the run's stored result when the log can't be
-  // loaded (e.g. browser dev backend) so the prompt + summary still render.
-  const [logContent, setLogContent] = useState<string | null>(null);
+  // Fetched log snapshot per run id (`get_run_log`, the same backend command
+  // Logs uses). The live tail (below) is layered onto the latest run while it
+  // streams; a failed fetch falls back to the run's stored result at parse time.
+  const [runLogs, setRunLogs] = useState<Map<string, string>>(new Map());
   const [loadingLog, setLoadingLog] = useState(false);
 
   // Live log tail. `get_run_log` gives the history once on entry; new lines then
@@ -113,45 +118,57 @@ function AgentSessionScreen() {
   useEffect(() => {
     if (run && run.status !== "running") setStopping(false);
   }, [run]);
+  // Fetch every run's log snapshot when the set of runs changes (a new reply
+  // adds a run id). Keyed on the id list, not the card object, so ordinary card
+  // mutations (status flips, live-log ticks) don't refetch and reset the tail.
+  const runIdsKey = runHistory.map((r) => r.id).join(",");
   useEffect(() => {
-    if (!card || !run) return;
+    if (!cardId || !runIdsKey) return;
+    // Iterate the id digest (not the runHistory array) so the effect only
+    // refires when the set of runs changes — ordinary card mutations keep a
+    // stable key, so they don't refetch and reset the live-tail baseline.
+    const ids = runIdsKey.split(",");
     let cancelled = false;
     setLoadingLog(true);
-    setLogContent(null);
-    const { connId, entityId } = parseGlobalId(card.id);
-    invokeOn<string>(connId, "get_run_log", { cardId: entityId, runId: run.id })
-      .then((log) => {
-        if (cancelled) return;
-        // Snapshot fetched: anything already streamed is part of it — only append
-        // live lines from here on.
-        liveBaselineRef.current = liveLinesRef.current.length;
-        setLogContent(log);
-      })
-      .catch(() => {
-        if (!cancelled) setLogContent(null); // fall back to run.result in parseTranscript
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingLog(false);
-      });
+    const { connId, entityId } = parseGlobalId(cardId);
+    void Promise.all(
+      ids.map((id) =>
+        invokeOn<string>(connId, "get_run_log", { cardId: entityId, runId: id })
+          .then((log) => [id, log] as const)
+          .catch(() => [id, ""] as const),
+      ),
+    ).then((pairs) => {
+      if (cancelled) return;
+      // Snapshots fetched: anything already streamed is part of them — only the
+      // live tail past this point layers onto the latest (running) run.
+      liveBaselineRef.current = liveLinesRef.current.length;
+      setRunLogs(new Map(pairs));
+      setLoadingLog(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [card, run]);
+  }, [cardId, runIdsKey]);
 
   const running = run?.status === "running";
 
-  // Append the freshly-streamed tail (past the fetch baseline) to the snapshot
-  // while the run is live; once it stops, the re-fetched log is authoritative.
+  // The live tail (past the fetch baseline) layers onto the latest run while
+  // it streams; finished runs render from their static snapshot.
   const liveTail = liveLines.slice(liveBaselineRef.current).join("\n");
-  const effectiveLog = useMemo(() => {
-    if (!running || !liveTail) return logContent;
-    return [logContent ?? "", liveTail].filter(Boolean).join("\n");
-  }, [logContent, running, liveTail]);
 
-  const transcript = useMemo(
-    () => (run ? parseTranscript(effectiveLog, run) : { entries: [], structured: false }),
-    [effectiveLog, run],
-  );
+  // One continuous transcript across every run: each run contributes its
+  // triggering turn (the original task, or the reply note for a resume) plus
+  // its assistant output, in order.
+  const transcript = useMemo(() => {
+    const entries: TranscriptEntry[] = [];
+    runHistory.forEach((r, i) => {
+      const isLatest = i === runHistory.length - 1;
+      const base = runLogs.get(r.id) ?? null;
+      const log = isLatest && running && liveTail ? [base ?? "", liveTail].filter(Boolean).join("\n") : base;
+      entries.push(...parseTranscript(log, r, { userTurn: threadUserTurn(r.prompt) }).entries);
+    });
+    return { entries, structured: true };
+  }, [runHistory, runLogs, running, liveTail]);
 
   // Keep the live view pinned to the latest output while the agent is running.
   // Re-runs as the transcript grows (entryCount) so each new line scrolls in.

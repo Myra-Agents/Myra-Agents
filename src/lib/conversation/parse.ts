@@ -22,6 +22,19 @@ export function stripProtocolFooter(prompt: string): string {
   return head.trim();
 }
 
+/**
+ * The user turn to show for a run inside a continuous thread. A resumed run's
+ * prompt carries a "## Revision instructions (most recent first)" block whose
+ * item 1 is the note that triggered *this* turn (see `@myra/shared`
+ * `buildPrompt`); surface just that instead of re-showing the whole task. A
+ * first run has no such block, so its full (stripped) prompt is the task.
+ */
+export function threadUserTurn(prompt: string): string {
+  const stripped = stripProtocolFooter(prompt);
+  const m = /##\s*Revision instructions[^\n]*\n+\s*1\.\s*([\s\S]*?)(?:\n\s*2\.\s|\n+##\s|$)/.exec(stripped);
+  return m ? m[1].trim() : stripped;
+}
+
 /** Coerce stream-json `content` (string | block[]) into display text. */
 function blocksToText(content: unknown): string {
   if (typeof content === "string") return content;
@@ -144,9 +157,11 @@ function entriesFromEvents(events: ParsedEvent[]): TranscriptEntry[] {
  * (`get_run_log`); `run` supplies the prompt (the human turn) and usage
  * fallbacks when the log has no terminal `result` event.
  */
-export function parseTranscript(log: string | null, run: AgentRun): Transcript {
+export function parseTranscript(log: string | null, run: AgentRun, opts?: { userTurn?: string | null }): Transcript {
   const entries: TranscriptEntry[] = [];
-  const prompt = stripProtocolFooter(run.prompt);
+  // The human turn: caller override (thread mode passes the triggering note, or
+  // `null` to omit it), else the run's own stripped prompt.
+  const prompt = opts && "userTurn" in opts ? opts.userTurn : stripProtocolFooter(run.prompt);
   if (prompt) entries.push({ kind: "user", text: prompt });
 
   const events = log ? parseStreamEvents(log) : null;
@@ -157,7 +172,7 @@ export function parseTranscript(log: string | null, run: AgentRun): Transcript {
 
   // opencode / codex terminal log: tagged action stream + markers.
   const oc = log ? parseOpencodeLog(log) : null;
-  if (oc && oc.length) {
+  if (oc?.length) {
     entries.push(...oc);
     return { entries, structured: true };
   }
