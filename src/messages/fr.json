@@ -977,6 +977,7 @@
       "description": "Plugins installés dans ~/.myra-agents/plugins. Désactivez-en un pour retirer ses agents du sélecteur ; appliqué après Enregistrer et un redémarrage.",
       "empty": "Aucun plugin installé. Déposez-en un dans ~/.myra-agents/plugins puis redémarrez.",
       "toggleAria": "Activer/désactiver {name}",
+      "incompatible": "Nécessite une version plus récente de Myra",
       "role": {
         "agent": "{count, plural, one {# agent} other {# agents}} : {agents}",
         "event": "Réagit à {events}",
