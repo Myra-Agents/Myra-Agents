@@ -73,7 +73,7 @@ import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/hom
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke, isTauri } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
-import type { AgentPreset, AppSettings } from "@/types/settings";
+import type { AgentPreset, AppSettings, EmbeddedLlmConfig } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
 
 type DataAction = "export" | "import" | "clear" | "clearHistory";
@@ -128,6 +128,68 @@ interface AgentPresetCardProps {
  * install gate (auto / manual) — unless the user opts to configure anyway.
  */
 type TestState = "idle" | "testing" | "passed" | "failed";
+
+const EMBEDDED_AGENT_ID = "myra-embedded";
+
+/** The embedded "Myra" agent card: no CLI/install/test — just its LLM config
+ * (BYOK key + model). The endpoint is resolved server-side (hub or OpenRouter). */
+function EmbeddedAgentCard({
+  preset,
+  llm,
+  onChange,
+  onSave,
+  saving,
+  t,
+}: {
+  preset: AgentPreset;
+  llm: EmbeddedLlmConfig | undefined;
+  onChange: (patch: Partial<EmbeddedLlmConfig>) => void;
+  onSave: () => Promise<void> | void;
+  saving: boolean;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <div className="space-y-3 rounded-md border p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label className="font-semibold text-sm">{preset.name}</Label>
+          <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
+            {t("agents.embedded.badge")}
+          </span>
+        </div>
+        <Button size="sm" onClick={() => void onSave()} disabled={saving}>
+          {t("agents.embedded.save")}
+        </Button>
+      </div>
+      <p className="text-muted-foreground text-xs">{t("agents.embedded.description")}</p>
+      <div className="space-y-1.5">
+        <Label className="text-xs" htmlFor="myra-api-key">
+          {t("agents.embedded.apiKeyLabel")}
+        </Label>
+        <Input
+          id="myra-api-key"
+          type="password"
+          autoComplete="off"
+          placeholder={t("agents.embedded.apiKeyPlaceholder")}
+          value={llm?.apiKey ?? ""}
+          onChange={(e) => onChange({ apiKey: e.target.value })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs" htmlFor="myra-model">
+          {t("agents.embedded.modelLabel")}
+        </Label>
+        <Input
+          id="myra-model"
+          placeholder="auto"
+          value={llm?.model ?? ""}
+          onChange={(e) => onChange({ model: e.target.value })}
+        />
+        <p className="text-muted-foreground text-xs">{t("agents.embedded.modelHint")}</p>
+      </div>
+    </div>
+  );
+}
 
 function AgentPresetCard({
   preset,
@@ -842,22 +904,34 @@ export default function SettingsPage() {
 
               <Separator />
 
-              {current.agents.map((preset, idx) => (
-                <AgentPresetCard
-                  key={preset.id}
-                  preset={preset}
-                  idx={idx}
-                  isDefault={DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id)}
-                  t={t}
-                  onUpdate={updatePreset}
-                  onRemove={removePreset}
-                  onDuplicate={duplicatePreset}
-                  isDirty={(dirtyPresetFields.get(idx)?.size ?? 0) > 0}
-                  needsTest={[...(dirtyPresetFields.get(idx) ?? [])].some((f) => EXEC_FIELDS.has(f))}
-                  saving={saving}
-                  onSave={handleSave}
-                />
-              ))}
+              {current.agents.map((preset, idx) =>
+                preset.id === EMBEDDED_AGENT_ID ? (
+                  <EmbeddedAgentCard
+                    key={preset.id}
+                    preset={preset}
+                    llm={current.embeddedLlm}
+                    onChange={(patch) => update({ embeddedLlm: { ...current.embeddedLlm, ...patch } })}
+                    onSave={handleSave}
+                    saving={saving}
+                    t={t}
+                  />
+                ) : (
+                  <AgentPresetCard
+                    key={preset.id}
+                    preset={preset}
+                    idx={idx}
+                    isDefault={DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id)}
+                    t={t}
+                    onUpdate={updatePreset}
+                    onRemove={removePreset}
+                    onDuplicate={duplicatePreset}
+                    isDirty={(dirtyPresetFields.get(idx)?.size ?? 0) > 0}
+                    needsTest={[...(dirtyPresetFields.get(idx) ?? [])].some((f) => EXEC_FIELDS.has(f))}
+                    saving={saving}
+                    onSave={handleSave}
+                  />
+                ),
+              )}
             </CardContent>
           </Card>
         </TabsContent>

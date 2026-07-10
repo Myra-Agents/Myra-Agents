@@ -1113,7 +1113,16 @@
       "testAndSave": "Test & Save",
       "testAndSaveTooltip": "Test the agent, then save if it responds",
       "testedBadge": "Tested",
-      "testFailedBadge": "Test failed"
+      "testFailedBadge": "Test failed",
+      "embedded": {
+        "badge": "Built-in",
+        "save": "Save",
+        "description": "Embedded agent — no install, no CLI. Runs on the Myra hub, or with your own key.",
+        "apiKeyLabel": "API key (optional)",
+        "apiKeyPlaceholder": "sk-or-…  — leave empty to use the Myra hub",
+        "modelLabel": "Model",
+        "modelHint": "Leave empty or \"auto\" to let Myra pick a free model."
+      }
     },
     "preferences": {
       "title": "Preferences",
