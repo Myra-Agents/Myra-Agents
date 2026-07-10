@@ -25,9 +25,14 @@ const HARNESS_TYPES = new Set(["text", "thinking", "tool_use", "tool_result", "t
  *
  * This is a native, structured mapping — no terminal/text parsing — and the same
  * `harnessEventToEntry` runs on the live path (`agent-transcript-event`).
+ *
+ * Deduped by the envelope `seq` (monotonic per run): the live view concatenates
+ * the fetched `get_run_log` snapshot with the live tail, which can overlap, and
+ * `seq` is exactly what the envelope carries to make that idempotent.
  */
 function parseHarnessEvents(log: string): TranscriptEntry[] | null {
   const entries: TranscriptEntry[] = [];
+  const seen = new Set<number>();
   let sawEvent = false;
   for (const line of log.split("\n")) {
     const trimmed = line.trim();
@@ -43,6 +48,8 @@ function parseHarnessEvents(log: string): TranscriptEntry[] | null {
       continue;
     }
     sawEvent = true;
+    if (seen.has(ev.seq)) continue; // already rendered this event (snapshot ∩ live tail)
+    seen.add(ev.seq);
     const entry = harnessEventToEntry(ev);
     if (entry) entries.push(entry);
   }
