@@ -15,8 +15,7 @@ import { useConnections } from "@/hooks/use-connections";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
 import { tagClassName } from "@/lib/kanban-tags";
 import { cn } from "@/lib/utils";
-import type { KanbanCard } from "@/types/kanban";
-import { COLUMN_CONFIG } from "@/types/kanban";
+import { COLUMN_CONFIG, type KanbanCard } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
 
 // Statuses whose cards carry an agent run — body click opens the conversation
