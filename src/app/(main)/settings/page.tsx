@@ -131,8 +131,10 @@ type TestState = "idle" | "testing" | "passed" | "failed";
 
 const EMBEDDED_AGENT_ID = "myra-embedded";
 
-/** The embedded "Myra" agent card: no CLI/install/test — just its LLM config
- * (BYOK key + model). The endpoint is resolved server-side (hub or OpenRouter). */
+/** The embedded "Myra" agent card. No CLI install — but it shows the same
+ * "Installed · <version>" badge (from the harness `smoke` probe) and the same
+ * Test & Save button as the CLI presets. Its only config is the LLM (BYOK key +
+ * model); the endpoint is resolved server-side (hub or OpenRouter). */
 function EmbeddedAgentCard({
   preset,
   llm,
@@ -148,18 +150,43 @@ function EmbeddedAgentCard({
   saving: boolean;
   t: ReturnType<typeof useTranslations>;
 }) {
+  const bin = useBinaryStatus(preset.binary);
+  const [testState, setTestState] = useState<TestState>("idle");
+  const [storedResult, setStoredResult] = useState<StoredTestResult | null>(() => loadTestResult(preset.id));
+
+  const handleTestAndSave = useCallback(async () => {
+    setTestState("testing");
+    try {
+      // For the embedded harness `test_agent` runs its network-free `smoke`.
+      await invoke("test_agent", {
+        binary: preset.binary,
+        argsTemplate: preset.argsTemplate,
+        flags: [],
+        launchVia: "direct",
+        ollamaModel: "",
+        workingDir: null,
+      });
+      persistTestResult(preset.id, "passed");
+      setStoredResult({ status: "passed", ts: Date.now() });
+      setTestState("passed");
+      await onSave();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : typeof err === "string" ? err : undefined;
+      persistTestResult(preset.id, "failed", reason);
+      setStoredResult({ status: "failed", ts: Date.now(), reason });
+      setTestState("failed");
+    }
+    setTimeout(() => setTestState("idle"), 3000);
+  }, [preset.id, preset.binary, preset.argsTemplate, onSave]);
+
   return (
     <div className="space-y-3 rounded-md border p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Label className="font-semibold text-sm">{preset.name}</Label>
-          <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
-            {t("agents.embedded.badge")}
-          </span>
-        </div>
-        <Button size="sm" onClick={() => void onSave()} disabled={saving}>
-          {t("agents.embedded.save")}
-        </Button>
+      <div className="flex items-center gap-2">
+        <Label className="font-semibold text-sm">{preset.name}</Label>
+        <AgentStatusBadge {...bin} />
+        <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
+          {t("agents.embedded.badge")}
+        </span>
       </div>
       <p className="text-muted-foreground text-xs">{t("agents.embedded.description")}</p>
       <div className="space-y-1.5">
@@ -186,6 +213,38 @@ function EmbeddedAgentCard({
           onChange={(e) => onChange({ model: e.target.value })}
         />
         <p className="text-muted-foreground text-xs">{t("agents.embedded.modelHint")}</p>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            onClick={() => void handleTestAndSave()}
+            disabled={testState === "testing" || saving}
+            title={t("agents.testAndSaveTooltip")}
+          >
+            {testState === "testing" ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : testState === "passed" ? (
+              <CheckCircle2Icon className="size-3.5 text-green-500" />
+            ) : testState === "failed" ? (
+              <XCircleIcon className="size-3.5 text-destructive" />
+            ) : (
+              <FlaskConicalIcon className="size-3.5" />
+            )}
+            {testState === "testing"
+              ? t("agents.testing")
+              : testState === "passed"
+                ? t("agents.testPassed")
+                : testState === "failed"
+                  ? t("agents.testFailed")
+                  : t("agents.testAndSave")}
+          </Button>
+        </div>
+        {testState === "failed" && storedResult?.reason && (
+          <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
+            {storedResult.reason}
+          </p>
+        )}
       </div>
     </div>
   );
