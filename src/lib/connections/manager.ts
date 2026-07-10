@@ -157,9 +157,11 @@ class ConnectionManager {
   /** The auto-seeded local connection: a real server (env), the desktop, or offline browser. */
   private defaultLocal(): Connection {
     if (SERVER_URL) {
+      // Base label; `labelLocalFromHealth` refines it to "Local (<build>)" once
+      // the server answers /healthz.
       return {
         id: LOCAL_ID,
-        label: `Server (${SERVER_URL})`,
+        label: "Local",
         baseUrl: SERVER_URL,
         kind: "remote",
         status: "connected",
@@ -168,7 +170,7 @@ class ConnectionManager {
     const tauri = isTauri();
     return {
       id: LOCAL_ID,
-      label: tauri ? "This device" : "Browser (offline)",
+      label: tauri ? "Local" : "Browser (offline)",
       baseUrl: "",
       kind: "sidecar",
       status: "connected",
@@ -314,12 +316,41 @@ class ConnectionManager {
   }
 
   private async initLocalSidecar(): Promise<void> {
-    if (SERVER_URL || !isTauri()) return;
+    if (SERVER_URL) {
+      // LOCAL already points at a real server — just fetch its build for the label.
+      await this.labelLocalFromHealth(SERVER_URL);
+      return;
+    }
+    if (!isTauri()) return;
     try {
       const port = await tauriInvoke<number>("get_sidecar_port");
       this.pointLocalAtPort(port);
     } catch (e) {
       console.error("[ConnectionManager] sidecar init failed:", e);
+    }
+  }
+
+  /**
+   * Fetch the LOCAL backend's `/healthz` and relabel it `Local (<build>)` — the
+   * server's descriptive build id (version + git sha + `-dirty`; see the server's
+   * build.rs). Best-effort: a dead/old backend just keeps its current label.
+   */
+  private async labelLocalFromHealth(baseUrl: string): Promise<void> {
+    try {
+      const res = await fetch(`${baseUrl}${HUB_ROUTES.health}`, { method: "GET" });
+      if (!res.ok) return;
+      const body = (await res.json()) as { build?: string; version?: string };
+      const ver = (body.build ?? body.version)?.trim();
+      if (!ver) return;
+      const entry = this.entries.get(LOCAL_ID);
+      if (!entry) return;
+      const label = `Local (${ver})`;
+      if (entry.connection.label === label) return;
+      this.entries.set(LOCAL_ID, { ...entry, connection: { ...entry.connection, label } });
+      this.persist();
+      this.emitTopology();
+    } catch {
+      /* leave the existing label */
     }
   }
 
@@ -343,6 +374,8 @@ class ConnectionManager {
     this.entries.set(LOCAL_ID, { connection, transport: createHttpTransport(baseUrl) });
     this.persist();
     this.emitTopology();
+    // Relabel "Local (<build>)" once the backend answers /healthz (async).
+    void this.labelLocalFromHealth(baseUrl);
   }
 
   /**
@@ -380,6 +413,8 @@ class ConnectionManager {
         if (conn.kind === "hub-instance" || !conn.baseUrl) return;
         this.setStatus(conn.id, "connecting");
         this.setStatus(conn.id, (await this.probeHealth(conn.baseUrl)) ? "connected" : "error");
+        // Keep the LOCAL label's build version current (e.g. after a server swap).
+        if (conn.id === LOCAL_ID) await this.labelLocalFromHealth(conn.baseUrl);
       }),
     );
   }
