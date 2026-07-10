@@ -54,6 +54,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MyraLoader, type MyraLoaderVariant } from "@/components/ui/myra-loader";
+import { MyraMark } from "@/components/ui/myra-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -182,6 +183,7 @@ function EmbeddedAgentCard({
   return (
     <div className="space-y-3 rounded-md border p-3">
       <div className="flex items-center gap-2">
+        <MyraMark className="size-4 text-foreground" />
         <Label className="font-semibold text-sm">{preset.name}</Label>
         <AgentStatusBadge {...bin} />
         {storedResult && (
