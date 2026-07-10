@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
-  ActivityIcon,
   CheckCircle2Icon,
   CheckIcon,
   ChevronDownIcon,
@@ -16,14 +15,12 @@ import {
   GitBranchIcon,
   HomeIcon,
   LightbulbIcon,
-  MessageSquareIcon,
   PlayIcon,
   PlusIcon,
   RefreshCwIcon,
   RotateCcwIcon,
   Trash2Icon,
   TriangleAlertIcon,
-  UsersIcon,
   XCircleIcon,
   XIcon,
 } from "lucide-react";
@@ -66,6 +63,7 @@ import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { loadTestResult } from "@/lib/agent-test-store";
 import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
+import { type ConnectorTrigger, listConnectorTriggers } from "@/lib/connector-triggers";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
@@ -2170,19 +2168,19 @@ function AddTriggerMenu({
     { key: "custom", make: () => defaultScheduleKind("cron") },
   ];
 
-  // Event-driven connectors aren't in the schedule model yet — surfaced for parity
-  // with the design, flagged as coming soon.
-  const connectors: { key: "github" | "slack" | "teams" | "sentry" | "linear"; icon: React.ReactNode }[] = [
-    { key: "github", icon: <GitBranchIcon className="size-4 text-icon-secondary" /> },
-    { key: "slack", icon: <MessageSquareIcon className="size-4 text-icon-secondary" /> },
-    { key: "teams", icon: <UsersIcon className="size-4 text-icon-secondary" /> },
-    { key: "sentry", icon: <TriangleAlertIcon className="size-4 text-icon-secondary" /> },
-    { key: "linear", icon: <ActivityIcon className="size-4 text-icon-secondary" /> },
-  ];
+  // Trigger-capable connectors, detected from the installed plugins (event role /
+  // catalog.verbs="trigger"). Replaces the old hardcoded "coming soon" list — the
+  // menu now reflects what's actually installed. Picking one is design-flagged
+  // (see connector-trigger binding); for now it deep-links to Plugins to set up.
+  const router = useRouter();
+  const [connectorTriggers, setConnectorTriggers] = useState<ConnectorTrigger[]>([]);
+  useEffect(() => {
+    void listConnectorTriggers().then(setConnectorTriggers);
+  }, []);
 
   const q = query.trim().toLowerCase();
   const showScheduled = !q || t("categories.scheduled").toLowerCase().includes(q);
-  const visibleConnectors = connectors.filter((c) => !q || t(`categories.${c.key}`).toLowerCase().includes(q));
+  const visibleConnectors = connectorTriggers.filter((c) => !q || c.name.toLowerCase().includes(q));
 
   return (
     <DropdownMenu>
@@ -2239,19 +2237,23 @@ function AddTriggerMenu({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             ))}
-          {visibleConnectors.map((c) => (
-            <DropdownMenuSub key={c.key}>
-              <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-                {c.icon}
-                {t(`categories.${c.key}`)}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem disabled className="text-[13px]">
-                  {t("comingSoon")}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ))}
+          {visibleConnectors.map((c) => {
+            const Icon = c.icon;
+            return (
+              <DropdownMenuSub key={c.id}>
+                <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                  <Icon className="size-4 text-icon-secondary" />
+                  {c.name}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {c.summary && <div className="px-2 py-1.5 text-[12px] text-text-tertiary">{c.summary}</div>}
+                  <DropdownMenuItem className="text-[13px]" onSelect={() => router.push("/settings")}>
+                    {t("configureConnector")}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            );
+          })}
           {!showScheduled && visibleConnectors.length === 0 && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noTriggers")}</p>
           )}

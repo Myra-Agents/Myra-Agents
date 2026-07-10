@@ -1410,13 +1410,9 @@
     "searchTriggers": "Search Triggers...",
     "comingSoon": "Coming soon",
     "noTriggers": "No matching triggers",
+    "configureConnector": "Set up in Plugins",
     "categories": {
-      "scheduled": "Scheduled",
-      "github": "GitHub / GitLab",
-      "slack": "Slack",
-      "teams": "Microsoft Teams",
-      "sentry": "Sentry",
-      "linear": "Linear"
+      "scheduled": "Scheduled"
     },
     "scheduledOptions": {
       "hourly": "Hourly",

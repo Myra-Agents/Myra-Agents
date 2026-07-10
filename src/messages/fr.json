@@ -1410,13 +1410,9 @@
     "searchTriggers": "Rechercher des déclencheurs...",
     "comingSoon": "Bientôt disponible",
     "noTriggers": "Aucun déclencheur correspondant",
+    "configureConnector": "Configurer dans Plugins",
     "categories": {
-      "scheduled": "Planifié",
-      "github": "GitHub / GitLab",
-      "slack": "Slack",
-      "teams": "Microsoft Teams",
-      "sentry": "Sentry",
-      "linear": "Linear"
+      "scheduled": "Planifié"
     },
     "scheduledOptions": {
       "hourly": "Toutes les heures",
