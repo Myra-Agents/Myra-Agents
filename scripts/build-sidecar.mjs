@@ -77,6 +77,14 @@ const stamp = join(outDir, `.${assetName}.version`);
 
 mkdirSync(outDir, { recursive: true });
 
+// `./dev.sh app` sets this when the user chose to REUSE a myra-server already
+// running on the dev port: the Tauri shell will adopt that server, so rebuilding
+// the sidecar here is wasted work. Skip when a prior binary is already present.
+if (process.env.MYRA_SKIP_SIDECAR_BUILD && existsSync(outfile)) {
+  console.log("[build-sidecar] MYRA_SKIP_SIDECAR_BUILD set — reusing existing sidecar binary");
+  process.exit(0);
+}
+
 // --- compile path (local Rust server checkout present) ---------------------
 // In the dev workspace the Rust server lives next to this app (../server). When
 // it's there AND we're building for the host (not a CI cross-compile), build it
