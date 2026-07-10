@@ -997,6 +997,30 @@
         "save": "Save",
         "clear": "Clear",
         "configured": "Configured"
+      },
+      "tabs": {
+        "installed": "Installed",
+        "browse": "Browse"
+      },
+      "browse": {
+        "searchPlaceholder": "Search plugins",
+        "by": "by {author} · v{version}",
+        "install": "Install",
+        "installing": "Installing…",
+        "installed": "Installed · configure",
+        "empty": "No plugins match.",
+        "filter": {
+          "all": "All",
+          "trigger": "Triggers",
+          "action": "Actions",
+          "notify": "Notify"
+        },
+        "verb": {
+          "trigger": "Trigger",
+          "action": "Action",
+          "notify": "Notify",
+          "receive": "Receive"
+        }
       }
     },
     "integrations": {

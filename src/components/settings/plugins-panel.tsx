@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { PluginCatalog } from "@/components/settings/plugin-catalog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { connectionManager } from "@/lib/connections/manager";
 import { isDevModeError } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -210,47 +212,60 @@ export function PluginsPanel({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t("title")}</CardTitle>
-        <p className="text-muted-foreground text-sm">{t("description")}</p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {error && <p className="text-destructive text-sm">{error}</p>}
+    <Tabs defaultValue="installed" className="gap-3">
+      <TabsList>
+        <TabsTrigger value="installed">{t("tabs.installed")}</TabsTrigger>
+        <TabsTrigger value="browse">{t("tabs.browse")}</TabsTrigger>
+      </TabsList>
 
-        {anyWebhooks && (
-          <Alert>
-            <TriangleAlertIcon className="size-4" />
-            <AlertTitle>{t("webhookWarning.title")}</AlertTitle>
-            <AlertDescription>{t("webhookWarning.body")}</AlertDescription>
-          </Alert>
-        )}
+      <TabsContent value="installed">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("title")}</CardTitle>
+            <p className="text-muted-foreground text-sm">{t("description")}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {error && <p className="text-destructive text-sm">{error}</p>}
 
-        {plugins !== null && plugins.length === 0 && !error && (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <BlocksIcon className="size-8 text-muted-foreground" />
-            <p className="text-muted-foreground text-sm">{t("empty")}</p>
-          </div>
-        )}
+            {anyWebhooks && (
+              <Alert>
+                <TriangleAlertIcon className="size-4" />
+                <AlertTitle>{t("webhookWarning.title")}</AlertTitle>
+                <AlertDescription>{t("webhookWarning.body")}</AlertDescription>
+              </Alert>
+            )}
 
-        {PLUGIN_GROUPS.map((group) => {
-          const members = plugins?.filter((p) => groupsFor(p).includes(group)) ?? [];
-          if (members.length === 0) return null;
-          const GroupIcon = GROUP_ICON[group];
-          return (
-            <Collapsible key={group} defaultOpen className="rounded-lg border">
-              <CollapsibleTrigger className="group flex w-full items-center gap-2 px-3 py-2.5 text-left font-medium text-sm">
-                <GroupIcon className="size-4 text-muted-foreground" />
-                <span>{t(`group.${group}`)}</span>
-                <span className="text-muted-foreground text-xs">{members.length}</span>
-                <ChevronDownIcon className="ml-auto size-4 text-muted-foreground transition-transform group-data-[state=closed]:-rotate-90" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 px-3 pb-3">{members.map(renderRow)}</CollapsibleContent>
-            </Collapsible>
-          );
-        })}
-      </CardContent>
-    </Card>
+            {plugins !== null && plugins.length === 0 && !error && (
+              <div className="flex flex-col items-center gap-2 py-8 text-center">
+                <BlocksIcon className="size-8 text-muted-foreground" />
+                <p className="text-muted-foreground text-sm">{t("empty")}</p>
+              </div>
+            )}
+
+            {PLUGIN_GROUPS.map((group) => {
+              const members = plugins?.filter((p) => groupsFor(p).includes(group)) ?? [];
+              if (members.length === 0) return null;
+              const GroupIcon = GROUP_ICON[group];
+              return (
+                <Collapsible key={group} defaultOpen className="rounded-lg border">
+                  <CollapsibleTrigger className="group flex w-full items-center gap-2 px-3 py-2.5 text-left font-medium text-sm">
+                    <GroupIcon className="size-4 text-muted-foreground" />
+                    <span>{t(`group.${group}`)}</span>
+                    <span className="text-muted-foreground text-xs">{members.length}</span>
+                    <ChevronDownIcon className="ml-auto size-4 text-muted-foreground transition-transform group-data-[state=closed]:-rotate-90" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 px-3 pb-3">{members.map(renderRow)}</CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="browse">
+        <PluginCatalog installedNames={(plugins ?? []).map((p) => p.name)} onInstalled={load} />
+      </TabsContent>
+    </Tabs>
   );
 }
 
