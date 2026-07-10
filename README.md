@@ -16,6 +16,10 @@ Myra Agents is **local-first**: the desktop app runs fully on your machine
 against a bundled local server sidecar. An optional managed cloud (sign-in,
 remote machines) can be enabled via environment variables, but is not required.
 
+> **Why we build this:** [MISSION.md](./MISSION.md) — free yourself from
+> repetitive work. **Where it's headed:** [VISION.md](./VISION.md) — the colony,
+> the marketplace, and the 1–2 year picture.
+
 ---
 
 ## Features
