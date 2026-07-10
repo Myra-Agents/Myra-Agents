@@ -184,6 +184,22 @@ function EmbeddedAgentCard({
       <div className="flex items-center gap-2">
         <Label className="font-semibold text-sm">{preset.name}</Label>
         <AgentStatusBadge {...bin} />
+        {storedResult && (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium text-[10px] ${
+              storedResult.status === "passed"
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+            }`}
+          >
+            {storedResult.status === "passed" ? (
+              <CheckCircle2Icon className="size-2.5" />
+            ) : (
+              <XCircleIcon className="size-2.5" />
+            )}
+            {storedResult.status === "passed" ? t("agents.testedBadge") : t("agents.testFailedBadge")}
+          </span>
+        )}
         <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
           {t("agents.embedded.badge")}
         </span>
