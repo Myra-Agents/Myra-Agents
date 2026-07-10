@@ -13,10 +13,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { MyraThinking } from "@/components/ui/myra-thinking";
 import { useConnections } from "@/hooks/use-connections";
 import { parseGlobalId } from "@/lib/aggregate/global-id";
-import { columnConfigFor } from "@/lib/kanban-column-config";
 import { tagClassName } from "@/lib/kanban-tags";
 import { cn } from "@/lib/utils";
-import type { KanbanCard } from "@/types/kanban";
+import { COLUMN_CONFIG, type KanbanCard } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
 
 // Statuses whose cards carry an agent run — body click opens the conversation
@@ -73,7 +72,7 @@ export function KanbanCardComponent({
   };
 
   const { connections } = useConnections();
-  const config = columnConfigFor(card.status);
+  const config = COLUMN_CONFIG[card.status];
   const isTrashed = card.status === "trashed";
   // Only tag cards by origin server once more than one connection is active.
   const originLabel =

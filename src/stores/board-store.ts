@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { parseGlobalId, toGlobalId } from "@/lib/aggregate/global-id";
 import { connectionManager } from "@/lib/connections/manager";
+import { normalizeCardStatus } from "@/lib/kanban-status";
 import { agentProps } from "@/lib/posthog/agent-props";
 import { captureError, track } from "@/lib/posthog/events";
 import { isDevModeError } from "@/lib/tauri";
@@ -23,7 +24,8 @@ import type { AgentPreset } from "@/types/settings";
 
 /** Rewrite a server-local card's id into a GlobalId tagged by its connection. */
 function globalize(card: KanbanCard, connId: string): KanbanCard {
-  return { ...card, id: toGlobalId(connId, card.id) };
+  const normalized = normalizeCardStatus(card);
+  return { ...normalized, id: toGlobalId(connId, normalized.id) };
 }
 
 /** Cap the live log buffer per card so a long-running agent can't grow it
@@ -90,7 +92,8 @@ function reconcileCancelling(cancelling: Set<string>, cards: KanbanCard[]): Set<
 
 /** Apply a cards update and re-reconcile the cancelling set in one shot. */
 function commitCards(set: (partial: Partial<BoardState>) => void, get: () => BoardState, cards: KanbanCard[]) {
-  set({ cards, cancellingIds: reconcileCancelling(get().cancellingIds, cards) });
+  const normalizedCards = cards.map(normalizeCardStatus);
+  set({ cards: normalizedCards, cancellingIds: reconcileCancelling(get().cancellingIds, normalizedCards) });
 }
 
 export const useBoardStore = create<BoardState>((set, get) => ({
