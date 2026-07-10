@@ -83,10 +83,38 @@ mkdirSync(outDir, { recursive: true });
 // from source so the bundled sidecar always matches local server changes — no
 // pinned-release download, no manual binary copy. The public app repo has no
 // ../server, so it falls through to the download path below.
+// Resolve the embedded harness ("Myra") binary for the host, building it once if
+// absent, so the server's build.rs bakes it in (it reads MYRA_HARNESS_BIN). Null
+// when the harness workspace member isn't checked out → server builds without the
+// embedded agent (the dev PATH/MYRA_HARNESS_BIN_DEV fallback still works).
+// NOTE: `bun run compile` targets the host (darwin-arm64 here); release CI builds
+// the per-platform harness artifacts separately.
+function ensureHarnessBinary() {
+  const harnessDir = join(root, "..", "harness");
+  if (!existsSync(join(harnessDir, "package.json"))) return null;
+  const bin = join(harnessDir, "dist", isWindows ? "myra-harness.exe" : "myra-harness");
+  if (!existsSync(bin)) {
+    console.log("[build-sidecar] harness binary missing — compiling (bun run compile)");
+    spawnSync("bun", ["install"], { stdio: "inherit", cwd: harnessDir });
+    const c = spawnSync("bun", ["run", "compile"], { stdio: "inherit", cwd: harnessDir });
+    if (c.status !== 0 || !existsSync(bin)) {
+      console.warn("[build-sidecar] harness compile failed — server built WITHOUT the embedded agent");
+      return null;
+    }
+  }
+  return bin;
+}
+
 const rustServerDir = join(root, "..", "server");
 if (!process.env.MYRA_SERVER_TRIPLE && existsSync(join(rustServerDir, "Cargo.toml"))) {
   console.log(`[build-sidecar] local Rust server found, building\n            -> ${outfile}`);
-  const res = spawnSync("cargo", ["build", "--release"], { stdio: "inherit", cwd: rustServerDir });
+  const harnessBin = ensureHarnessBinary();
+  const env = { ...process.env };
+  if (harnessBin) {
+    env.MYRA_HARNESS_BIN = harnessBin;
+    console.log(`[build-sidecar] embedding harness -> ${harnessBin}`);
+  }
+  const res = spawnSync("cargo", ["build", "--release"], { stdio: "inherit", cwd: rustServerDir, env });
   if (res.status !== 0) {
     console.error("[build-sidecar] cargo build --release failed");
     process.exit(res.status ?? 1);
