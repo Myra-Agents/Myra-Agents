@@ -1486,6 +1486,60 @@
     "resetOverrides": "Reset",
     "cancel": "Cancel",
     "createTag": "Create \"{tag}\"",
-    "createTagHint": "Type a name to create a new tag"
+    "createTagHint": "Type a name to create a new tag",
+    "skills": "Skills",
+    "skillsEmpty": "No skills attached. Attach a skill to fold its guidance into every run.",
+    "skillsNoneInLibrary": "No skills in your library yet — create some in the Skills page first.",
+    "skillAttach": "Attach a skill",
+    "skillRemove": "Remove skill"
+  },
+  "skills": {
+    "title": "Skills",
+    "subtitle": "Reusable agent instructions you can attach to any patrol.",
+    "tabs": {
+      "mine": "My skills ({count})",
+      "marketplace": "Marketplace"
+    },
+    "newSkill": "New skill",
+    "editSkill": "Edit skill",
+    "deleteSkill": "Delete skill",
+    "marketplaceIntro": "Install curated skills into your library, then attach them to patrols.",
+    "install": "Install",
+    "installed": "Installed",
+    "by": "by {author}",
+    "empty": {
+      "title": "No skills yet",
+      "description": "Create your own skill or install one from the marketplace to get started."
+    },
+    "badge": {
+      "custom": "Custom",
+      "marketplace": "Marketplace"
+    },
+    "form": {
+      "hint": "A skill is a block of instructions injected into the agent's prompt when attached.",
+      "name": "Name",
+      "namePlaceholder": "e.g. Conventional Commits",
+      "category": "Category",
+      "categoryPlaceholder": "e.g. Git",
+      "description": "Description",
+      "descriptionPlaceholder": "One-line summary",
+      "content": "Instructions",
+      "contentPlaceholder": "Markdown instructions the agent should follow…",
+      "contentHint": "Markdown. Injected into the agent prompt for every run it's attached to.",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "confirmDelete": {
+      "title": "Delete skill?",
+      "description": "\"{name}\" will be removed from your library. Patrols keep the guidance already saved into their prompt.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "created": "Skill created",
+      "updated": "Skill updated",
+      "deleted": "Skill deleted",
+      "installed": "Installed \"{name}\""
+    }
   }
 }
