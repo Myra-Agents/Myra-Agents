@@ -56,6 +56,40 @@ fn parse_auth_code(url: &url::Url) -> Option<String> {
         .filter(|c| !c.is_empty())
 }
 
+/// Map a non-auth `myra://` deep link to the in-app route to navigate to.
+///
+/// Supported routes (emitted by the landing site so a web visitor can open a
+/// catalog entry straight in the desktop app):
+///   `myra://skill/install?id=<id>`    → `/skills?install=<id>`   (marketplace)
+///   `myra://patrol/new?template=<id>` → `/schedules/edit/?template=<id>`
+///
+/// Returns the app-relative path (query included, value percent-encoded) or
+/// `None` when the URL is not a recognised route. `id`/`template` are matched
+/// verbatim against the bundled catalogs on the frontend, so an unknown value
+/// simply resolves to nothing.
+fn parse_deep_link_route(url: &url::Url) -> Option<String> {
+    if url.scheme() != "myra" {
+        return None;
+    }
+    // For `myra://skill/install` the authority ("skill") is the host and
+    // "/install" the path; trim a trailing slash so both forms match.
+    let host = url.host_str().unwrap_or("");
+    let path = url.path().trim_end_matches('/');
+    let param = |key: &str| -> Option<String> {
+        url.query_pairs()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.into_owned())
+            .filter(|v| !v.is_empty())
+    };
+    let encode = |v: &str| -> String { url::form_urlencoded::byte_serialize(v.as_bytes()).collect() };
+
+    match (host, path) {
+        ("skill", "/install") => Some(format!("/skills?install={}", encode(&param("id")?))),
+        ("patrol", "/new") => Some(format!("/schedules/edit/?template={}", encode(&param("template")?))),
+        _ => None,
+    }
+}
+
 /// The stable port the persistent local service listens on. When a service is
 /// running here we *adopt* it instead of spawning a duplicate writer on
 /// `~/.myra-agents`.
@@ -697,18 +731,24 @@ fn setup_deep_link(handle: &AppHandle) {
     let h = handle.clone();
     handle.deep_link().on_open_url(move |event| {
         for url in event.urls() {
-            let Some(code) = parse_auth_code(&url) else {
-                continue;
-            };
-            if let Some(state) = h.try_state::<PendingAuth>() {
-                if let Ok(mut slot) = state.0.lock() {
-                    *slot = Some(code.clone());
+            // Auth handoff takes priority (`myra://auth/callback?code=…`).
+            if let Some(code) = parse_auth_code(&url) {
+                if let Some(state) = h.try_state::<PendingAuth>() {
+                    if let Ok(mut slot) = state.0.lock() {
+                        *slot = Some(code.clone());
+                    }
                 }
+                let _ = h.emit("auth-callback", AuthCallback { code });
+                if let Some(win) = h.get_webview_window("main") {
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                }
+                continue;
             }
-            let _ = h.emit("auth-callback", AuthCallback { code });
-            if let Some(win) = h.get_webview_window("main") {
-                let _ = win.show();
-                let _ = win.set_focus();
+            // Catalog deep links (skill install, patrol template) route the main
+            // window to the matching in-app page via the tray-navigate bridge.
+            if let Some(path) = parse_deep_link_route(&url) {
+                navigate_main(&h, &path, false);
             }
         }
     });

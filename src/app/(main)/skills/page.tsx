@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { DownloadIcon, PencilIcon, PlusIcon, SparklesIcon, Trash2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -36,7 +38,47 @@ import { type MarketplaceSkill, SKILL_MARKETPLACE, type Skill, type SkillInput }
 
 const EMPTY_FORM: SkillInput = { name: "", description: "", content: "", category: "" };
 
+/**
+ * Handles the `myra://skill/install?id=<id>` deep link: the Rust handler routes
+ * it to `/skills?install=<id>`, and this listener installs the matching
+ * marketplace entry into the local library (idempotently), confirms with a
+ * toast, then strips the query so a reload doesn't re-fire. Rendered inside a
+ * Suspense boundary because `useSearchParams` bails out of static prerender.
+ */
+function MarketplaceInstallListener() {
+  const t = useTranslations("skills");
+  const router = useRouter();
+  const params = useSearchParams();
+  const { installFromMarketplace } = useSkills();
+  const installId = params.get("install");
+  const handled = useRef(false);
+
+  useEffect(() => {
+    if (!installId || handled.current) return;
+    handled.current = true;
+    const entry = SKILL_MARKETPLACE.find((e) => e.id === installId);
+    if (entry) {
+      installFromMarketplace(entry);
+      toast.success(t("toast.installed", { name: entry.name }));
+    }
+    router.replace("/skills");
+  }, [installId, installFromMarketplace, router, t]);
+
+  return null;
+}
+
 export default function SkillsPage() {
+  return (
+    <>
+      <Suspense fallback={null}>
+        <MarketplaceInstallListener />
+      </Suspense>
+      <SkillsLibrary />
+    </>
+  );
+}
+
+function SkillsLibrary() {
   const t = useTranslations("skills");
   const { skills, addSkill, updateSkill, deleteSkill, installFromMarketplace, isInstalled } = useSkills();
 
