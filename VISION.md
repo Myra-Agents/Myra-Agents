@@ -54,14 +54,13 @@ delegate stops being bounded by how many things they can babysit at once.
 What this pulls us toward:
 
 - **Orchestration over isolation** — agents that hand off to each other, fan
-  out, wait on a dependency, or react to another agent's result — not just N
-  independent cards racing a concurrency limit.
+  out, wait on a dependency, or react to another agent's result.
 - **Parallelism as the default feeling** — the product should read as *a team
   working*, not *a task queue draining*. Scale is the point, not an edge case.
 - **Set-and-forget survival** — the win condition is an agent that keeps
   producing clean runs weeks later with zero edits. The colony has to be
   trustworthy enough to leave alone.
-- **The metaphor, honestly** — *Myra* is Swedish for *ant*. One agent is one
+- **The metaphor** — *Myra* is Swedish for *ant*. One agent is one
   ant; the setup is the colony. We lean into that: many small workers, resilient
   in aggregate, quietly doing the work.
 
@@ -115,17 +114,12 @@ These constrain the *how*. They're commitments, not preferences.
    never mean taking power away from developers. Presets, args templates, and
    custom binaries stay; the marketplace sits *on top* of them.
 
-6. **The metaphor earns its keep.** Ant, colony, workers — the language only
-   stays if it makes the product easier to understand. It's a lens, not a theme.
-
 ---
 
 ## Non-goals — what Myra will *not* become
 
 Naming these keeps the vision honest. In this window, Myra is deliberately **not**:
 
-- **A chatbot.** No turn-by-turn assistant to converse with. The interaction is
-  delegate-and-leave, not back-and-forth.
 - **A cloud-only SaaS.** We will never require you to run your agents on our
   servers to use the product. The managed cloud is an option, not a gate.
 - **An IDE or a coding tool.** Myra *runs* coding agents; it is not a place you
@@ -136,7 +130,7 @@ Naming these keeps the vision honest. In this window, Myra is deliberately **not
   scheduler*, not a toolkit.
 - **A closed garden.** Presets, plugins, and automations are portable and
   shareable. We don't trap your setup to raise a switching cost.
-- **An observability/eval dashboard.** Watching agents work in fine detail is a
+- **An eval dashboard.** Watching agents work in fine detail is a
   developer indulgence. The goal is to make watching *unnecessary*, not prettier.
 
 ---
