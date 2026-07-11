@@ -21,6 +21,7 @@ import {
   PlusIcon,
   RefreshCwIcon,
   RotateCcwIcon,
+  SparklesIcon,
   Trash2Icon,
   TriangleAlertIcon,
   UsersIcon,
@@ -64,6 +65,7 @@ import { useKanban } from "@/hooks/use-kanban";
 import { useRunStartedToast } from "@/hooks/use-run-started-toast";
 import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
+import { useSkills } from "@/hooks/use-skills";
 import { loadTestResult } from "@/lib/agent-test-store";
 import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
@@ -77,6 +79,8 @@ import type { KanbanCard } from "@/types/kanban";
 import type { CreateScheduleInput, ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
 import { defaultScheduleKind, describeSchedule } from "@/types/schedule";
 import type { AgentPreset } from "@/types/settings";
+import type { Skill } from "@/types/skill";
+import { composeAgentPrompt, parseAgentPrompt } from "@/types/skill";
 
 export default function ScheduleEditPage() {
   // useSearchParams() needs a Suspense boundary in the static export.
@@ -97,7 +101,12 @@ type Draft = {
   // Patrol title + the descriptive line under it (editable in the header).
   name: string;
   cardDescription: string;
+  // The *base* agent instruction only — the attached-skills block is parsed out
+  // of the persisted prompt into `skillIds` and re-composed on save (so the
+  // textarea stays clean and the fired agent still receives the skill guidance).
   agentPrompt: string;
+  // Ids of skills attached to this patrol (see `@/types/skill`).
+  skillIds: string[];
   // Null while the user has removed the (single) schedule trigger — Save is then
   // blocked until a trigger is re-added.
   schedule: ScheduledTask["schedule"] | null;
@@ -112,11 +121,13 @@ type Draft = {
 };
 
 function draftOf(task: ScheduledTask): Draft {
+  const { basePrompt, skillIds } = parseAgentPrompt(task.agentPrompt);
   return {
     enabled: task.enabled,
     name: task.name,
     cardDescription: task.cardDescription,
-    agentPrompt: task.agentPrompt,
+    agentPrompt: basePrompt,
+    skillIds,
     schedule: task.schedule,
     workingDir: task.workingDir ?? "",
     tags: task.tags ?? [],
@@ -160,7 +171,21 @@ function ScheduleEditScreen() {
   // in real time without per-page wiring.
   const { cards, cancelAgent } = useKanban();
   const { settings } = useSettings();
+  const { skills } = useSkills();
   const showRunStarted = useRunStartedToast();
+
+  // Resolve a draft's attached skill ids to live library skills (in the draft's
+  // order), dropping any that were since deleted. Used to compose the agent
+  // prompt the patrol persists so its fired runs receive the skill guidance.
+  const composePrompt = useCallback(
+    (draftToSave: Draft): string => {
+      const attached = draftToSave.skillIds
+        .map((sid) => skills.find((s) => s.id === sid))
+        .filter((s): s is Skill => s != null);
+      return composeAgentPrompt(draftToSave.agentPrompt, attached);
+    },
+    [skills],
+  );
 
   // "Create from template" mode: opened as `/schedules/edit/?template=<id>` with
   // no real schedule yet. We synthesize a task from the template definition + its
@@ -474,7 +499,7 @@ function ScheduleEditScreen() {
         // The form edits only `name`; the materialized card's title mirrors it.
         cardTitle: draft.name.trim() || task.name,
         cardDescription: draft.cardDescription,
-        agentPrompt: draft.agentPrompt,
+        agentPrompt: composePrompt(draft),
         tags: draft.tags,
         schedule: draft.schedule,
         enabled: draft.enabled,
@@ -497,7 +522,7 @@ function ScheduleEditScreen() {
     } finally {
       setSaving(false);
     }
-  }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, validateRequired, t]);
+  }, [task, draft, dirty, branchByFolder, tagColorMap, updateSchedule, validateRequired, composePrompt, t]);
 
   // Template mode: create a real schedule from the prefilled draft, then land on
   // its actual edit page (so the user can keep tweaking / see its runs).
@@ -512,7 +537,7 @@ function ScheduleEditScreen() {
           // The form edits only `name`; the materialized card's title mirrors it.
           cardTitle: draft.name.trim() || task.name,
           cardDescription: draft.cardDescription,
-          agentPrompt: draft.agentPrompt,
+          agentPrompt: composePrompt(draft),
           tags: draft.tags,
           schedule: draft.schedule,
           enabled,
@@ -537,7 +562,7 @@ function ScheduleEditScreen() {
         setSaving(false);
       }
     },
-    [task, draft, branchByFolder, tagColorMap, createSchedule, router, validateRequired, t],
+    [task, draft, branchByFolder, tagColorMap, createSchedule, router, validateRequired, composePrompt, t],
   );
 
   // Runs belonging to this schedule: cards it materialized share its card title
@@ -937,6 +962,7 @@ function ScheduleEditScreen() {
             setDraft={setDraft}
             agents={settings.agents}
             defaultAgentId={settings.defaultAgentId}
+            skills={skills}
             promptError={promptErrorShown && !draft.agentPrompt.trim()}
             onPromptInput={() => setPromptErrorShown(false)}
             t={t}
@@ -1307,6 +1333,7 @@ function SettingsTab({
   setDraft,
   agents,
   defaultAgentId,
+  skills,
   promptError,
   onPromptInput,
   t,
@@ -1315,6 +1342,7 @@ function SettingsTab({
   setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
   agents: AgentPreset[];
   defaultAgentId?: string;
+  skills: Skill[];
   promptError: boolean;
   onPromptInput: () => void;
   t: ReturnType<typeof useTranslations>;
@@ -1364,6 +1392,109 @@ function SettingsTab({
         </div>
         {promptError && <span className="px-2 text-[11px] text-destructive">{t("toast.needPrompt")}</span>}
       </section>
+
+      {/* Skills — reusable instruction blocks folded into the fired agent's prompt. */}
+      <section className="flex flex-col gap-2.5">
+        <span className="px-2 text-[12px] text-text-secondary">{t("skills")}</span>
+        <SkillsSection draft={draft} setDraft={setDraft} skills={skills} t={t} />
+      </section>
+    </div>
+  );
+}
+
+/** Attach/detach library skills on a patrol. Attached skills are composed into
+ *  the agent prompt on save, so the fired run receives their guidance. */
+function SkillsSection({
+  draft,
+  setDraft,
+  skills,
+  t,
+}: {
+  draft: Draft;
+  setDraft: React.Dispatch<React.SetStateAction<Draft | null>>;
+  skills: Skill[];
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const attached = draft.skillIds.map((id) => skills.find((s) => s.id === id)).filter((s): s is Skill => s != null);
+
+  const toggle = (id: string) =>
+    setDraft((d) =>
+      d ? { ...d, skillIds: d.skillIds.includes(id) ? d.skillIds.filter((x) => x !== id) : [...d.skillIds, id] } : d,
+    );
+  const remove = (id: string) => setDraft((d) => (d ? { ...d, skillIds: d.skillIds.filter((x) => x !== id) } : d));
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border-cards bg-card-background p-4">
+      {attached.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {attached.map((skill) => (
+            <span
+              key={skill.id}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border-cards bg-card-background-secondary py-1 pr-1 pl-2.5 text-[12px] text-text-primary"
+            >
+              <SparklesIcon className="size-3 text-text-tertiary" />
+              {skill.name}
+              <button
+                type="button"
+                onClick={() => remove(skill.id)}
+                aria-label={t("skillRemove")}
+                className="inline-flex size-4 items-center justify-center rounded-full text-text-tertiary transition-colors hover:bg-muted hover:text-text-primary"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[12px] text-text-tertiary">
+          {skills.length === 0 ? t("skillsNoneInLibrary") : t("skillsEmpty")}
+        </p>
+      )}
+
+      {skills.length > 0 && (
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border-cards bg-card-background-secondary px-2.5 py-1.5 text-[12px] text-text-secondary transition-colors hover:text-text-primary"
+            >
+              <PlusIcon className="size-3.5" />
+              {t("skillAttach")}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-72 p-1">
+            <div className="max-h-64 overflow-y-auto">
+              {skills.map((skill) => {
+                const on = draft.skillIds.includes(skill.id);
+                return (
+                  <button
+                    type="button"
+                    key={skill.id}
+                    onClick={() => toggle(skill.id)}
+                    className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted"
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border",
+                        on ? "border-primary bg-primary text-primary-foreground" : "border-border-cards",
+                      )}
+                    >
+                      {on && <CheckIcon className="size-3" />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12px] text-text-primary">{skill.name}</span>
+                      {skill.description ? (
+                        <span className="block truncate text-[11px] text-text-tertiary">{skill.description}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // House, ScrollText icons parked — Home/Logs nav entries commented out below.
-import { Activity, History, type LucideIcon, Route } from "lucide-react";
+import { Activity, History, type LucideIcon, Route, Sparkles } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -80,6 +80,13 @@ export const sidebarItems: NavGroup[] = [
         url: "/schedules",
         icon: Route,
         description: "Set up recurring and cron-triggered runs so agents fire on their own.",
+      },
+      {
+        title: "Skills",
+        url: "/skills",
+        icon: Sparkles,
+        description: "Manage reusable agent skills and install more from the marketplace.",
+        isNew: true,
       },
       // Day Planner is parked for now — re-enable with the ClipboardList icon import.
       // {

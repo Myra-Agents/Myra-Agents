@@ -1486,6 +1486,60 @@
     "resetOverrides": "Réinitialiser",
     "cancel": "Annuler",
     "createTag": "Créer « {tag} »",
-    "createTagHint": "Tape un nom pour créer un nouveau tag"
+    "createTagHint": "Tape un nom pour créer un nouveau tag",
+    "skills": "Compétences",
+    "skillsEmpty": "Aucune compétence attachée. Attachez-en une pour intégrer ses consignes à chaque exécution.",
+    "skillsNoneInLibrary": "Aucune compétence dans votre bibliothèque — créez-en d’abord dans la page Compétences.",
+    "skillAttach": "Attacher une compétence",
+    "skillRemove": "Retirer la compétence"
+  },
+  "skills": {
+    "title": "Compétences",
+    "subtitle": "Des consignes d’agent réutilisables, à attacher à n’importe quelle patrouille.",
+    "tabs": {
+      "mine": "Mes compétences ({count})",
+      "marketplace": "Place de marché"
+    },
+    "newSkill": "Nouvelle compétence",
+    "editSkill": "Modifier la compétence",
+    "deleteSkill": "Supprimer la compétence",
+    "marketplaceIntro": "Installez des compétences prêtes à l’emploi, puis attachez-les à vos patrouilles.",
+    "install": "Installer",
+    "installed": "Installée",
+    "by": "par {author}",
+    "empty": {
+      "title": "Aucune compétence",
+      "description": "Créez votre propre compétence ou installez-en une depuis la place de marché pour commencer."
+    },
+    "badge": {
+      "custom": "Personnalisée",
+      "marketplace": "Place de marché"
+    },
+    "form": {
+      "hint": "Une compétence est un bloc de consignes injecté dans le prompt de l’agent lorsqu’elle est attachée.",
+      "name": "Nom",
+      "namePlaceholder": "ex. Conventional Commits",
+      "category": "Catégorie",
+      "categoryPlaceholder": "ex. Git",
+      "description": "Description",
+      "descriptionPlaceholder": "Résumé en une ligne",
+      "content": "Consignes",
+      "contentPlaceholder": "Consignes en Markdown que l’agent doit suivre…",
+      "contentHint": "Markdown. Injecté dans le prompt de l’agent à chaque exécution où elle est attachée.",
+      "save": "Enregistrer",
+      "cancel": "Annuler"
+    },
+    "confirmDelete": {
+      "title": "Supprimer la compétence ?",
+      "description": "« {name} » sera retirée de votre bibliothèque. Les patrouilles conservent les consignes déjà enregistrées dans leur prompt.",
+      "confirm": "Supprimer",
+      "cancel": "Annuler"
+    },
+    "toast": {
+      "created": "Compétence créée",
+      "updated": "Compétence mise à jour",
+      "deleted": "Compétence supprimée",
+      "installed": "« {name} » installée"
+    }
   }
 }
