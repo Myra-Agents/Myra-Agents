@@ -24,11 +24,21 @@ export interface ConnectorTrigger {
   summary?: string;
 }
 
+/** One config field of an action (rendered as a form input in the picker). */
+export interface ConnectorActionConfigField {
+  key: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  placeholder?: string;
+}
+
 /** A post-run action a connector can perform (from its manifest catalog.actions). */
 export interface ConnectorActionType {
   id: string;
   label: string;
   summary?: string;
+  config?: ConnectorActionConfigField[];
 }
 
 /** A connector that can run actions at the end of a patrol. */
@@ -69,14 +79,24 @@ const SEED: ConnectorTrigger[] = [
   { id: "gmail", name: "Gmail", icon: MailIcon, summary: "New email matching your rules" },
 ];
 
+const GMAIL_ACTION_CONFIG: ConnectorActionConfigField[] = [
+  { key: "to", label: "To", type: "string", required: true },
+  { key: "subject", label: "Subject", type: "string", placeholder: "Templated — {{title}}" },
+  { key: "body", label: "Body", type: "string", placeholder: "Templated — {{result}}" },
+];
 const ACTION_SEED: ConnectorActionProvider[] = [
   {
     id: "gmail",
     name: "Gmail",
     icon: MailIcon,
     actions: [
-      { id: "send", label: "Send an email", summary: "Email the run result" },
-      { id: "draft", label: "Create a draft", summary: "Save the result as a Gmail draft" },
+      { id: "send", label: "Send an email", summary: "Email the run result", config: GMAIL_ACTION_CONFIG },
+      {
+        id: "draft",
+        label: "Create a draft",
+        summary: "Save the result as a Gmail draft",
+        config: GMAIL_ACTION_CONFIG,
+      },
     ],
   },
 ];

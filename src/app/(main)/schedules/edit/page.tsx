@@ -17,6 +17,7 @@ import {
   LightbulbIcon,
   PlayIcon,
   PlusIcon,
+  PuzzleIcon,
   RefreshCwIcon,
   RotateCcwIcon,
   Trash2Icon,
@@ -65,6 +66,7 @@ import { loadTestResult } from "@/lib/agent-test-store";
 import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
 import {
   type ConnectorActionProvider,
+  type ConnectorActionType,
   type ConnectorTrigger,
   listConnectorActions,
   listConnectorTriggers,
@@ -77,7 +79,13 @@ import { cn } from "@/lib/utils";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import { useNavGuard } from "@/stores/nav-guard-store";
 import type { KanbanCard } from "@/types/kanban";
-import type { CreateScheduleInput, ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
+import type {
+  CreateScheduleInput,
+  ScheduledTask,
+  ScheduleKindType,
+  TaskAction,
+  UpdateScheduleInput,
+} from "@/types/schedule";
 import { defaultScheduleKind, describeSchedule } from "@/types/schedule";
 import type { AgentPreset } from "@/types/settings";
 
@@ -112,6 +120,8 @@ type Draft = {
   useWorktree?: boolean;
   launchVia?: "direct" | "ollama";
   ollamaModel?: string;
+  // Post-run actions to run when a materialized card finishes.
+  actions: TaskAction[];
 };
 
 function draftOf(task: ScheduledTask): Draft {
@@ -128,6 +138,7 @@ function draftOf(task: ScheduledTask): Draft {
     useWorktree: task.useWorktree,
     launchVia: task.launchVia,
     ollamaModel: task.ollamaModel,
+    actions: task.actions ?? [],
   };
 }
 
@@ -487,6 +498,7 @@ function ScheduleEditScreen() {
         workingDir: draft.workingDir.trim() || undefined,
         launchVia: draft.launchVia,
         ollamaModel: draft.ollamaModel,
+        actions: draft.actions.length ? draft.actions : undefined,
       };
       await updateSchedule(input);
       // Commit the app-local per-folder branch overrides alongside the save.
@@ -525,6 +537,7 @@ function ScheduleEditScreen() {
           workingDir: draft.workingDir.trim() || undefined,
           launchVia: draft.launchVia,
           ollamaModel: draft.ollamaModel,
+          actions: draft.actions.length ? draft.actions : undefined,
         };
         const created = await createSchedule(input);
         // Persist app-local per-folder branch overrides under the new schedule id.
@@ -1338,7 +1351,15 @@ function SettingsTab({
       {/* Actions — run when the patrol finishes */}
       <section className="flex flex-col gap-2.5">
         <span className="px-2 text-[12px] text-text-secondary">{t("actions")}</span>
-        <ActionsCard t={t} />
+        <ActionsCard
+          actions={draft.actions}
+          onAdd={(a) => setDraft((d) => (d ? { ...d, actions: [...d.actions, a] } : d))}
+          onUpdate={(i, config) =>
+            setDraft((d) => (d ? { ...d, actions: d.actions.map((a, idx) => (idx === i ? { ...a, config } : a)) } : d))
+          }
+          onRemove={(i) => setDraft((d) => (d ? { ...d, actions: d.actions.filter((_, idx) => idx !== i) } : d))}
+          t={t}
+        />
       </section>
 
       {/* Agent Instruction */}
@@ -2274,27 +2295,120 @@ function AddTriggerMenu({
   );
 }
 
-/** "Actions" card — post-run actions from installed connectors. Mirrors the
- *  Triggers card; wiring a picked action to the patrol (task.actions + server
- *  routing) is a follow-up, so picking one deep-links to Plugins to set up. */
-function ActionsCard({ t }: { t: ReturnType<typeof useTranslations> }) {
-  return (
-    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
-      <AddActionMenu t={t} />
-    </div>
-  );
-}
-
-/** "+ Add Action" row → dropdown of action-capable connectors, each expanding to
- *  its action types (Send an email, Create a draft, …). */
-function AddActionMenu({ t }: { t: ReturnType<typeof useTranslations> }) {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
+/** "Actions" card — post-run actions run when a materialized card finishes. Lists
+ *  the configured actions (each editable in a popover) + an Add-Action menu of
+ *  installed action-capable connectors. */
+function ActionsCard({
+  actions,
+  onAdd,
+  onUpdate,
+  onRemove,
+  t,
+}: {
+  actions: TaskAction[];
+  onAdd: (a: TaskAction) => void;
+  onUpdate: (index: number, config: Record<string, unknown>) => void;
+  onRemove: (index: number) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
   const [providers, setProviders] = useState<ConnectorActionProvider[]>([]);
   useEffect(() => {
     void listConnectorActions().then(setProviders);
   }, []);
 
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
+      {actions.map((a, i) => {
+        const provider = providers.find((p) => p.id === a.connector);
+        const actionType = provider?.actions.find((x) => x.id === a.type);
+        return (
+          <ActionRow
+            // biome-ignore lint/suspicious/noArrayIndexKey: positional action list.
+            key={i}
+            action={a}
+            provider={provider}
+            actionType={actionType}
+            onChange={(config) => onUpdate(i, config)}
+            onRemove={() => onRemove(i)}
+            t={t}
+          />
+        );
+      })}
+      <AddActionMenu providers={providers} onAdd={onAdd} t={t} />
+    </div>
+  );
+}
+
+/** One configured action — click to edit its (templated) config; trash to remove. */
+function ActionRow({
+  action,
+  provider,
+  actionType,
+  onChange,
+  onRemove,
+  t,
+}: {
+  action: TaskAction;
+  provider?: ConnectorActionProvider;
+  actionType?: ConnectorActionType;
+  onChange: (config: Record<string, unknown>) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const Icon = provider?.icon ?? PuzzleIcon;
+  const fields = actionType?.config ?? [];
+  const label = `${provider?.name ?? action.connector} · ${actionType?.label ?? action.type}`;
+  return (
+    <div className="group relative flex items-center">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 py-3.5 pr-12 pl-4 text-left transition-colors hover:bg-muted/20"
+          >
+            <Icon className="size-[18px] shrink-0 text-icon-secondary" />
+            <span className="text-[14px] text-text-primary">{label}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-80 flex-col gap-2.5">
+          {fields.length === 0 && <p className="text-[13px] text-text-tertiary">{t("noActionConfig")}</p>}
+          {fields.map((f) => (
+            <div key={f.key} className="flex flex-col gap-1">
+              <span className="text-[12px] text-text-secondary">{f.label}</span>
+              <Input
+                value={String(action.config[f.key] ?? "")}
+                placeholder={f.placeholder}
+                onChange={(e) => onChange({ ...action.config, [f.key]: e.target.value })}
+                className="h-8 text-[13px]"
+              />
+            </div>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={t("removeAction")}
+        onClick={onRemove}
+        className="absolute right-3 flex size-7 items-center justify-center rounded-md text-icon-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2Icon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+/** "+ Add Action" row → connectors → their action types. Picking one appends it
+ *  to the patrol's actions (config edited in its row). */
+function AddActionMenu({
+  providers,
+  onAdd,
+  t,
+}: {
+  providers: ConnectorActionProvider[];
+  onAdd: (a: TaskAction) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const visible = providers.filter(
     (p) => !q || p.name.toLowerCase().includes(q) || p.actions.some((a) => a.label.toLowerCase().includes(q)),
@@ -2335,7 +2449,7 @@ function AddActionMenu({ t }: { t: ReturnType<typeof useTranslations> }) {
                     <DropdownMenuItem
                       key={a.id}
                       className="flex-col items-start gap-0.5 text-[13px]"
-                      onSelect={() => router.push("/settings")}
+                      onSelect={() => onAdd({ connector: p.id, type: a.id, config: {} })}
                     >
                       <span>{a.label}</span>
                       {a.summary && <span className="text-[11px] text-text-tertiary">{a.summary}</span>}

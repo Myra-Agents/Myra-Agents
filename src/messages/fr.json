@@ -1415,6 +1415,8 @@
     "addAction": "Ajouter une action",
     "searchActions": "Rechercher des actions...",
     "noActions": "Aucune action correspondante",
+    "noActionConfig": "Aucun réglage pour cette action.",
+    "removeAction": "Supprimer l'action",
     "categories": {
       "scheduled": "Planifié"
     },
