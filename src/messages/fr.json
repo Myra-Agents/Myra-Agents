@@ -1498,5 +1498,55 @@
     "cancel": "Annuler",
     "createTag": "Créer « {tag} »",
     "createTagHint": "Tape un nom pour créer un nouveau tag"
+  },
+  "onboarding": {
+    "skip": "Passer",
+    "back": "Retour",
+    "next": "Suivant",
+    "getStarted": "Commencer",
+    "welcome": {
+      "title": "Bienvenue sur Myra Agents",
+      "description": "Un tableau où vos cartes exécutent des agents de code. Écrivez une consigne, déposez-la sur le tableau, et Myra lance un agent CLI pour faire le travail.",
+      "points": {
+        "board": "Chaque carte porte une consigne — lancez-la pour exécuter un agent et récupérer sa sortie en direct.",
+        "agents": "Utilisez votre propre agent CLI — opencode, Claude, Copilot ou un binaire personnalisé.",
+        "patrols": "Planifiez des exécutions récurrentes pour que les agents se déclenchent en cron, chaque jour ou à intervalle."
+      },
+      "flow": {
+        "draft": "Brouillon",
+        "todo": "À faire",
+        "inProgress": "En cours",
+        "review": "Revue",
+        "done": "Terminé"
+      }
+    },
+    "agent": {
+      "title": "Configurez votre agent",
+      "description": "Myra utilise la CLI {agent} pour exécuter vos cartes. Vérifions qu'elle est installée.",
+      "checking": "Vérification…",
+      "installed": "Installé",
+      "notInstalled": "Non installé",
+      "ready": "Prêt",
+      "missing": "Manquant",
+      "installHint": "{agent} n'est pas encore dans votre PATH. Installez-le en un clic, ou récupérez-le depuis la documentation.",
+      "install": "Installer {agent}",
+      "installing": "Installation…",
+      "viewDocs": "Voir la doc",
+      "footnote": "Vous pourrez ajouter d'autres agents ou changer celui par défaut à tout moment dans les Réglages."
+    },
+    "folder": {
+      "title": "Choisissez un dossier de travail",
+      "description": "Les agents s'exécutent dans ce dossier par défaut — généralement le projet ou le dépôt sur lequel vous voulez qu'ils travaillent.",
+      "placeholder": "/chemin/vers/votre/projet",
+      "hint": "Vous pourrez le remplacer par carte et par patrouille plus tard. Laissez votre dossier personnel pour choisir à chaque fois."
+    },
+    "ready": {
+      "title": "Tout est prêt",
+      "description": "Voici votre configuration. Vous pouvez tout modifier depuis les Réglages quand vous le souhaitez.",
+      "agentRow": "Agent {agent}",
+      "folderRow": "Dossier de travail",
+      "folderUnset": "Dossier personnel",
+      "cta": "Rendez-vous sur le tableau, ajoutez une carte avec une consigne et lancez votre première exécution."
+    }
   }
 }

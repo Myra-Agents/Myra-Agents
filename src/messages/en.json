@@ -1498,5 +1498,55 @@
     "cancel": "Cancel",
     "createTag": "Create \"{tag}\"",
     "createTagHint": "Type a name to create a new tag"
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Next",
+    "getStarted": "Get started",
+    "welcome": {
+      "title": "Welcome to Myra Agents",
+      "description": "A board where your cards run coding agents. Write a prompt, drop it on the board, and Myra launches a CLI agent to do the work.",
+      "points": {
+        "board": "Each card carries a prompt — launch it to run an agent and stream its output back.",
+        "agents": "Bring your own CLI agent — opencode, Claude, Copilot, or a custom binary.",
+        "patrols": "Schedule recurring runs so agents fire on a cron, daily, or interval basis."
+      },
+      "flow": {
+        "draft": "Draft",
+        "todo": "Todo",
+        "inProgress": "In Progress",
+        "review": "Review",
+        "done": "Done"
+      }
+    },
+    "agent": {
+      "title": "Set up your agent",
+      "description": "Myra runs the {agent} CLI to execute your cards. Let's make sure it's installed.",
+      "checking": "Checking…",
+      "installed": "Installed",
+      "notInstalled": "Not installed",
+      "ready": "Ready",
+      "missing": "Missing",
+      "installHint": "{agent} isn't on your PATH yet. Install it in one click, or grab it from the docs.",
+      "install": "Install {agent}",
+      "installing": "Installing…",
+      "viewDocs": "View docs",
+      "footnote": "You can add more agents or switch the default anytime in Settings."
+    },
+    "folder": {
+      "title": "Choose a working folder",
+      "description": "Agents run inside this folder by default — typically the project or repo you want them to work on.",
+      "placeholder": "/path/to/your/project",
+      "hint": "You can override this per card and per patrol later. Leave it as your home folder to decide each time."
+    },
+    "ready": {
+      "title": "You're all set",
+      "description": "Here's your setup. You can change any of it from Settings whenever you like.",
+      "agentRow": "{agent} agent",
+      "folderRow": "Working folder",
+      "folderUnset": "Home folder",
+      "cta": "Head to the board, add a card with a prompt, and launch your first run."
+    }
   }
 }

@@ -15,6 +15,7 @@ import { GlobalShortcuts } from "./_components/global-shortcuts";
 import { HEADER_ACTIONS_ID } from "./_components/header-actions";
 import { HeaderBreadcrumb } from "./_components/header-breadcrumb";
 import { NavHistoryControls } from "./_components/nav-history-controls";
+import { OnboardingBootstrap } from "./_components/onboarding/onboarding-bootstrap";
 import { RefreshOnNavigate } from "./_components/refresh-on-navigate";
 import { RunStartedToasts } from "./_components/run-started-toasts";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
@@ -55,6 +56,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       <AppUpdateBootstrap />
       {/* One-shot auto connectivity test for installed-but-never-tested agents. */}
       <AgentTestBootstrap />
+      {/* First-run onboarding wizard (localStorage-gated, shows once). */}
+      <OnboardingBootstrap />
       <TrayActionListener />
       {/* Global "Operation started" toast for every run start (manual or scheduled). */}
       <RunStartedToasts />
