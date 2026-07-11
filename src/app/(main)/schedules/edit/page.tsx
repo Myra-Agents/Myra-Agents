@@ -63,7 +63,12 @@ import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { loadTestResult } from "@/lib/agent-test-store";
 import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
-import { type ConnectorTrigger, listConnectorTriggers } from "@/lib/connector-triggers";
+import {
+  type ConnectorActionProvider,
+  type ConnectorTrigger,
+  listConnectorActions,
+  listConnectorTriggers,
+} from "@/lib/connector-triggers";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
@@ -1330,6 +1335,12 @@ function SettingsTab({
         />
       </section>
 
+      {/* Actions — run when the patrol finishes */}
+      <section className="flex flex-col gap-2.5">
+        <span className="px-2 text-[12px] text-text-secondary">{t("actions")}</span>
+        <ActionsCard t={t} />
+      </section>
+
       {/* Agent Instruction */}
       <section className="flex flex-col gap-2.5">
         <span className="px-2 text-[12px] text-text-secondary">{t("agentInstruction")}</span>
@@ -2257,6 +2268,84 @@ function AddTriggerMenu({
           {!showScheduled && visibleConnectors.length === 0 && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noTriggers")}</p>
           )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** "Actions" card — post-run actions from installed connectors. Mirrors the
+ *  Triggers card; wiring a picked action to the patrol (task.actions + server
+ *  routing) is a follow-up, so picking one deep-links to Plugins to set up. */
+function ActionsCard({ t }: { t: ReturnType<typeof useTranslations> }) {
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
+      <AddActionMenu t={t} />
+    </div>
+  );
+}
+
+/** "+ Add Action" row → dropdown of action-capable connectors, each expanding to
+ *  its action types (Send an email, Create a draft, …). */
+function AddActionMenu({ t }: { t: ReturnType<typeof useTranslations> }) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [providers, setProviders] = useState<ConnectorActionProvider[]>([]);
+  useEffect(() => {
+    void listConnectorActions().then(setProviders);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const visible = providers.filter(
+    (p) => !q || p.name.toLowerCase().includes(q) || p.actions.some((a) => a.label.toLowerCase().includes(q)),
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-text-secondary transition-colors hover:bg-muted/20 hover:text-text-primary"
+        >
+          <PlusIcon className="size-[18px] shrink-0" />
+          <span className="text-[14px]">{t("addAction")}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("searchActions")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="p-1">
+          {visible.map((p) => {
+            const Icon = p.icon;
+            return (
+              <DropdownMenuSub key={p.id}>
+                <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                  <Icon className="size-4 text-icon-secondary" />
+                  {p.name}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {p.actions.map((a) => (
+                    <DropdownMenuItem
+                      key={a.id}
+                      className="flex-col items-start gap-0.5 text-[13px]"
+                      onSelect={() => router.push("/settings")}
+                    >
+                      <span>{a.label}</span>
+                      {a.summary && <span className="text-[11px] text-text-tertiary">{a.summary}</span>}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            );
+          })}
+          {visible.length === 0 && <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noActions")}</p>}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

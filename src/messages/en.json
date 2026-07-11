@@ -1411,6 +1411,10 @@
     "comingSoon": "Coming soon",
     "noTriggers": "No matching triggers",
     "configureConnector": "Set up in Plugins",
+    "actions": "Actions",
+    "addAction": "Add Action",
+    "searchActions": "Search Actions...",
+    "noActions": "No matching actions",
     "categories": {
       "scheduled": "Scheduled"
     },

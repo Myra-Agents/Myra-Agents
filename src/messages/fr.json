@@ -1411,6 +1411,10 @@
     "comingSoon": "Bientôt disponible",
     "noTriggers": "Aucun déclencheur correspondant",
     "configureConnector": "Configurer dans Plugins",
+    "actions": "Actions",
+    "addAction": "Ajouter une action",
+    "searchActions": "Rechercher des actions...",
+    "noActions": "Aucune action correspondante",
     "categories": {
       "scheduled": "Planifié"
     },
