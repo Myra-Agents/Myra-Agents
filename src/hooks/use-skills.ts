@@ -100,8 +100,14 @@ export function useSkills() {
 
   const installFromMarketplace = useCallback(
     (entry: MarketplaceSkill): Skill => {
+      // Idempotent: re-installing a marketplace entry (e.g. via the landing-site
+      // `myra://skill/install?id=…` deep link) returns the existing copy instead
+      // of duplicating it in the library.
+      const existing = readSkills();
+      const already = existing.find((s) => s.marketplaceId === entry.id);
+      if (already) return already;
       const skill = skillFromMarketplace(entry);
-      persist([...readSkills(), skill]);
+      persist([...existing, skill]);
       return skill;
     },
     [persist],
