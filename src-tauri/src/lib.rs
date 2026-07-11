@@ -283,6 +283,19 @@ fn start_local_backend(app: &AppHandle) -> u16 {
     if let Ok(demo) = std::env::var("DEMO") {
         command = command.env("DEMO", demo);
     }
+    // Forward the embedded-harness LLM env when set (Tauri gives the sidecar a
+    // minimal env, so these wouldn't reach it otherwise). Lets a dev run point
+    // the harness at a hub / OpenRouter without enrolling:
+    //   MYRA_HUB_URL=https://openrouter.ai/api MYRA_CREDENTIAL=sk-or-… \
+    //   MYRA_MODEL=deepseek/deepseek-chat-v3.1:free ./dev.sh app
+    // In production the credential comes from hub-credential.json (enrollment).
+    for key in ["MYRA_HUB_URL", "MYRA_CREDENTIAL", "MYRA_MODEL"] {
+        if let Ok(val) = std::env::var(key) {
+            if !val.is_empty() {
+                command = command.env(key, val);
+            }
+        }
+    }
 
     match command.spawn() {
         Ok((mut rx, child)) => {

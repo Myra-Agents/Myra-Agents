@@ -50,6 +50,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MyraMark } from "@/components/ui/myra-mark";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRunStartedToast } from "@/hooks/use-run-started-toast";
@@ -118,9 +119,11 @@ function ConnectorFlow({ keys }: { keys: ConnectorKey[] }) {
   );
 }
 
-/** Pick a lucide glyph for an agent binary (no brand marks in lucide). */
+/** Pick a glyph for an agent binary: the Myra mark for the embedded agent, else
+ * a lucide glyph (no brand marks in lucide). */
 function agentIcon(binary: string) {
   const b = binary.toLowerCase();
+  if (b === "myra-embedded") return MyraMark;
   if (b.includes("opencode")) return BotIcon;
   return TerminalIcon;
 }

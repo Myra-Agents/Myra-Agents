@@ -72,6 +72,14 @@ interface AgentLogEvent {
   runId: string;
   line: string;
 }
+/** Embedded-harness transcript frame (`agent-transcript-event`): one structured
+ * `HarnessEvent`. Appended to the run's log buffer as NDJSON so the existing
+ * `parseTranscript` path renders it live (no terminal parsing). */
+interface AgentTranscriptEvent {
+  cardId: string;
+  runId: string;
+  event: unknown;
+}
 
 interface BoardState {
   cards: KanbanCard[];
@@ -434,6 +442,24 @@ async function doSubscribeLive() {
   } catch (e) {
     console.error("Failed to subscribe agent-log-appended:", e);
     captureError(e, { where: "boardStore.subscribeLive.log" });
+  }
+  try {
+    // Embedded harness: structured transcript frames. Serialise each event as one
+    // NDJSON line into the same run-log buffer the CLI agents stream into, so the
+    // live transcript renders through the existing `parseTranscript` path (which
+    // maps harness NDJSON natively). The worker also persists these to the run log
+    // for replay, and drives the card transition from the `result` event via
+    // `agent-result-changed`, so no extra handling is needed here.
+    const offTranscript = await connectionManager.listenAll<AgentTranscriptEvent>(
+      "agent-transcript-event",
+      ({ connId, payload }) => {
+        store.appendLog(toGlobalId(connId, payload.cardId), JSON.stringify(payload.event));
+      },
+    );
+    liveUnsubs.push(offTranscript);
+  } catch (e) {
+    console.error("Failed to subscribe agent-transcript-event:", e);
+    captureError(e, { where: "boardStore.subscribeLive.transcript" });
   }
 }
 

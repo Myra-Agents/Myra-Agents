@@ -33,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MyraMark } from "@/components/ui/myra-mark";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type HistoryColumnId, TOGGLEABLE_COLUMNS, useHistoryColumns } from "@/hooks/use-history-columns";
 import { useRunStartedToast } from "@/hooks/use-run-started-toast";
@@ -1057,9 +1058,12 @@ function StatCard({ title, value, accent }: { title: string; value: string; acce
   );
 }
 
-/** Pick a lucide glyph for the agent binary (no brand marks in lucide). */
+/** Pick a glyph for the agent binary: the Myra mark for the embedded agent, else
+ * a lucide glyph (no brand marks in lucide). */
 function agentIcon(binary: string) {
-  return binary.toLowerCase().includes("opencode") ? BotIcon : TerminalIcon;
+  const b = binary.toLowerCase();
+  if (b === "myra-embedded") return MyraMark;
+  return b.includes("opencode") ? BotIcon : TerminalIcon;
 }
 
 /** A bordered chip with the agent's icon + name, mirroring the Operations Agent cell. */

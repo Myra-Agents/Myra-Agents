@@ -1113,7 +1113,16 @@
       "testAndSave": "Tester & Sauvegarder",
       "testAndSaveTooltip": "Teste l'agent, puis sauvegarde s'il répond",
       "testedBadge": "Testé",
-      "testFailedBadge": "Test échoué"
+      "testFailedBadge": "Test échoué",
+      "embedded": {
+        "badge": "Intégré",
+        "save": "Enregistrer",
+        "description": "Agent intégré — sans installation ni CLI. Tourne sur le hub Myra, ou avec votre propre clé.",
+        "apiKeyLabel": "Clé API (optionnel)",
+        "apiKeyPlaceholder": "sk-or-…  — laisser vide pour utiliser le hub Myra",
+        "modelLabel": "Modèle",
+        "modelHint": "Laisser vide ou « auto » pour laisser Myra choisir un modèle gratuit."
+      }
     },
     "preferences": {
       "title": "Préférences",

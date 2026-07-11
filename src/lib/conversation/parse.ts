@@ -6,11 +6,55 @@
 // real chat. When the log is plain text (any agent without stream-json), we
 // fall back to a single assistant text block so nothing is lost.
 
+import { type HarnessEvent, harnessEventToEntry } from "@myra/shared";
+
 import type { AgentRun } from "@/types/kanban";
 
 import { cleanLog, parseOpencodeLog } from "./opencode";
 import { parseOpencodeJson } from "./opencode-json";
 import type { ToolResultEntry, Transcript, TranscriptEntry } from "./types";
+
+/** `type` discriminants of an embedded-harness event (see `@myra/shared`). */
+const HARNESS_TYPES = new Set(["text", "thinking", "tool_use", "tool_result", "todos", "result"]);
+
+/**
+ * Parse an embedded-harness run log: newline-delimited `HarnessEvent`s (the
+ * worker persists each frame as one NDJSON line). Non-event lines — the harness's
+ * own stderr diagnostics, also captured to the same file — are skipped. Returns
+ * null when no line is a harness event (so the other parsers get a turn).
+ *
+ * This is a native, structured mapping — no terminal/text parsing — and the same
+ * `harnessEventToEntry` runs on the live path (`agent-transcript-event`).
+ *
+ * Deduped by the envelope `seq` (monotonic per run): the live view concatenates
+ * the fetched `get_run_log` snapshot with the live tail, which can overlap, and
+ * `seq` is exactly what the envelope carries to make that idempotent.
+ */
+function parseHarnessEvents(log: string): TranscriptEntry[] | null {
+  const entries: TranscriptEntry[] = [];
+  const seen = new Set<number>();
+  let sawEvent = false;
+  for (const line of log.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed[0] !== "{") continue;
+    let ev: HarnessEvent;
+    try {
+      const parsed = JSON.parse(trimmed) as Partial<HarnessEvent>;
+      if (typeof parsed?.type !== "string" || !HARNESS_TYPES.has(parsed.type) || typeof parsed.seq !== "number") {
+        continue; // not a harness event line
+      }
+      ev = parsed as HarnessEvent;
+    } catch {
+      continue;
+    }
+    sawEvent = true;
+    if (seen.has(ev.seq)) continue; // already rendered this event (snapshot ∩ live tail)
+    seen.add(ev.seq);
+    const entry = harnessEventToEntry(ev);
+    if (entry) entries.push(entry);
+  }
+  return sawEvent ? entries : null;
+}
 
 /** Drop the result-protocol footer we append to every prompt (see
  * `@myra/shared` `buildPrompt`) so the user turn shows only the real task. */
@@ -164,6 +208,14 @@ export function parseTranscript(log: string | null, run: AgentRun, opts?: { user
   // `null` to omit it), else the run's own stripped prompt.
   const prompt = opts && "userTurn" in opts ? opts.userTurn : stripProtocolFooter(run.prompt);
   if (prompt) entries.push({ kind: "user", text: prompt });
+
+  // Embedded harness (Antenna): NDJSON HarnessEvents. Checked first — the most
+  // specific, structured format — mapped natively via `harnessEventToEntry`.
+  const harness = log ? parseHarnessEvents(log) : null;
+  if (harness) {
+    entries.push(...harness);
+    return { entries, structured: true };
+  }
 
   const events = log ? parseStreamEvents(log) : null;
   if (events) {

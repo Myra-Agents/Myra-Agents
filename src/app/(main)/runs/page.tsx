@@ -52,6 +52,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MyraMark } from "@/components/ui/myra-mark";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useKanban } from "@/hooks/use-kanban";
 import { type RunsColumnId, TOGGLEABLE_COLUMNS, useRunsColumns } from "@/hooks/use-runs-columns";
@@ -1484,6 +1485,7 @@ function compareBy(key: SortKey, a: KanbanCard, b: KanbanCard, agentName: (c: Ka
 /** Pick a lucide glyph for the agent binary (no brand marks in lucide). */
 function agentIcon(binary: string) {
   const b = binary.toLowerCase();
+  if (b === "myra-embedded") return MyraMark;
   if (b.includes("opencode")) return BotIcon;
   return TerminalIcon;
 }

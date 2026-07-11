@@ -54,6 +54,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MyraLoader, type MyraLoaderVariant } from "@/components/ui/myra-loader";
+import { MyraMark } from "@/components/ui/myra-mark";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -73,7 +74,7 @@ import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/hom
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke, isTauri } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
-import type { AgentPreset, AppSettings } from "@/types/settings";
+import type { AgentPreset, AppSettings, EmbeddedLlmConfig } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
 
 type DataAction = "export" | "import" | "clear" | "clearHistory";
@@ -128,6 +129,144 @@ interface AgentPresetCardProps {
  * install gate (auto / manual) — unless the user opts to configure anyway.
  */
 type TestState = "idle" | "testing" | "passed" | "failed";
+
+const EMBEDDED_AGENT_ID = "myra-embedded";
+
+/** The embedded "Myra" agent card. No CLI install — but it shows the same
+ * "Installed · <version>" badge (from the harness `smoke` probe) and the same
+ * Test & Save button as the CLI presets. Its only config is the LLM (BYOK key +
+ * model); the endpoint is resolved server-side (hub or OpenRouter). */
+function EmbeddedAgentCard({
+  preset,
+  llm,
+  onChange,
+  onSave,
+  saving,
+  t,
+}: {
+  preset: AgentPreset;
+  llm: EmbeddedLlmConfig | undefined;
+  onChange: (patch: Partial<EmbeddedLlmConfig>) => void;
+  onSave: () => Promise<void> | void;
+  saving: boolean;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const bin = useBinaryStatus(preset.binary);
+  const [testState, setTestState] = useState<TestState>("idle");
+  const [storedResult, setStoredResult] = useState<StoredTestResult | null>(() => loadTestResult(preset.id));
+
+  const handleTestAndSave = useCallback(async () => {
+    setTestState("testing");
+    try {
+      // For the embedded harness `test_agent` runs its network-free `smoke`.
+      await invoke("test_agent", {
+        binary: preset.binary,
+        argsTemplate: preset.argsTemplate,
+        flags: [],
+        launchVia: "direct",
+        ollamaModel: "",
+        workingDir: null,
+      });
+      persistTestResult(preset.id, "passed");
+      setStoredResult({ status: "passed", ts: Date.now() });
+      setTestState("passed");
+      await onSave();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : typeof err === "string" ? err : undefined;
+      persistTestResult(preset.id, "failed", reason);
+      setStoredResult({ status: "failed", ts: Date.now(), reason });
+      setTestState("failed");
+    }
+    setTimeout(() => setTestState("idle"), 3000);
+  }, [preset.id, preset.binary, preset.argsTemplate, onSave]);
+
+  return (
+    <div className="space-y-3 rounded-md border p-3">
+      <div className="flex items-center gap-2">
+        <MyraMark className="size-4 text-foreground" />
+        <Label className="font-semibold text-sm">{preset.name}</Label>
+        <AgentStatusBadge {...bin} />
+        {storedResult && (
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium text-[10px] ${
+              storedResult.status === "passed"
+                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+            }`}
+          >
+            {storedResult.status === "passed" ? (
+              <CheckCircle2Icon className="size-2.5" />
+            ) : (
+              <XCircleIcon className="size-2.5" />
+            )}
+            {storedResult.status === "passed" ? t("agents.testedBadge") : t("agents.testFailedBadge")}
+          </span>
+        )}
+        <span className="rounded bg-muted px-1.5 py-0.5 text-muted-foreground text-xs">
+          {t("agents.embedded.badge")}
+        </span>
+      </div>
+      <p className="text-muted-foreground text-xs">{t("agents.embedded.description")}</p>
+      <div className="space-y-1.5">
+        <Label className="text-xs" htmlFor="myra-api-key">
+          {t("agents.embedded.apiKeyLabel")}
+        </Label>
+        <Input
+          id="myra-api-key"
+          type="password"
+          autoComplete="off"
+          placeholder={t("agents.embedded.apiKeyPlaceholder")}
+          value={llm?.apiKey ?? ""}
+          onChange={(e) => onChange({ apiKey: e.target.value })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs" htmlFor="myra-model">
+          {t("agents.embedded.modelLabel")}
+        </Label>
+        <Input
+          id="myra-model"
+          placeholder="auto"
+          value={llm?.model ?? ""}
+          onChange={(e) => onChange({ model: e.target.value })}
+        />
+        <p className="text-muted-foreground text-xs">{t("agents.embedded.modelHint")}</p>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            onClick={() => void handleTestAndSave()}
+            disabled={testState === "testing" || saving}
+            title={t("agents.testAndSaveTooltip")}
+          >
+            {testState === "testing" ? (
+              <Loader2Icon className="size-3.5 animate-spin" />
+            ) : testState === "passed" ? (
+              <CheckCircle2Icon className="size-3.5 text-green-500" />
+            ) : testState === "failed" ? (
+              <XCircleIcon className="size-3.5 text-destructive" />
+            ) : (
+              <FlaskConicalIcon className="size-3.5" />
+            )}
+            {testState === "testing"
+              ? t("agents.testing")
+              : testState === "passed"
+                ? t("agents.testPassed")
+                : testState === "failed"
+                  ? t("agents.testFailed")
+                  : t("agents.testAndSave")}
+          </Button>
+        </div>
+        {testState === "failed" && storedResult?.reason && (
+          <p className="rounded-md bg-destructive/10 px-2 py-1.5 font-mono text-[11px] text-destructive">
+            {storedResult.reason}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AgentPresetCard({
   preset,
@@ -842,22 +981,34 @@ export default function SettingsPage() {
 
               <Separator />
 
-              {current.agents.map((preset, idx) => (
-                <AgentPresetCard
-                  key={preset.id}
-                  preset={preset}
-                  idx={idx}
-                  isDefault={DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id)}
-                  t={t}
-                  onUpdate={updatePreset}
-                  onRemove={removePreset}
-                  onDuplicate={duplicatePreset}
-                  isDirty={(dirtyPresetFields.get(idx)?.size ?? 0) > 0}
-                  needsTest={[...(dirtyPresetFields.get(idx) ?? [])].some((f) => EXEC_FIELDS.has(f))}
-                  saving={saving}
-                  onSave={handleSave}
-                />
-              ))}
+              {current.agents.map((preset, idx) =>
+                preset.id === EMBEDDED_AGENT_ID ? (
+                  <EmbeddedAgentCard
+                    key={preset.id}
+                    preset={preset}
+                    llm={current.embeddedLlm}
+                    onChange={(patch) => update({ embeddedLlm: { ...current.embeddedLlm, ...patch } })}
+                    onSave={handleSave}
+                    saving={saving}
+                    t={t}
+                  />
+                ) : (
+                  <AgentPresetCard
+                    key={preset.id}
+                    preset={preset}
+                    idx={idx}
+                    isDefault={DEFAULT_AGENT_PRESETS.some((defaultPreset) => defaultPreset.id === preset.id)}
+                    t={t}
+                    onUpdate={updatePreset}
+                    onRemove={removePreset}
+                    onDuplicate={duplicatePreset}
+                    isDirty={(dirtyPresetFields.get(idx)?.size ?? 0) > 0}
+                    needsTest={[...(dirtyPresetFields.get(idx) ?? [])].some((f) => EXEC_FIELDS.has(f))}
+                    saving={saving}
+                    onSave={handleSave}
+                  />
+                ),
+              )}
             </CardContent>
           </Card>
         </TabsContent>
