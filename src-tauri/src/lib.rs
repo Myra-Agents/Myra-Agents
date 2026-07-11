@@ -21,6 +21,13 @@ use tray::{hide_tray_popover, open_main, quit_app, TrayNavigate, TrayState};
 #[derive(Default)]
 struct PendingAuth(Mutex<Option<String>>);
 
+/// Buffer for a `myra://patrol/new?template=…` deep link that arrives before the
+/// webview's listener is ready (the link can launch/focus the app first, a cold
+/// start). Holds the resolved in-app route; the frontend drains it via
+/// `take_pending_deep_link` on mount.
+#[derive(Default)]
+struct PendingDeepLink(Mutex<Option<String>>);
+
 /// Where the hosted web app's desktop login bridge page lives. The desktop
 /// opens `<base>/auth/desktop/` in the system browser; the bridge runs Clerk,
 /// then deep-links back with a one-time handoff code.
@@ -45,6 +52,13 @@ struct AuthCallback {
     code: String,
 }
 
+/// Payload emitted to the frontend when a `myra://patrol/new?template=…` deep
+/// link arrives, carrying the in-app route the webview should navigate to.
+#[derive(Clone, Serialize)]
+struct DeepLinkNavigate {
+    path: String,
+}
+
 /// Extract the `code` query param from a `myra://auth/callback?code=…` URL.
 fn parse_auth_code(url: &url::Url) -> Option<String> {
     if url.scheme() != "myra" {
@@ -54,6 +68,25 @@ fn parse_auth_code(url: &url::Url) -> Option<String> {
         .find(|(k, _)| k == "code")
         .map(|(_, v)| v.into_owned())
         .filter(|c| !c.is_empty())
+}
+
+/// Map a `myra://patrol/new?template=<id>` deep link to the in-app editor route
+/// the frontend consumes (`/schedules/edit/?template=<id>`), which opens the
+/// patrol editor prefilled from the template. Returns `None` for any other
+/// `myra://` URL (auth callbacks, unknown hosts/paths, or a missing id). The id
+/// is re-encoded into the query so exotic values survive the round trip; whether
+/// it names a live template is left to the frontend (unknown → editor "not found").
+fn parse_template_path(url: &url::Url) -> Option<String> {
+    if url.scheme() != "myra" || url.host_str() != Some("patrol") || url.path() != "/new" {
+        return None;
+    }
+    let id = url
+        .query_pairs()
+        .find(|(k, _)| k == "template")
+        .map(|(_, v)| v.into_owned())
+        .filter(|v| !v.is_empty())?;
+    let id_enc: String = url::form_urlencoded::byte_serialize(id.as_bytes()).collect();
+    Some(format!("/schedules/edit/?template={id_enc}"))
 }
 
 /// The stable port the persistent local service listens on. When a service is
@@ -672,6 +705,13 @@ fn take_pending_auth_code(state: tauri::State<'_, PendingAuth>) -> Option<String
     state.0.lock().ok().and_then(|mut c| c.take())
 }
 
+/// Drain any deep-link route buffered before the frontend's listener mounted
+/// (a cold start where a `myra://patrol/new?template=…` link launched the app).
+#[tauri::command]
+fn take_pending_deep_link(state: tauri::State<'_, PendingDeepLink>) -> Option<String> {
+    state.0.lock().ok().and_then(|mut c| c.take())
+}
+
 /// Open the webview's devtools, invoked by the frontend's dev-only "Inspect
 /// Element" context-menu item (the native WebKit menu — and its Inspect entry —
 /// are suppressed by the frontend). `open_devtools` only exists in debug builds
@@ -682,8 +722,12 @@ fn open_devtools(#[allow(unused_variables)] window: tauri::WebviewWindow) {
     window.open_devtools();
 }
 
-/// Wire the `myra://` deep-link handler: buffer the auth code, notify the
-/// frontend, and bring the window forward.
+/// Wire the `myra://` deep-link handler. Two link kinds are recognized:
+///   - `myra://auth/callback?code=…` → buffer the auth code + emit `auth-callback`.
+///   - `myra://patrol/new?template=<id>` → buffer + emit `deep-link-navigate` with
+///     the in-app editor route, opening the patrol editor prefilled from the template.
+/// Both bring the window forward. Each kind is buffered so a cold start (link
+/// launched the app) survives the webview mounting after the event fires.
 fn setup_deep_link(handle: &AppHandle) {
     use tauri_plugin_deep_link::DeepLinkExt;
 
@@ -697,17 +741,26 @@ fn setup_deep_link(handle: &AppHandle) {
     let h = handle.clone();
     handle.deep_link().on_open_url(move |event| {
         for url in event.urls() {
-            let Some(code) = parse_auth_code(&url) else {
-                continue;
-            };
-            if let Some(state) = h.try_state::<PendingAuth>() {
-                if let Ok(mut slot) = state.0.lock() {
-                    *slot = Some(code.clone());
+            if let Some(code) = parse_auth_code(&url) {
+                if let Some(state) = h.try_state::<PendingAuth>() {
+                    if let Ok(mut slot) = state.0.lock() {
+                        *slot = Some(code.clone());
+                    }
                 }
+                let _ = h.emit("auth-callback", AuthCallback { code });
+            } else if let Some(path) = parse_template_path(&url) {
+                if let Some(state) = h.try_state::<PendingDeepLink>() {
+                    if let Ok(mut slot) = state.0.lock() {
+                        *slot = Some(path.clone());
+                    }
+                }
+                let _ = h.emit("deep-link-navigate", DeepLinkNavigate { path });
+            } else {
+                continue;
             }
-            let _ = h.emit("auth-callback", AuthCallback { code });
             if let Some(win) = h.get_webview_window("main") {
                 let _ = win.show();
+                let _ = win.unminimize();
                 let _ = win.set_focus();
             }
         }
@@ -834,6 +887,7 @@ pub fn run() {
         })
         .manage(TrayState::default())
         .manage(PendingAuth::default())
+        .manage(PendingDeepLink::default())
         .setup(|app| {
             tray::setup_tray(app.handle())?;
             start_local_backend(app.handle());
@@ -862,6 +916,7 @@ pub fn run() {
             remote_access_status,
             start_login,
             take_pending_auth_code,
+            take_pending_deep_link,
             open_devtools,
             hide_tray_popover,
             open_main,
