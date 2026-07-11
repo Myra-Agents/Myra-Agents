@@ -925,7 +925,15 @@
         "revoked": "Instance revoked.",
         "revokeFailed": "Could not revoke the instance.",
         "osUnix": "macOS / Linux",
-        "osWindows": "Windows"
+        "osWindows": "Windows",
+        "selfHostedTitle": "Self-hosted hub",
+        "selfHostedDescription": "Connect this app to your own on-prem hub. Paste its URL and access token; each enrolled machine appears as its own board origin.",
+        "urlField": "Hub URL",
+        "labelPlaceholder": "My hub",
+        "tokenField": "Access token",
+        "tokenPlaceholder": "Paste MYRA_HUB_TOKEN",
+        "invalidUrl": "Enter a full URL (https://…).",
+        "tokenRequired": "Paste the hub access token."
       },
       "localServer": {
         "title": "Local Server",

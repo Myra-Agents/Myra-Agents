@@ -3,11 +3,22 @@
 import { useEffect, useState } from "react";
 
 import { serverUpdateState } from "@myra/shared";
-import { CheckCircle2Icon, CircleIcon, RefreshCwIcon, ServerIcon, TrashIcon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  CircleIcon,
+  PlusIcon,
+  RadioTowerIcon,
+  RefreshCwIcon,
+  ServerIcon,
+  TrashIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useConnections } from "@/hooks/use-connections";
 import { useLatestServerVersion } from "@/hooks/use-latest-server-version";
 import { useServerVersions } from "@/hooks/use-server-versions";
@@ -38,10 +49,33 @@ const VERSION_BADGE: Record<"current" | "outdated" | "ahead", string> = {
  */
 export function ConnectionsPanel() {
   const t = useTranslations("settings.connections");
-  const { connections, primaryId, remove, setPrimary, refresh, toggleVisible, isVisible } = useConnections();
+  const { connections, hubs, primaryId, remove, addHub, removeHub, setPrimary, refresh, toggleVisible, isVisible } =
+    useConnections();
   const versions = useServerVersions();
   const { latest, refresh: refreshLatest } = useLatestServerVersion();
   const [refreshing, setRefreshing] = useState(false);
+
+  // Self-hosted hub registration form (URL + static access token → addHub).
+  const [hubLabel, setHubLabel] = useState("");
+  const [hubUrl, setHubUrl] = useState("");
+  const [hubToken, setHubToken] = useState("");
+
+  const handleAddHub = () => {
+    const url = hubUrl.trim().replace(/\/$/, "");
+    if (!/^https?:\/\//.test(url)) {
+      toast.error(t("hub.invalidUrl"));
+      return;
+    }
+    if (!hubToken.trim()) {
+      toast.error(t("hub.tokenRequired"));
+      return;
+    }
+    addHub({ label: hubLabel.trim() || url, baseUrl: url, token: hubToken.trim() });
+    setHubLabel("");
+    setHubUrl("");
+    setHubToken("");
+    toast.success(t("hub.added"));
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -74,93 +108,161 @@ export function ConnectionsPanel() {
   }, [refresh, refreshLatest]);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ServerIcon className="size-4 text-muted-foreground" />
-          {t("title")}
-        </CardTitle>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => void handleRefresh()}
-          disabled={refreshing}
-          title={t("refresh")}
-        >
-          <RefreshCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
-          {t("refresh")}
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-muted-foreground text-sm">{t("description")}</p>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ServerIcon className="size-4 text-muted-foreground" />
+            {t("title")}
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing}
+            title={t("refresh")}
+          >
+            <RefreshCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
+            {t("refresh")}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground text-sm">{t("description")}</p>
 
-        <div className="space-y-2">
-          {connections.map((conn) => {
-            const isPrimary = conn.id === primaryId;
-            const visible = isVisible(conn.id);
-            const isLocal = conn.id === "local";
-            const version = versions[conn.id];
-            const vstate = serverUpdateState(version, latest);
-            return (
-              <div key={conn.id} className="flex items-center gap-2 rounded-md border p-3">
-                <CircleIcon className={cn("size-3 shrink-0 fill-current", STATUS_COLOR[conn.status])} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate font-medium text-sm">{conn.label}</span>
-                    {isPrimary && (
-                      <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-[10px] text-primary">
-                        {t("primary")}
+          <div className="space-y-2">
+            {connections.map((conn) => {
+              const isPrimary = conn.id === primaryId;
+              const visible = isVisible(conn.id);
+              const isLocal = conn.id === "local";
+              const version = versions[conn.id];
+              const vstate = serverUpdateState(version, latest);
+              return (
+                <div key={conn.id} className="flex items-center gap-2 rounded-md border p-3">
+                  <CircleIcon className={cn("size-3 shrink-0 fill-current", STATUS_COLOR[conn.status])} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-medium text-sm">{conn.label}</span>
+                      {isPrimary && (
+                        <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-[10px] text-primary">
+                          {t("primary")}
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate font-mono text-muted-foreground text-xs">
+                      {conn.baseUrl || t("inProcess")} · {t(`status.${conn.status}`)}
+                      {version && ` · v${version}`}
+                    </p>
+                    {version && vstate !== "unknown" && (
+                      <span
+                        className={cn(
+                          "mt-1 inline-block rounded px-1.5 py-0.5 font-medium text-[10px]",
+                          VERSION_BADGE[vstate],
+                        )}
+                        title={
+                          vstate === "outdated"
+                            ? t("version.outdatedHint", { latest: latest ?? "" })
+                            : vstate === "ahead"
+                              ? t("version.aheadHint", { latest: latest ?? "" })
+                              : undefined
+                        }
+                      >
+                        {t(`version.${vstate}`)}
                       </span>
                     )}
                   </div>
-                  <p className="truncate font-mono text-muted-foreground text-xs">
-                    {conn.baseUrl || t("inProcess")} · {t(`status.${conn.status}`)}
-                    {version && ` · v${version}`}
-                  </p>
-                  {version && vstate !== "unknown" && (
-                    <span
-                      className={cn(
-                        "mt-1 inline-block rounded px-1.5 py-0.5 font-medium text-[10px]",
-                        VERSION_BADGE[vstate],
-                      )}
-                      title={
-                        vstate === "outdated"
-                          ? t("version.outdatedHint", { latest: latest ?? "" })
-                          : vstate === "ahead"
-                            ? t("version.aheadHint", { latest: latest ?? "" })
-                            : undefined
-                      }
-                    >
-                      {t(`version.${vstate}`)}
-                    </span>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleVisible(conn.id)}
+                    title={visible ? t("hide") : t("show")}
+                  >
+                    {visible ? t("visible") : t("hidden")}
+                  </Button>
+
+                  {!isPrimary && (
+                    <Button variant="ghost" size="sm" onClick={() => setPrimary(conn.id)} title={t("makePrimary")}>
+                      <CheckCircle2Icon className="size-3.5" />
+                    </Button>
+                  )}
+
+                  {!isLocal && (
+                    <Button variant="ghost" size="icon-xs" onClick={() => remove(conn.id)} title={t("remove")}>
+                      <TrashIcon />
+                    </Button>
                   )}
                 </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleVisible(conn.id)}
-                  title={visible ? t("hide") : t("show")}
-                >
-                  {visible ? t("visible") : t("hidden")}
-                </Button>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <RadioTowerIcon className="size-4 text-muted-foreground" />
+            {t("hub.selfHostedTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground text-sm">{t("hub.selfHostedDescription")}</p>
 
-                {!isPrimary && (
-                  <Button variant="ghost" size="sm" onClick={() => setPrimary(conn.id)} title={t("makePrimary")}>
-                    <CheckCircle2Icon className="size-3.5" />
-                  </Button>
-                )}
-
-                {!isLocal && (
-                  <Button variant="ghost" size="icon-xs" onClick={() => remove(conn.id)} title={t("remove")}>
+          {hubs.length > 0 && (
+            <div className="space-y-2">
+              {hubs.map((hub) => (
+                <div key={hub.id} className="flex items-center gap-2 rounded-md border p-3">
+                  <RadioTowerIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <span className="truncate font-medium text-sm">{hub.label}</span>
+                    <p className="truncate font-mono text-muted-foreground text-xs">{hub.baseUrl}</p>
+                  </div>
+                  <Button variant="ghost" size="icon-xs" onClick={() => removeHub(hub.id)} title={t("hub.remove")}>
                     <TrashIcon />
                   </Button>
-                )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid gap-2 rounded-md border border-dashed p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("labelField")}</Label>
+                <Input
+                  value={hubLabel}
+                  onChange={(e) => setHubLabel(e.target.value)}
+                  placeholder={t("hub.labelPlaceholder")}
+                  className="h-8"
+                />
               </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("hub.urlField")}</Label>
+                <Input
+                  value={hubUrl}
+                  onChange={(e) => setHubUrl(e.target.value)}
+                  placeholder={t("hub.urlPlaceholder")}
+                  className="h-8"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("hub.tokenField")}</Label>
+              <Input
+                type="password"
+                value={hubToken}
+                onChange={(e) => setHubToken(e.target.value)}
+                placeholder={t("hub.tokenPlaceholder")}
+                className="h-8 font-mono"
+              />
+            </div>
+            <Button size="sm" className="justify-self-start" onClick={handleAddHub}>
+              <PlusIcon className="size-3" />
+              {t("hub.add")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
