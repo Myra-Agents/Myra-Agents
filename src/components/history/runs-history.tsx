@@ -236,12 +236,12 @@ export function RunsHistory({
   }, [hasMore, rows.length]);
   const rangeLabel = t(`ranges.${range}`);
 
-  // A live (still-running) operation opens its Operations detail — the
-  // "Operations › {title}" live view at `/logs` (Stop / live output). A finished
-  // run opens its History detail at `/history/run`.
+  // Every run — live or finished — opens its History detail at `/history/run`
+  // (the agent-session view streams live output too, so there's no separate live
+  // route). A live run omits `run=` so the view tracks the latest run.
   const openRun = (r: PastRun) =>
     r.live
-      ? router.push(`/logs/?card=${encodeURIComponent(r.cardId)}`)
+      ? router.push(`/history/run/?card=${encodeURIComponent(r.cardId)}`)
       : router.push(`/history/run/?card=${encodeURIComponent(r.cardId)}&run=${encodeURIComponent(r.runId)}`);
   const editPatrol = (r: PastRun) => {
     if (r.linkedTaskId) router.push(`/schedules/edit/?id=${encodeURIComponent(r.linkedTaskId)}`);

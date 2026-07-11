@@ -308,7 +308,7 @@ export default function RunsPage() {
     setSort(null);
   };
 
-  const openLogs = (id: string) => router.push(`/logs?card=${encodeURIComponent(id)}`);
+  const openLogs = (id: string) => router.push(`/history/run?card=${encodeURIComponent(id)}`);
   // "Edit Patrol" → the owning schedule's settings (the patrol editor). Falls
   // back to the Patrols list when the run isn't linked to a schedule.
   const editPatrol = (card: KanbanCard) =>
@@ -741,7 +741,7 @@ export default function RunsPage() {
                           <TableRow
                             key={card.id}
                             className="cursor-pointer border-border-cards hover:bg-secondary/40"
-                            onClick={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
+                            onClick={() => router.push(`/history/run?card=${encodeURIComponent(card.id)}`)}
                           >
                             {visibleColumns.map((c) => (
                               <TableCell key={c.id} className={c.cellClassName}>

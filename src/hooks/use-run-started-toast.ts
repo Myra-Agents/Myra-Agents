@@ -28,7 +28,7 @@ export function claimRunToast(runId: string): boolean {
 /**
  * Success toast shown after a run is started manually ("Run now" on a patrol,
  * re-run from history, …) with a "View operation" action that deep-links to
- * the created operation's live view (`/logs?card=…`).
+ * the created operation's run detail (`/history/run?card=…`).
  *
  * Kept per-trigger (instead of relying solely on the global listener) so the
  * click always gets immediate feedback even if the event pipeline lags; the
@@ -55,7 +55,7 @@ export function useRunStartedToast() {
           label: t("view"),
           onClick: () => {
             const card = useBoardStore.getState().cards.find((c) => c.agentRunId === runId);
-            router.push(card ? `/logs?card=${encodeURIComponent(card.id)}` : "/runs");
+            router.push(card ? `/history/run?card=${encodeURIComponent(card.id)}` : "/runs");
           },
         },
       });

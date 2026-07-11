@@ -14,9 +14,8 @@ export type BreadcrumbOverride = {
   href?: string;
   /**
    * Optional explicit parent crumb. When set, the breadcrumb renders
-   * `parent › label` regardless of the current path — e.g. the run detail
-   * reached from Operations shows "Operations › {run title}" even though it
-   * lives on `/logs`.
+   * `parent › label` regardless of the current path — e.g. a detail view can
+   * claim a different section than its path implies.
    */
   parent?: { label: string; href: string };
   /**

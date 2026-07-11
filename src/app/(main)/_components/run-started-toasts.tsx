@@ -36,11 +36,11 @@ export function RunStartedToasts() {
       // Already watching this operation's live view (e.g. an auto-resume of the
       // open run) — a toast pointing at the current page would be noise.
       const here = window.location;
-      if (here.pathname.startsWith("/logs") && here.search.includes(encodeURIComponent(card.id))) return;
+      if (here.pathname.startsWith("/history/run") && here.search.includes(encodeURIComponent(card.id))) return;
       toast.success(t("started"), {
         action: {
           label: t("view"),
-          onClick: () => router.push(`/logs?card=${encodeURIComponent(card.id)}`),
+          onClick: () => router.push(`/history/run?card=${encodeURIComponent(card.id)}`),
         },
       });
     });

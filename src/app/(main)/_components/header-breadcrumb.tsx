@@ -61,7 +61,7 @@ export function HeaderBreadcrumb() {
   if (override && crumbs.length > 0) {
     // An explicit parent rebuilds the whole trail (parent › leaf) so a detail
     // view can claim a different section than its path implies — e.g. the run
-    // detail at `/logs` showing "Operations › {title}".
+    // detail at `/history/run` showing "History › {title}".
     if (override.parent) {
       crumbs.length = 0;
       crumbs.push({ url: override.parent.href, label: override.parent.label });

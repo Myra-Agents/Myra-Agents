@@ -151,7 +151,7 @@ export default function TrayPopover() {
       {attention.length > 0 && (
         <button
           type="button"
-          onClick={() => openMain(`/logs?card=${encodeURIComponent(attention[0]?.id ?? "")}`)}
+          onClick={() => openMain(`/history/run?card=${encodeURIComponent(attention[0]?.id ?? "")}`)}
           className="mx-3 mb-2 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2 text-left transition-colors hover:bg-amber-500/15"
         >
           <span className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
@@ -176,7 +176,7 @@ export default function TrayPopover() {
             <button
               type="button"
               key={card.id}
-              onClick={() => openMain(`/logs?card=${encodeURIComponent(card.id)}`)}
+              onClick={() => openMain(`/history/run?card=${encodeURIComponent(card.id)}`)}
               className="hover:bg-accent flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors"
             >
               <LoaderIcon className="text-primary size-4 shrink-0 animate-spin [animation-duration:2s]" />
