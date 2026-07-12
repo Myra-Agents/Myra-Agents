@@ -31,6 +31,7 @@ import { toast } from "sonner";
 
 import { HeaderActions } from "@/app/(main)/_components/header-actions";
 import { AgentInstallGate, useBinaryStatus } from "@/components/agents/binary-status";
+import { SchedulesViewSwitcher } from "@/components/schedules/schedules-view-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -552,8 +553,9 @@ export default function SchedulesPage() {
         </div>
       </div>
 
-      {/* New Patrol lives in the shared top bar (left of the theme switcher). */}
+      {/* View switcher + New Patrol live in the shared top bar (left of the theme switcher). */}
       <HeaderActions>
+        <SchedulesViewSwitcher active="list" />
         <button
           type="button"
           onClick={handleCreate}

@@ -868,6 +868,9 @@ export function demoCards(): KanbanCard[] {
       position: 5000,
       createdAt: at(26 * HOUR),
       updatedAt: at(26 * HOUR - 52000),
+      // Materialized by the "Standup prep" patrol — colours its calendar blocks
+      // green (last run ok) and feeds the block's duration / cost / rate tooltip.
+      linkedTaskId: "demo-sched-standup",
       tags: ["✨ demo", "standup"],
       agentRunId: "run-opencode",
       agentRunStartedAt: at(26 * HOUR),
@@ -881,6 +884,93 @@ export function demoCards(): KanbanCard[] {
           tokens: 16800,
           cost: 0.0594,
           result: "Added PluginInfo protocol-compatibility fields to @myra/shared.",
+        }),
+      ],
+    },
+    // ── Patrol run history ───────────────────────────────────────────────────
+    // Cards materialized by a schedule (`linkedTaskId`), kept as finished runs so
+    // the Calendar view colours each patrol by its last-run verdict and the block
+    // tooltips show real duration / cost / success-rate stats (issues #181, #144).
+    {
+      ...base,
+      id: "demo-run-inbox",
+      title: "Inbox triage",
+      description: "Triage the shared inbox and draft replies.",
+      status: "done",
+      position: 6000,
+      createdAt: at(2 * HOUR),
+      updatedAt: at(2 * HOUR - 41000),
+      linkedTaskId: "demo-sched-inbox",
+      tags: ["✨ demo", "brief"],
+      runHistory: [
+        run("run-inbox-2", "completed", "Triage the shared inbox and draft replies.", {
+          startedAt: at(2 * HOUR),
+          endedAt: at(2 * HOUR - 41000),
+          exitCode: 0,
+          tokens: 8200,
+          cost: 0.0293,
+          result: "6 threads triaged, 2 drafts prepared.",
+        }),
+        run("run-inbox-1", "completed", "Triage the shared inbox and draft replies.", {
+          startedAt: at(4 * HOUR),
+          endedAt: at(4 * HOUR - 38000),
+          exitCode: 0,
+          tokens: 7600,
+          cost: 0.0271,
+          result: "4 threads triaged.",
+        }),
+      ],
+    },
+    {
+      ...base,
+      id: "demo-run-deps",
+      title: "Dependency audit",
+      description: "Audit dependencies for CVEs and stale majors.",
+      status: "todo",
+      position: 7000,
+      createdAt: at(20 * HOUR),
+      updatedAt: at(20 * HOUR - 60000),
+      // Last attempt failed → the "Dependency audit" patrol reads red on the calendar.
+      linkedTaskId: "demo-sched-deps",
+      tags: ["✨ demo", "deps"],
+      runHistory: [
+        run("run-deps-2", "failed", "Audit dependencies for CVEs and stale majors.", {
+          startedAt: at(20 * HOUR),
+          endedAt: at(20 * HOUR - 60000),
+          exitCode: 1,
+          tokens: 12400,
+          cost: 0.0631,
+          result: "Registry timeout while resolving the lockfile; audit incomplete.",
+        }),
+        run("run-deps-1", "completed", "Audit dependencies for CVEs and stale majors.", {
+          startedAt: at(3 * DAY),
+          endedAt: at(3 * DAY - 71000),
+          exitCode: 0,
+          tokens: 11800,
+          cost: 0.0587,
+          result: "No new CVEs; 2 minor bumps proposed.",
+        }),
+      ],
+    },
+    {
+      ...base,
+      id: "demo-run-review",
+      title: "Weekly review",
+      description: "Compile the weekly progress review across boards.",
+      status: "done",
+      position: 8000,
+      createdAt: at(2 * DAY),
+      updatedAt: at(2 * DAY - 96000),
+      linkedTaskId: "demo-sched-review",
+      tags: ["✨ demo", "review"],
+      runHistory: [
+        run("run-review-1", "completed", "Compile the weekly progress review across boards.", {
+          startedAt: at(2 * DAY),
+          endedAt: at(2 * DAY - 96000),
+          exitCode: 0,
+          tokens: 21200,
+          cost: 0.0912,
+          result: "Weekly review compiled: 14 cards moved to Done.",
         }),
       ],
     },
