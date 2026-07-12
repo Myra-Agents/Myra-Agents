@@ -20,8 +20,10 @@ import {
   PuzzleIcon,
   RefreshCwIcon,
   RotateCcwIcon,
+  SparklesIcon,
   Trash2Icon,
   TriangleAlertIcon,
+  TypeIcon,
   XCircleIcon,
   XIcon,
 } from "lucide-react";
@@ -2372,17 +2374,36 @@ function ActionRow({
         </PopoverTrigger>
         <PopoverContent align="start" className="flex w-80 flex-col gap-2.5">
           {fields.length === 0 && <p className="text-[13px] text-text-tertiary">{t("noActionConfig")}</p>}
-          {fields.map((f) => (
-            <div key={f.key} className="flex flex-col gap-1">
-              <span className="text-[12px] text-text-secondary">{f.label}</span>
-              <Input
-                value={String(action.config[f.key] ?? "")}
-                placeholder={f.placeholder}
-                onChange={(e) => onChange({ ...action.config, [f.key]: e.target.value })}
-                className="h-8 text-[13px]"
-              />
-            </div>
-          ))}
+          {fields.map((f) => {
+            const raw = action.config[f.key];
+            const isPrompt = typeof raw === "object" && raw !== null && "prompt" in raw;
+            const text = isPrompt ? String((raw as { prompt?: string }).prompt ?? "") : String(raw ?? "");
+            const setText = (v: string) => onChange({ ...action.config, [f.key]: isPrompt ? { prompt: v } : v });
+            const toggle = () => onChange({ ...action.config, [f.key]: isPrompt ? text : { prompt: text } });
+            return (
+              <div key={f.key} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-text-secondary">{f.label}</span>
+                  {/* Fixed text (templated) ↔ prompt resolved by an agent at run time. */}
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    title={t(isPrompt ? "fieldPromptHint" : "fieldTextHint")}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-tertiary transition-colors hover:bg-muted/40 hover:text-text-primary"
+                  >
+                    {isPrompt ? <SparklesIcon className="size-3" /> : <TypeIcon className="size-3" />}
+                    {t(isPrompt ? "fieldPrompt" : "fieldText")}
+                  </button>
+                </div>
+                <Input
+                  value={text}
+                  placeholder={isPrompt ? t("fieldPromptPlaceholder") : f.placeholder}
+                  onChange={(e) => setText(e.target.value)}
+                  className={cn("h-8 text-[13px]", isPrompt && "border-[color:var(--task-status-needs-you)]")}
+                />
+              </div>
+            );
+          })}
         </PopoverContent>
       </Popover>
       <button
