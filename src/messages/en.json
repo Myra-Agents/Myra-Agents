@@ -1508,7 +1508,7 @@
       "title": "Welcome to Myra Agents",
       "description": "A board where your cards run coding agents. Write a prompt, drop it on the board, and Myra launches a CLI agent to do the work.",
       "points": {
-        "board": "Each card carries a prompt — launch it to run an agent and stream its output back.",
+        "board": "Write a prompt on a card, launch it, and watch the agent stream its work back.",
         "agents": "Bring your own CLI agent — opencode, Claude, Copilot, or a custom binary.",
         "patrols": "Schedule recurring runs so agents fire on a cron, daily, or interval basis."
       },

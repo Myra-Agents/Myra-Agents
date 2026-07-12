@@ -1508,7 +1508,7 @@
       "title": "Bienvenue sur Myra Agents",
       "description": "Un tableau où vos cartes exécutent des agents de code. Écrivez une consigne, déposez-la sur le tableau, et Myra lance un agent CLI pour faire le travail.",
       "points": {
-        "board": "Chaque carte porte une consigne — lancez-la pour exécuter un agent et récupérer sa sortie en direct.",
+        "board": "Écrivez une consigne sur une carte, lancez-la, et suivez le travail de l'agent en direct.",
         "agents": "Utilisez votre propre agent CLI — opencode, Claude, Copilot ou un binaire personnalisé.",
         "patrols": "Planifiez des exécutions récurrentes pour que les agents se déclenchent en cron, chaque jour ou à intervalle."
       },
