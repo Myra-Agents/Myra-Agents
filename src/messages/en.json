@@ -528,9 +528,8 @@
       "ollamaLearnMore": "Ollama documentation"
     },
     "calendar": {
+      "title": "Calendar",
       "subtitle": "Calendar view of your patrols — see when everything fires, spot busy slots, and plan around collisions.",
-      "viewList": "List",
-      "viewCalendar": "Calendar",
       "today": "Today",
       "prev": "Previous",
       "next": "Next",

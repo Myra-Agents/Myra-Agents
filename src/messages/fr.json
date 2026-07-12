@@ -528,9 +528,8 @@
       "ollamaLearnMore": "Ollama documentation"
     },
     "calendar": {
+      "title": "Calendrier",
       "subtitle": "Vue calendrier de vos patrouilles — visualisez ce qui tourne quand, repérez les pics de charge et planifiez sans collision.",
-      "viewList": "Liste",
-      "viewCalendar": "Calendrier",
       "today": "Aujourd'hui",
       "prev": "Précédent",
       "next": "Suivant",

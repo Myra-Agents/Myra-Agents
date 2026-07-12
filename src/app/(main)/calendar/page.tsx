@@ -2,21 +2,18 @@
 
 import { useTranslations } from "next-intl";
 
-import { HeaderActions } from "@/app/(main)/_components/header-actions";
 import { ScheduleCalendar } from "@/components/schedules/schedule-calendar";
-import { SchedulesViewSwitcher } from "@/components/schedules/schedules-view-switcher";
 import { useKanban } from "@/hooks/use-kanban";
 import { useSchedules } from "@/hooks/use-schedules";
 
 /**
- * Calendar view of scheduled patrols (issue #181). A month / week / day grid of
- * every schedule's upcoming fire times — occurrences expanded client-side from
- * each schedule's cron/interval/daily/weekly kind — coloured by last-run status,
- * with per-schedule stats (duration · cost · success rate) on hover. Sits beside
- * the list view under `/schedules/calendar`; the header switcher toggles between
- * the two.
+ * Calendar view of scheduled patrols (issue #181) — its own sidebar page. A month
+ * / week / day grid of every schedule's upcoming fire times, expanded client-side
+ * from each schedule's cron/interval/daily/weekly kind, coloured by last-run
+ * status with per-schedule stats (duration · cost · success rate) on hover. The
+ * Patrols list stays a separate page; this one is reached from the sidebar.
  */
-export default function SchedulesCalendarPage() {
+export default function CalendarPage() {
   const t = useTranslations("schedules");
   const { schedules, loading } = useSchedules();
   // Cards carry the run history the calendar overlays as per-schedule stats +
@@ -33,12 +30,8 @@ export default function SchedulesCalendarPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1160px] flex-col">
-      <HeaderActions>
-        <SchedulesViewSwitcher active="calendar" />
-      </HeaderActions>
-
       <div className="flex flex-col pl-1.5">
-        <h1 className="text-text-primary text-base font-medium">{t("title")}</h1>
+        <h1 className="text-text-primary text-base font-medium">{t("calendar.title")}</h1>
         <p className="text-text-secondary text-xs font-light">{t("calendar.subtitle")}</p>
       </div>
 
