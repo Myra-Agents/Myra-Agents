@@ -6,30 +6,22 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
-  DownloadIcon,
   FolderOpenIcon,
   KanbanIcon,
-  Loader2Icon,
   RocketIcon,
   SparklesIcon,
-  TerminalIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { MyraMark } from "@/components/ui/myra-mark";
 import { Progress } from "@/components/ui/progress";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
-import { openExternal } from "@/lib/tauri";
-import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
-
-/** The CLI agent we detect/install during onboarding — the shipped default preset. */
-const ONBOARDING_AGENT_BINARY = DEFAULT_AGENT_PRESETS[0]?.binary ?? "opencode";
 
 type StepId = "welcome" | "agent" | "folder" | "ready";
 
@@ -42,7 +34,7 @@ interface OnboardingWizardProps {
 
 /**
  * First-run wizard. Walks a new user from "what is this" to a runnable setup:
- * welcome → install/detect the agent CLI → pick a working folder → ready. Gating
+ * welcome → confirm the built-in agent → pick a working folder → ready. Gating
  * (localStorage flag) lives in {@link OnboardingBootstrap}; this component just
  * renders the flow and persists the folder choice + completion.
  */
@@ -50,8 +42,6 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const t = useTranslations("onboarding");
   const [stepIndex, setStepIndex] = useState(0);
   const [homeFolder, setHomeFolder] = useState("");
-
-  const agent = useBinaryStatus(ONBOARDING_AGENT_BINARY);
 
   // Seed the folder field from the saved setting, falling back to the OS home dir.
   useEffect(() => {
@@ -120,14 +110,7 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
         <Progress value={progress} className="h-1 rounded-none" />
 
         <div className="flex min-h-[22rem] flex-col p-6">
-          <StepBody
-            stepId={stepId}
-            t={t}
-            agent={agent}
-            homeFolder={homeFolder}
-            setHomeFolder={setHomeFolder}
-            openExternalUrl={openExternal}
-          />
+          <StepBody stepId={stepId} t={t} homeFolder={homeFolder} setHomeFolder={setHomeFolder} />
 
           <div className="mt-auto flex items-center justify-between pt-6">
             <div className="flex items-center gap-1.5">
@@ -181,17 +164,15 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
 interface StepBodyProps {
   stepId: StepId;
   t: ReturnType<typeof useTranslations>;
-  agent: ReturnType<typeof useBinaryStatus>;
   homeFolder: string;
   setHomeFolder: (value: string) => void;
-  openExternalUrl: (url: string) => Promise<void>;
 }
 
-function StepBody({ stepId, t, agent, homeFolder, setHomeFolder, openExternalUrl }: StepBodyProps) {
+function StepBody({ stepId, t, homeFolder, setHomeFolder }: StepBodyProps) {
   if (stepId === "welcome") return <WelcomeStep t={t} />;
-  if (stepId === "agent") return <AgentStep t={t} agent={agent} openExternalUrl={openExternalUrl} />;
+  if (stepId === "agent") return <AgentStep t={t} />;
   if (stepId === "folder") return <FolderStep t={t} homeFolder={homeFolder} setHomeFolder={setHomeFolder} />;
-  return <ReadyStep t={t} agent={agent} homeFolder={homeFolder} />;
+  return <ReadyStep t={t} homeFolder={homeFolder} />;
 }
 
 function StepHeading({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
@@ -235,82 +216,33 @@ function WelcomeStep({ t }: { t: ReturnType<typeof useTranslations> }) {
   );
 }
 
-function AgentStep({
-  t,
-  agent,
-  openExternalUrl,
-}: {
-  t: ReturnType<typeof useTranslations>;
-  agent: ReturnType<typeof useBinaryStatus>;
-  openExternalUrl: (url: string) => Promise<void>;
-}) {
-  const { name, status, checking, resolved, installing, install, installInfo } = agent;
-  const found = status?.found === true;
-
+/**
+ * Agent step. Myra ships a built-in embedded agent ("myra-embedded") that needs
+ * no CLI install — so onboarding just confirms it's ready rather than pushing a
+ * download. Bringing your own CLI (opencode, Claude, …) stays an optional,
+ * never-forced choice surfaced as a footnote pointing at Settings.
+ */
+function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
   return (
     <div className="space-y-5">
-      <StepHeading
-        icon={<TerminalIcon />}
-        title={t("agent.title")}
-        description={t("agent.description", { agent: name })}
-      />
+      <StepHeading icon={<MyraMark />} title={t("agent.title")} description={t("agent.description")} />
 
       <div className="rounded-lg border border-border-cards bg-card-background p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
-              <TerminalIcon />
+              <MyraMark />
             </div>
             <div className="leading-tight">
-              <p className="font-medium text-sm text-text-primary">{name}</p>
-              <p className="font-mono text-text-tertiary text-xs">
-                {checking || !resolved
-                  ? t("agent.checking")
-                  : found
-                    ? (status?.version ?? t("agent.installed"))
-                    : t("agent.notInstalled")}
-              </p>
+              <p className="font-medium text-sm text-text-primary">{t("agent.name")}</p>
+              <p className="text-text-tertiary text-xs">{t("agent.cardDescription")}</p>
             </div>
           </div>
-          {!resolved || checking ? (
-            <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
-          ) : found ? (
-            <Badge
-              variant="outline"
-              className="gap-1 border-green-500/30 bg-green-500/10 text-green-600"
-              title={status?.path}
-            >
-              <CheckIcon className="size-3" />
-              {t("agent.ready")}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="gap-1 border-destructive/30 bg-destructive/10 text-destructive">
-              {t("agent.missing")}
-            </Badge>
-          )}
+          <Badge variant="outline" className="gap-1 border-green-500/30 bg-green-500/10 text-green-600">
+            <CheckIcon className="size-3" />
+            {t("agent.builtIn")}
+          </Badge>
         </div>
-
-        {resolved && !found && (
-          <div className="mt-4 space-y-2.5">
-            <p className="text-sm text-text-secondary">{t("agent.installHint", { agent: name })}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" onClick={() => void install()} disabled={installing}>
-                {installing ? <Loader2Icon className="animate-spin" /> : <DownloadIcon />}
-                {installing ? t("agent.installing") : t("agent.install", { agent: name })}
-              </Button>
-              {installInfo && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void openExternalUrl(installInfo.docsUrl)}
-                >
-                  {t("agent.viewDocs")}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <p className="text-text-tertiary text-xs leading-relaxed">{t("agent.footnote")}</p>
@@ -338,22 +270,14 @@ function FolderStep({
   );
 }
 
-function ReadyStep({
-  t,
-  agent,
-  homeFolder,
-}: {
-  t: ReturnType<typeof useTranslations>;
-  agent: ReturnType<typeof useBinaryStatus>;
-  homeFolder: string;
-}) {
-  const agentReady = agent.status?.found === true;
+function ReadyStep({ t, homeFolder }: { t: ReturnType<typeof useTranslations>; homeFolder: string }) {
   const rows: { key: string; label: string; ok: boolean; value?: string }[] = [
     {
       key: "agent",
-      label: t("ready.agentRow", { agent: agent.name }),
-      ok: agentReady,
-      value: agentReady ? (agent.status?.version ?? t("agent.installed")) : t("agent.notInstalled"),
+      // The built-in agent needs no install, so it's always ready at this point.
+      label: t("ready.agentRow"),
+      ok: true,
+      value: t("agent.builtIn"),
     },
     {
       key: "folder",

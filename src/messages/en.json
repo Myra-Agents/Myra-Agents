@@ -1521,18 +1521,12 @@
       }
     },
     "agent": {
-      "title": "Set up your agent",
-      "description": "Myra runs the {agent} CLI to execute your cards. Let's make sure it's installed.",
-      "checking": "Checking…",
-      "installed": "Installed",
-      "notInstalled": "Not installed",
-      "ready": "Ready",
-      "missing": "Missing",
-      "installHint": "{agent} isn't on your PATH yet. Install it in one click, or grab it from the docs.",
-      "install": "Install {agent}",
-      "installing": "Installing…",
-      "viewDocs": "View docs",
-      "footnote": "You can add more agents or switch the default anytime in Settings."
+      "title": "Your agent is ready",
+      "description": "Myra ships with a built-in agent — no install, no CLI to set up.",
+      "name": "Myra agent",
+      "cardDescription": "Runs on the Myra hub out of the box, or with your own API key.",
+      "builtIn": "Built-in",
+      "footnote": "Prefer your own CLI? Add opencode, Claude, Copilot, or a custom binary anytime in Settings."
     },
     "folder": {
       "title": "Choose a working folder",
@@ -1543,7 +1537,7 @@
     "ready": {
       "title": "You're all set",
       "description": "Here's your setup. You can change any of it from Settings whenever you like.",
-      "agentRow": "{agent} agent",
+      "agentRow": "Agent",
       "folderRow": "Working folder",
       "folderUnset": "Home folder",
       "cta": "Head to the board, add a card with a prompt, and launch your first run."
