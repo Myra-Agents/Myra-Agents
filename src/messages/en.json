@@ -1118,10 +1118,12 @@
         "badge": "Built-in",
         "save": "Save",
         "description": "Embedded agent — no install, no CLI. Runs on the Myra hub, or with your own key.",
-        "apiKeyLabel": "API key (optional)",
+        "apiKeyLabel": "OpenRouter API key",
         "apiKeyPlaceholder": "sk-or-…  — leave empty to use the Myra hub",
         "modelLabel": "Model",
-        "modelHint": "Leave empty or \"auto\" to let Myra pick a free model."
+        "modelHint": "Leave empty or \"auto\" to let Myra pick a free model.",
+        "getKey": "Get a key",
+        "browseModels": "Browse models"
       }
     },
     "preferences": {
