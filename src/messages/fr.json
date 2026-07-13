@@ -1528,6 +1528,17 @@
       "builtIn": "Intégré",
       "footnote": "Vous préférez votre propre CLI ? Ajoutez opencode, Claude, Copilot ou un binaire personnalisé à tout moment dans les Réglages."
     },
+    "connect": {
+      "title": "Connectez un modèle",
+      "description": "L'agent intégré fonctionne avec un LLM. Pour l'instant, renseignez une clé API OpenRouter et choisissez un modèle pour l'alimenter.",
+      "keyLabel": "Clé API OpenRouter",
+      "getKey": "Obtenir une clé",
+      "keyPlaceholder": "sk-or-…",
+      "modelLabel": "Modèle",
+      "modelPlaceholder": "ex. openai/gpt-4o-mini",
+      "gifAlt": "Copie de l'identifiant d'un modèle sur une page modèle OpenRouter",
+      "gifCaption": "Chaque modèle sur <link>openrouter.ai/models</link> affiche son identifiant sous son nom — copiez-le et collez-le ci-dessus."
+    },
     "folder": {
       "title": "Choisissez un dossier de travail",
       "description": "Les agents s'exécutent dans ce dossier par défaut — généralement le projet ou le dépôt sur lequel vous voulez qu'ils travaillent.",
@@ -1538,6 +1549,9 @@
       "title": "Tout est prêt",
       "description": "Voici votre configuration. Vous pouvez tout modifier depuis les Réglages quand vous le souhaitez.",
       "agentRow": "Agent",
+      "modelRow": "Modèle",
+      "modelUnset": "Non défini",
+      "modelHub": "Hub Myra (auto)",
       "folderRow": "Dossier de travail",
       "folderUnset": "Dossier personnel",
       "cta": "Rendez-vous sur le tableau, ajoutez une carte avec une consigne et lancez votre première exécution."

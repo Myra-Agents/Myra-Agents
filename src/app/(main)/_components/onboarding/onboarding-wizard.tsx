@@ -6,8 +6,10 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
+  ExternalLinkIcon,
   FolderOpenIcon,
   KanbanIcon,
+  KeyIcon,
   RocketIcon,
   SparklesIcon,
 } from "lucide-react";
@@ -17,15 +19,22 @@ import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { MyraMark } from "@/components/ui/myra-mark";
 import { Progress } from "@/components/ui/progress";
+import { useSettings } from "@/hooks/use-settings";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
+import { openExternal } from "@/lib/tauri";
 
-type StepId = "welcome" | "agent" | "folder" | "ready";
+/** Where users mint an OpenRouter key + browse model ids. */
+const OPENROUTER_KEYS_URL = "https://openrouter.ai/keys";
+const OPENROUTER_MODELS_URL = "https://openrouter.ai/models";
 
-const STEP_ORDER: StepId[] = ["welcome", "agent", "folder", "ready"];
+type StepId = "welcome" | "agent" | "connect" | "folder" | "ready";
+
+const STEP_ORDER: StepId[] = ["welcome", "agent", "connect", "folder", "ready"];
 
 interface OnboardingWizardProps {
   /** Called once the wizard is dismissed (finished or skipped) so the host can unmount it. */
@@ -34,14 +43,29 @@ interface OnboardingWizardProps {
 
 /**
  * First-run wizard. Walks a new user from "what is this" to a runnable setup:
- * welcome → confirm the built-in agent → pick a working folder → ready. Gating
- * (localStorage flag) lives in {@link OnboardingBootstrap}; this component just
- * renders the flow and persists the folder choice + completion.
+ * welcome → confirm the built-in agent → connect an OpenRouter key + model →
+ * pick a working folder → ready. Gating (localStorage flag) lives in
+ * {@link OnboardingBootstrap}; this component renders the flow and persists the
+ * folder choice, the embedded LLM connection, and completion.
  */
 export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const t = useTranslations("onboarding");
+  const { settings, save, loading: settingsLoading } = useSettings();
   const [stepIndex, setStepIndex] = useState(0);
   const [homeFolder, setHomeFolder] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("");
+  const [seededLlm, setSeededLlm] = useState(false);
+
+  // Seed the OpenRouter fields once, after settings finish loading, from any
+  // already-saved embedded LLM config (don't seed from DEFAULT_SETTINGS).
+  useEffect(() => {
+    if (settingsLoading || seededLlm) return;
+    const llm = settings.embeddedLlm;
+    if (llm?.apiKey) setApiKey(llm.apiKey);
+    if (llm?.model) setModel(llm.model);
+    setSeededLlm(true);
+  }, [settingsLoading, settings.embeddedLlm, seededLlm]);
 
   // Seed the folder field from the saved setting, falling back to the OS home dir.
   useEffect(() => {
@@ -73,11 +97,24 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
       // Persist the folder choice regardless of how they leave — a set folder is
       // useful even for a skipper.
       if (homeFolder.trim()) setHomeFolderSetting(homeFolder);
+      // Persist the OpenRouter connection too when anything was entered. save()
+      // round-trips through the sidecar; swallow failures (e.g. browser dev mode)
+      // so a dead backend never traps the user in the wizard.
+      const key = apiKey.trim();
+      const modelId = model.trim();
+      if (key || modelId) {
+        void save({
+          ...settings,
+          embeddedLlm: { ...settings.embeddedLlm, apiKey: key || undefined, model: modelId || undefined },
+        }).catch(() => {
+          /* backend unreachable (e.g. browser dev) — non-fatal for onboarding */
+        });
+      }
       completeOnboarding();
       track(skipped ? "onboarding_skipped" : "onboarding_completed", { last_step: stepId });
       onClose();
     },
-    [homeFolder, stepId, onClose],
+    [homeFolder, apiKey, model, settings, save, stepId, onClose],
   );
 
   const goNext = useCallback(() => {
@@ -109,8 +146,17 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
         {/* Progress rail across the very top. */}
         <Progress value={progress} className="h-1 rounded-none" />
 
-        <div className="flex min-h-[22rem] flex-col p-6">
-          <StepBody stepId={stepId} t={t} homeFolder={homeFolder} setHomeFolder={setHomeFolder} />
+        <div className="flex max-h-[85vh] min-h-[22rem] flex-col overflow-y-auto p-6">
+          <StepBody
+            stepId={stepId}
+            t={t}
+            homeFolder={homeFolder}
+            setHomeFolder={setHomeFolder}
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            model={model}
+            setModel={setModel}
+          />
 
           <div className="mt-auto flex items-center justify-between pt-6">
             <div className="flex items-center gap-1.5">
@@ -166,13 +212,19 @@ interface StepBodyProps {
   t: ReturnType<typeof useTranslations>;
   homeFolder: string;
   setHomeFolder: (value: string) => void;
+  apiKey: string;
+  setApiKey: (value: string) => void;
+  model: string;
+  setModel: (value: string) => void;
 }
 
-function StepBody({ stepId, t, homeFolder, setHomeFolder }: StepBodyProps) {
+function StepBody({ stepId, t, homeFolder, setHomeFolder, apiKey, setApiKey, model, setModel }: StepBodyProps) {
   if (stepId === "welcome") return <WelcomeStep t={t} />;
   if (stepId === "agent") return <AgentStep t={t} />;
+  if (stepId === "connect")
+    return <ConnectStep t={t} apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />;
   if (stepId === "folder") return <FolderStep t={t} homeFolder={homeFolder} setHomeFolder={setHomeFolder} />;
-  return <ReadyStep t={t} homeFolder={homeFolder} />;
+  return <ReadyStep t={t} homeFolder={homeFolder} apiKey={apiKey} model={model} />;
 }
 
 function StepHeading({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
@@ -250,6 +302,101 @@ function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
   );
 }
 
+/**
+ * Connect step. The embedded agent runs on an LLM; for now that means bringing
+ * an OpenRouter key + a model id (the Myra hub cascade isn't the default yet).
+ * Both fields are optional here — persisted on finish — with an animated GIF
+ * showing where the model id lives on openrouter.ai. Values are lifted to the
+ * wizard so {@link OnboardingWizard.finish} can save them to the embedded config.
+ */
+function ConnectStep({
+  t,
+  apiKey,
+  setApiKey,
+  model,
+  setModel,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  apiKey: string;
+  setApiKey: (value: string) => void;
+  model: string;
+  setModel: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <StepHeading icon={<KeyIcon />} title={t("connect.title")} description={t("connect.description")} />
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="onboarding-openrouter-key" className="font-medium text-sm text-text-primary">
+              {t("connect.keyLabel")}
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto gap-1 px-1.5 py-0.5 text-primary text-xs"
+              onClick={() => void openExternal(OPENROUTER_KEYS_URL)}
+            >
+              {t("connect.getKey")}
+              <ExternalLinkIcon className="size-3" />
+            </Button>
+          </div>
+          <Input
+            id="onboarding-openrouter-key"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={t("connect.keyPlaceholder")}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="onboarding-openrouter-model" className="font-medium text-sm text-text-primary">
+            {t("connect.modelLabel")}
+          </label>
+          <Input
+            id="onboarding-openrouter-model"
+            autoComplete="off"
+            spellCheck={false}
+            value={model}
+            onChange={(event) => setModel(event.target.value)}
+            placeholder={t("connect.modelPlaceholder")}
+          />
+        </div>
+      </div>
+
+      {/* Animated walkthrough: where the model id lives on openrouter.ai. */}
+      <figure className="space-y-1.5 overflow-hidden rounded-lg border border-border-cards bg-card-background">
+        {/* biome-ignore lint/performance/noImgElement: static onboarding asset, not user content */}
+        <img
+          src="/onboarding/openrouter-model.gif"
+          alt={t("connect.gifAlt")}
+          className="w-full"
+          width={760}
+          height={291}
+        />
+        <figcaption className="px-3 pb-2 text-text-tertiary text-xs leading-relaxed">
+          {t.rich("connect.gifCaption", {
+            link: (chunks) => (
+              <button
+                type="button"
+                className="text-primary underline-offset-2 hover:underline"
+                onClick={() => void openExternal(OPENROUTER_MODELS_URL)}
+              >
+                {chunks}
+              </button>
+            ),
+          })}
+        </figcaption>
+      </figure>
+    </div>
+  );
+}
+
 function FolderStep({
   t,
   homeFolder,
@@ -270,7 +417,18 @@ function FolderStep({
   );
 }
 
-function ReadyStep({ t, homeFolder }: { t: ReturnType<typeof useTranslations>; homeFolder: string }) {
+function ReadyStep({
+  t,
+  homeFolder,
+  apiKey,
+  model,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  homeFolder: string;
+  apiKey: string;
+  model: string;
+}) {
+  const modelId = model.trim();
   const rows: { key: string; label: string; ok: boolean; value?: string }[] = [
     {
       key: "agent",
@@ -278,6 +436,13 @@ function ReadyStep({ t, homeFolder }: { t: ReturnType<typeof useTranslations>; h
       label: t("ready.agentRow"),
       ok: true,
       value: t("agent.builtIn"),
+    },
+    {
+      key: "model",
+      label: t("ready.modelRow"),
+      // A concrete model id is what makes the OpenRouter connection usable.
+      ok: modelId.length > 0,
+      value: modelId || (apiKey.trim() ? t("ready.modelUnset") : t("ready.modelHub")),
     },
     {
       key: "folder",
