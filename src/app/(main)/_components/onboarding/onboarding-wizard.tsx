@@ -6,15 +6,20 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
+  CpuIcon,
+  DownloadIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
   KanbanIcon,
   KeyIcon,
+  Loader2Icon,
   RocketIcon,
   SparklesIcon,
+  TerminalIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { useBinaryStatus } from "@/components/agents/binary-status";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,19 +27,28 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MyraMark } from "@/components/ui/myra-mark";
 import { Progress } from "@/components/ui/progress";
+import { useOllama } from "@/hooks/use-ollama";
 import { useSettings } from "@/hooks/use-settings";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
 import { openExternal } from "@/lib/tauri";
+import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
 
 /** Where users mint an OpenRouter key + browse model ids. */
 const OPENROUTER_KEYS_URL = "https://openrouter.ai/keys";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/models";
+/** Docs for the local-models runtime we offer to install. */
+const OLLAMA_URL = "https://ollama.com";
 
-type StepId = "welcome" | "agent" | "connect" | "folder" | "ready";
+/** CLI agents we probe for on the agent step — the shipped presets. Detected
+ * ones are listed with their version; missing ones are shown muted (never a
+ * forced install). */
+const DETECTABLE_AGENTS = DEFAULT_AGENT_PRESETS.map((p) => ({ binary: p.binary, name: p.name }));
 
-const STEP_ORDER: StepId[] = ["welcome", "agent", "connect", "folder", "ready"];
+type StepId = "welcome" | "agent" | "connect" | "local" | "folder" | "ready";
+
+const STEP_ORDER: StepId[] = ["welcome", "agent", "connect", "local", "folder", "ready"];
 
 interface OnboardingWizardProps {
   /** Called once the wizard is dismissed (finished or skipped) so the host can unmount it. */
@@ -43,8 +57,9 @@ interface OnboardingWizardProps {
 
 /**
  * First-run wizard. Walks a new user from "what is this" to a runnable setup:
- * welcome → confirm the built-in agent → connect an OpenRouter key + model →
- * pick a working folder → ready. Gating (localStorage flag) lives in
+ * welcome → confirm the built-in agent (+ detect CLI agents) → connect an
+ * OpenRouter key + model → optionally install Ollama for local models → pick a
+ * working folder → ready. Gating (localStorage flag) lives in
  * {@link OnboardingBootstrap}; this component renders the flow and persists the
  * folder choice, the embedded LLM connection, and completion.
  */
@@ -223,6 +238,7 @@ function StepBody({ stepId, t, homeFolder, setHomeFolder, apiKey, setApiKey, mod
   if (stepId === "agent") return <AgentStep t={t} />;
   if (stepId === "connect")
     return <ConnectStep t={t} apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />;
+  if (stepId === "local") return <LocalStep t={t} />;
   if (stepId === "folder") return <FolderStep t={t} homeFolder={homeFolder} setHomeFolder={setHomeFolder} />;
   return <ReadyStep t={t} homeFolder={homeFolder} apiKey={apiKey} model={model} />;
 }
@@ -271,33 +287,94 @@ function WelcomeStep({ t }: { t: ReturnType<typeof useTranslations> }) {
 /**
  * Agent step. Myra ships a built-in embedded agent ("myra-embedded") that needs
  * no CLI install — so onboarding just confirms it's ready rather than pushing a
- * download. Bringing your own CLI (opencode, Claude, …) stays an optional,
- * never-forced choice surfaced as a footnote pointing at Settings.
+ * download. It ALSO probes the shipped CLI presets ({@link DETECTABLE_AGENTS})
+ * and lists any it finds on PATH with their version, so a user who already has
+ * e.g. opencode sees it recognised — never a forced install.
  */
 function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
   return (
     <div className="space-y-5">
       <StepHeading icon={<MyraMark />} title={t("agent.title")} description={t("agent.description")} />
 
-      <div className="rounded-lg border border-border-cards bg-card-background p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
-              <MyraMark />
+      <div className="space-y-2">
+        <div className="rounded-lg border border-border-cards bg-card-background p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
+                <MyraMark />
+              </div>
+              <div className="leading-tight">
+                <p className="font-medium text-sm text-text-primary">{t("agent.name")}</p>
+                <p className="text-text-tertiary text-xs">{t("agent.cardDescription")}</p>
+              </div>
             </div>
-            <div className="leading-tight">
-              <p className="font-medium text-sm text-text-primary">{t("agent.name")}</p>
-              <p className="text-text-tertiary text-xs">{t("agent.cardDescription")}</p>
-            </div>
+            <Badge variant="outline" className="gap-1 border-green-500/30 bg-green-500/10 text-green-600">
+              <CheckIcon className="size-3" />
+              {t("agent.builtIn")}
+            </Badge>
           </div>
-          <Badge variant="outline" className="gap-1 border-green-500/30 bg-green-500/10 text-green-600">
-            <CheckIcon className="size-3" />
-            {t("agent.builtIn")}
-          </Badge>
         </div>
+
+        {/* Detected CLI agents already on the machine (e.g. opencode) — listed
+            with their version, never installed for the user here. */}
+        {DETECTABLE_AGENTS.map((agent) => (
+          <DetectedAgentCard key={agent.binary} t={t} binary={agent.binary} name={agent.name} />
+        ))}
       </div>
 
       <p className="text-text-tertiary text-xs leading-relaxed">{t("agent.footnote")}</p>
+    </div>
+  );
+}
+
+/** One CLI-agent row: probes the binary and reports detected+version or missing. */
+function DetectedAgentCard({
+  t,
+  binary,
+  name,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  binary: string;
+  name: string;
+}) {
+  const { status, checking, resolved } = useBinaryStatus(binary);
+  const found = status?.found === true;
+
+  return (
+    <div className="rounded-lg border border-border-cards bg-card-background p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-8 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
+            <TerminalIcon />
+          </div>
+          <div className="leading-tight">
+            <p className="font-medium text-sm text-text-primary">{name}</p>
+            <p className="font-mono text-text-tertiary text-xs">
+              {!resolved || checking
+                ? t("agent.checking")
+                : found
+                  ? (status?.version ?? t("agent.detected"))
+                  : t("agent.notDetected")}
+            </p>
+          </div>
+        </div>
+        {!resolved || checking ? (
+          <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+        ) : found ? (
+          <Badge
+            variant="outline"
+            className="gap-1 border-green-500/30 bg-green-500/10 text-green-600"
+            title={status?.path}
+          >
+            <CheckIcon className="size-3" />
+            {t("agent.detected")}
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-text-tertiary">
+            {t("agent.notDetected")}
+          </Badge>
+        )}
+      </div>
     </div>
   );
 }
@@ -393,6 +470,72 @@ function ConnectStep({
           })}
         </figcaption>
       </figure>
+    </div>
+  );
+}
+
+/**
+ * Local-models step. Optional: offers to run models locally with Ollama (private,
+ * offline, free). If Ollama is already detected it's shown as ready; otherwise a
+ * one-click install (the `ollama_install` rpc via {@link useOllama}) is offered.
+ * Purely opt-in — skipping (Next) leaves nothing installed.
+ */
+function LocalStep({ t }: { t: ReturnType<typeof useTranslations> }) {
+  const { status, loading, busy, install } = useOllama();
+  const installed = status?.installed === true;
+
+  return (
+    <div className="space-y-5">
+      <StepHeading icon={<CpuIcon />} title={t("local.title")} description={t("local.description")} />
+
+      <div className="rounded-lg border border-border-cards bg-card-background p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
+              <CpuIcon />
+            </div>
+            <div className="leading-tight">
+              <p className="font-medium text-sm text-text-primary">{t("local.ollamaName")}</p>
+              <p className="font-mono text-text-tertiary text-xs">
+                {loading
+                  ? t("local.checking")
+                  : installed
+                    ? (status?.version ?? t("local.installed"))
+                    : t("local.notInstalled")}
+              </p>
+            </div>
+          </div>
+          {loading ? (
+            <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+          ) : installed ? (
+            <Badge variant="outline" className="gap-1 border-green-500/30 bg-green-500/10 text-green-600">
+              <CheckIcon className="size-3" />
+              {t("local.ready")}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-text-tertiary">
+              {t("local.optional")}
+            </Badge>
+          )}
+        </div>
+
+        {!loading && !installed && (
+          <div className="mt-4 space-y-2.5">
+            <p className="text-sm text-text-secondary">{t("local.installHint")}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" onClick={() => void install()} disabled={busy}>
+                {busy ? <Loader2Icon className="animate-spin" /> : <DownloadIcon />}
+                {busy ? t("local.installing") : t("local.install")}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void openExternal(OLLAMA_URL)}>
+                {t("local.learnMore")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <p className="text-text-tertiary text-xs leading-relaxed">{t("local.footnote")}</p>
     </div>
   );
 }

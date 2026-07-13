@@ -1526,6 +1526,9 @@
       "name": "Myra agent",
       "cardDescription": "Runs on the Myra hub out of the box, or with your own API key.",
       "builtIn": "Built-in",
+      "checking": "Checking…",
+      "detected": "Detected",
+      "notDetected": "Not detected",
       "footnote": "Prefer your own CLI? Add opencode, Claude, Copilot, or a custom binary anytime in Settings."
     },
     "connect": {
@@ -1538,6 +1541,21 @@
       "modelPlaceholder": "e.g. openai/gpt-4o-mini",
       "gifAlt": "Copying a model id from an OpenRouter model page",
       "gifCaption": "Every model on <link>openrouter.ai/models</link> shows its id under the name — copy it and paste it above."
+    },
+    "local": {
+      "title": "Run models locally?",
+      "description": "Optionally run models on your own machine with Ollama — private, offline, and free. You can always set this up later.",
+      "ollamaName": "Ollama",
+      "checking": "Checking…",
+      "installed": "Installed",
+      "notInstalled": "Not installed",
+      "ready": "Ready",
+      "optional": "Optional",
+      "installHint": "Install Ollama now to run local models, or skip and stay on the cloud model.",
+      "install": "Install Ollama",
+      "installing": "Installing…",
+      "learnMore": "Learn more",
+      "footnote": "Once installed, pick and pull local models anytime from Settings."
     },
     "folder": {
       "title": "Choose a working folder",
