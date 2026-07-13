@@ -208,50 +208,75 @@ function EmbeddedAgentCard({
         </span>
       </div>
       <p className="text-muted-foreground text-xs">{t("agents.embedded.description")}</p>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs" htmlFor="myra-api-key">
-            {t("agents.embedded.apiKeyLabel")}
-          </Label>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-            onClick={() => openExternal("https://openrouter.ai/workspaces/default/keys")}
-          >
-            <ExternalLinkIcon className="size-3" />
-            {t("agents.embedded.getKey")}
-          </button>
-        </div>
-        <Input
-          id="myra-api-key"
-          type="password"
-          autoComplete="off"
-          placeholder={t("agents.embedded.apiKeyPlaceholder")}
-          value={llm?.apiKey ?? ""}
-          onChange={(e) => onChange({ apiKey: e.target.value })}
-        />
+      {/* Provider: cloud (OpenRouter/hub) vs a local Ollama daemon. */}
+      <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-0.5">
+        {(["cloud", "ollama"] as const).map((p) => {
+          const active = (llm?.provider ?? "cloud") === p;
+          return (
+            <Button
+              key={p}
+              type="button"
+              size="sm"
+              variant={active ? "secondary" : "ghost"}
+              className="h-7"
+              onClick={() => onChange({ provider: p })}
+            >
+              {t(p === "cloud" ? "agents.embedded.providerCloud" : "agents.embedded.providerOllama")}
+            </Button>
+          );
+        })}
       </div>
+      {(llm?.provider ?? "cloud") === "cloud" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs" htmlFor="myra-api-key">
+              {t("agents.embedded.apiKeyLabel")}
+            </Label>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+              onClick={() => openExternal("https://openrouter.ai/workspaces/default/keys")}
+            >
+              <ExternalLinkIcon className="size-3" />
+              {t("agents.embedded.getKey")}
+            </button>
+          </div>
+          <Input
+            id="myra-api-key"
+            type="password"
+            autoComplete="off"
+            placeholder={t("agents.embedded.apiKeyPlaceholder")}
+            value={llm?.apiKey ?? ""}
+            onChange={(e) => onChange({ apiKey: e.target.value })}
+          />
+        </div>
+      )}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label className="text-xs" htmlFor="myra-model">
             {t("agents.embedded.modelLabel")}
           </Label>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-            onClick={() => openExternal("https://openrouter.ai/models")}
-          >
-            <ExternalLinkIcon className="size-3" />
-            {t("agents.embedded.browseModels")}
-          </button>
+          {/* OpenRouter's catalog is meaningless for a local Ollama tag. */}
+          {(llm?.provider ?? "cloud") === "cloud" && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+              onClick={() => openExternal("https://openrouter.ai/models")}
+            >
+              <ExternalLinkIcon className="size-3" />
+              {t("agents.embedded.browseModels")}
+            </button>
+          )}
         </div>
         <Input
           id="myra-model"
-          placeholder="auto"
+          placeholder={(llm?.provider ?? "cloud") === "ollama" ? "qwen2.5-coder" : "auto"}
           value={llm?.model ?? ""}
           onChange={(e) => onChange({ model: e.target.value })}
         />
-        <p className="text-muted-foreground text-xs">{t("agents.embedded.modelHint")}</p>
+        <p className="text-muted-foreground text-xs">
+          {t((llm?.provider ?? "cloud") === "ollama" ? "agents.embedded.ollamaModelHint" : "agents.embedded.modelHint")}
+        </p>
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex justify-end">

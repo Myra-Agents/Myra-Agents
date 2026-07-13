@@ -1118,10 +1118,13 @@
         "badge": "Intégré",
         "save": "Enregistrer",
         "description": "Agent intégré — sans installation ni CLI. Tourne sur le hub Myra, ou avec votre propre clé.",
+        "providerCloud": "Cloud (OpenRouter)",
+        "providerOllama": "Local (Ollama)",
         "apiKeyLabel": "Clé API OpenRouter",
         "apiKeyPlaceholder": "sk-or-…  — laisser vide pour utiliser le hub Myra",
         "modelLabel": "Modèle",
         "modelHint": "Laisser vide ou « auto » pour laisser Myra choisir un modèle gratuit.",
+        "ollamaModelHint": "Le tag du modèle Ollama local à exécuter (ex. qwen2.5-coder). Nécessite Ollama installé.",
         "getKey": "Obtenir une clé",
         "browseModels": "Parcourir les modèles"
       }
@@ -1531,14 +1534,25 @@
     },
     "connect": {
       "title": "Connectez un modèle",
-      "description": "L'agent intégré fonctionne avec un LLM. Pour l'instant, renseignez une clé API OpenRouter et choisissez un modèle pour l'alimenter.",
+      "description": "L'agent intégré fonctionne avec un LLM. Utilisez un modèle cloud via OpenRouter, ou un modèle local via Ollama.",
+      "provider": {
+        "cloud": "Cloud (OpenRouter)",
+        "ollama": "Local (Ollama)"
+      },
       "keyLabel": "Clé API OpenRouter",
       "getKey": "Obtenir une clé",
       "keyPlaceholder": "sk-or-…",
       "modelLabel": "Modèle",
       "modelPlaceholder": "ex. openai/gpt-4o-mini",
       "gifAlt": "Copie de l'identifiant d'un modèle sur une page modèle OpenRouter",
-      "gifCaption": "Chaque modèle sur <link>openrouter.ai/models</link> affiche son identifiant sous son nom — copiez-le et collez-le ci-dessus."
+      "gifCaption": "Chaque modèle sur <link>openrouter.ai/models</link> affiche son identifiant sous son nom — copiez-le et collez-le ci-dessus.",
+      "ollama": {
+        "needsInstall": "Ollama n'est pas encore installé — l'étape suivante peut le configurer. Vous pouvez déjà choisir un modèle.",
+        "modelLabel": "Modèle Ollama",
+        "modelPlaceholder": "ex. qwen2.5-coder",
+        "hintPulled": "Choisissez un de vos modèles téléchargés, ou saisissez un tag.",
+        "hintPull": "Saisissez un tag de modèle — téléchargez-le depuis les Réglages une fois Ollama installé."
+      }
     },
     "local": {
       "title": "Lancer des modèles en local ?",

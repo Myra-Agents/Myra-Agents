@@ -33,7 +33,7 @@ import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/hom
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
 import { openExternal } from "@/lib/tauri";
-import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
+import { DEFAULT_AGENT_PRESETS, type EmbeddedLlmProvider } from "@/types/settings";
 
 /** Where users mint an OpenRouter key + browse model ids. */
 const OPENROUTER_KEYS_URL = "https://openrouter.ai/keys";
@@ -68,15 +68,17 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const { settings, save, loading: settingsLoading } = useSettings();
   const [stepIndex, setStepIndex] = useState(0);
   const [homeFolder, setHomeFolder] = useState("");
+  const [provider, setProvider] = useState<EmbeddedLlmProvider>("cloud");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [seededLlm, setSeededLlm] = useState(false);
 
-  // Seed the OpenRouter fields once, after settings finish loading, from any
+  // Seed the LLM fields once, after settings finish loading, from any
   // already-saved embedded LLM config (don't seed from DEFAULT_SETTINGS).
   useEffect(() => {
     if (settingsLoading || seededLlm) return;
     const llm = settings.embeddedLlm;
+    if (llm?.provider) setProvider(llm.provider);
     if (llm?.apiKey) setApiKey(llm.apiKey);
     if (llm?.model) setModel(llm.model);
     setSeededLlm(true);
@@ -112,15 +114,22 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
       // Persist the folder choice regardless of how they leave — a set folder is
       // useful even for a skipper.
       if (homeFolder.trim()) setHomeFolderSetting(homeFolder);
-      // Persist the OpenRouter connection too when anything was entered. save()
+      // Persist the LLM connection too when anything was entered. save()
       // round-trips through the sidecar; swallow failures (e.g. browser dev mode)
       // so a dead backend never traps the user in the wizard.
       const key = apiKey.trim();
       const modelId = model.trim();
-      if (key || modelId) {
+      // Ollama needs a model; cloud is usable with just a key OR model.
+      if ((provider === "ollama" && modelId) || key || modelId) {
         void save({
           ...settings,
-          embeddedLlm: { ...settings.embeddedLlm, apiKey: key || undefined, model: modelId || undefined },
+          embeddedLlm: {
+            ...settings.embeddedLlm,
+            provider,
+            // The key only applies to the cloud provider; drop it for Ollama.
+            apiKey: provider === "cloud" ? key || undefined : undefined,
+            model: modelId || undefined,
+          },
         }).catch(() => {
           /* backend unreachable (e.g. browser dev) — non-fatal for onboarding */
         });
@@ -129,7 +138,7 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
       track(skipped ? "onboarding_skipped" : "onboarding_completed", { last_step: stepId });
       onClose();
     },
-    [homeFolder, apiKey, model, settings, save, stepId, onClose],
+    [homeFolder, provider, apiKey, model, settings, save, stepId, onClose],
   );
 
   const goNext = useCallback(() => {
@@ -167,6 +176,8 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
             t={t}
             homeFolder={homeFolder}
             setHomeFolder={setHomeFolder}
+            provider={provider}
+            setProvider={setProvider}
             apiKey={apiKey}
             setApiKey={setApiKey}
             model={model}
@@ -227,17 +238,40 @@ interface StepBodyProps {
   t: ReturnType<typeof useTranslations>;
   homeFolder: string;
   setHomeFolder: (value: string) => void;
+  provider: EmbeddedLlmProvider;
+  setProvider: (value: EmbeddedLlmProvider) => void;
   apiKey: string;
   setApiKey: (value: string) => void;
   model: string;
   setModel: (value: string) => void;
 }
 
-function StepBody({ stepId, t, homeFolder, setHomeFolder, apiKey, setApiKey, model, setModel }: StepBodyProps) {
+function StepBody({
+  stepId,
+  t,
+  homeFolder,
+  setHomeFolder,
+  provider,
+  setProvider,
+  apiKey,
+  setApiKey,
+  model,
+  setModel,
+}: StepBodyProps) {
   if (stepId === "welcome") return <WelcomeStep t={t} />;
   if (stepId === "agent") return <AgentStep t={t} />;
   if (stepId === "connect")
-    return <ConnectStep t={t} apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />;
+    return (
+      <ConnectStep
+        t={t}
+        provider={provider}
+        setProvider={setProvider}
+        apiKey={apiKey}
+        setApiKey={setApiKey}
+        model={model}
+        setModel={setModel}
+      />
+    );
   if (stepId === "local") return <LocalStep t={t} />;
   if (stepId === "folder") return <FolderStep t={t} homeFolder={homeFolder} setHomeFolder={setHomeFolder} />;
   return <ReadyStep t={t} homeFolder={homeFolder} apiKey={apiKey} model={model} />;
@@ -370,13 +404,63 @@ function DetectedAgentCard({
 }
 
 /**
- * Connect step. The embedded agent runs on an LLM; for now that means bringing
- * an OpenRouter key + a model id (the Myra hub cascade isn't the default yet).
- * Both fields are optional here — persisted on finish — with an animated GIF
- * showing where the model id lives on openrouter.ai. Values are lifted to the
- * wizard so {@link OnboardingWizard.finish} can save them to the embedded config.
+ * Connect step. The embedded agent runs on an LLM — either a **cloud** provider
+ * (OpenRouter key + model, the default) or a **local Ollama** daemon (pick a
+ * pulled model tag). A segmented toggle switches between them; the choice +
+ * fields are lifted to the wizard so {@link OnboardingWizard.finish} saves them
+ * to the embedded config (provider forwarded to the Rust runner).
  */
 function ConnectStep({
+  t,
+  provider,
+  setProvider,
+  apiKey,
+  setApiKey,
+  model,
+  setModel,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  provider: EmbeddedLlmProvider;
+  setProvider: (value: EmbeddedLlmProvider) => void;
+  apiKey: string;
+  setApiKey: (value: string) => void;
+  model: string;
+  setModel: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <StepHeading icon={<KeyIcon />} title={t("connect.title")} description={t("connect.description")} />
+
+      {/* Cloud ↔ local provider toggle. */}
+      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted/60 p-1">
+        {(["cloud", "ollama"] as const).map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setProvider(p)}
+            className={
+              provider === p
+                ? "flex items-center justify-center gap-1.5 rounded-md bg-card-background px-3 py-1.5 font-medium text-sm text-text-primary shadow-sm"
+                : "flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 font-medium text-sm text-text-tertiary"
+            }
+          >
+            {p === "cloud" ? <KeyIcon className="size-3.5" /> : <CpuIcon className="size-3.5" />}
+            {t(`connect.provider.${p}`)}
+          </button>
+        ))}
+      </div>
+
+      {provider === "cloud" ? (
+        <ConnectCloud t={t} apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />
+      ) : (
+        <ConnectOllama t={t} model={model} setModel={setModel} />
+      )}
+    </div>
+  );
+}
+
+/** Cloud (OpenRouter) branch of the connect step. */
+function ConnectCloud({
   t,
   apiKey,
   setApiKey,
@@ -391,8 +475,6 @@ function ConnectStep({
 }) {
   return (
     <div className="space-y-5">
-      <StepHeading icon={<KeyIcon />} title={t("connect.title")} description={t("connect.description")} />
-
       <div className="space-y-3">
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
@@ -460,6 +542,56 @@ function ConnectStep({
           })}
         </figcaption>
       </figure>
+    </div>
+  );
+}
+
+/** Local Ollama branch of the connect step: pick a pulled model tag. */
+function ConnectOllama({
+  t,
+  model,
+  setModel,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  model: string;
+  setModel: (value: string) => void;
+}) {
+  const { status, loading } = useOllama();
+  const installed = status?.installed === true;
+  const models = status?.models ?? [];
+
+  return (
+    <div className="space-y-3">
+      {!loading && !installed && (
+        <p className="rounded-lg border border-border-cards bg-muted/40 px-3 py-2.5 text-sm text-text-secondary">
+          {t("connect.ollama.needsInstall")}
+        </p>
+      )}
+
+      <div className="space-y-1.5">
+        <label htmlFor="onboarding-ollama-model" className="font-medium text-sm text-text-primary">
+          {t("connect.ollama.modelLabel")}
+        </label>
+        <Input
+          id="onboarding-ollama-model"
+          list="onboarding-ollama-models"
+          autoComplete="off"
+          spellCheck={false}
+          value={model}
+          onChange={(event) => setModel(event.target.value)}
+          placeholder={t("connect.ollama.modelPlaceholder")}
+        />
+        {models.length > 0 && (
+          <datalist id="onboarding-ollama-models">
+            {models.map((m) => (
+              <option key={m.name} value={m.name} />
+            ))}
+          </datalist>
+        )}
+        <p className="text-text-tertiary text-xs leading-relaxed">
+          {models.length > 0 ? t("connect.ollama.hintPulled") : t("connect.ollama.hintPull")}
+        </p>
+      </div>
     </div>
   );
 }

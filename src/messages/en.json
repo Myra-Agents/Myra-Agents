@@ -1118,10 +1118,13 @@
         "badge": "Built-in",
         "save": "Save",
         "description": "Embedded agent — no install, no CLI. Runs on the Myra hub, or with your own key.",
+        "providerCloud": "Cloud (OpenRouter)",
+        "providerOllama": "Local (Ollama)",
         "apiKeyLabel": "OpenRouter API key",
         "apiKeyPlaceholder": "sk-or-…  — leave empty to use the Myra hub",
         "modelLabel": "Model",
         "modelHint": "Leave empty or \"auto\" to let Myra pick a free model.",
+        "ollamaModelHint": "The local Ollama model tag to run (e.g. qwen2.5-coder). Requires Ollama installed.",
         "getKey": "Get a key",
         "browseModels": "Browse models"
       }
@@ -1531,14 +1534,25 @@
     },
     "connect": {
       "title": "Connect a model",
-      "description": "The built-in agent runs on an LLM. For now, plug in an OpenRouter API key and pick a model to power it.",
+      "description": "The built-in agent runs on an LLM. Use a cloud model via OpenRouter, or a local model via Ollama.",
+      "provider": {
+        "cloud": "Cloud (OpenRouter)",
+        "ollama": "Local (Ollama)"
+      },
       "keyLabel": "OpenRouter API key",
       "getKey": "Get a key",
       "keyPlaceholder": "sk-or-…",
       "modelLabel": "Model",
       "modelPlaceholder": "e.g. openai/gpt-4o-mini",
       "gifAlt": "Copying a model id from an OpenRouter model page",
-      "gifCaption": "Every model on <link>openrouter.ai/models</link> shows its id under the name — copy it and paste it above."
+      "gifCaption": "Every model on <link>openrouter.ai/models</link> shows its id under the name — copy it and paste it above.",
+      "ollama": {
+        "needsInstall": "Ollama isn't installed yet — the next step can set it up. You can still pick a model now.",
+        "modelLabel": "Ollama model",
+        "modelPlaceholder": "e.g. qwen2.5-coder",
+        "hintPulled": "Choose one of your pulled models, or type any tag.",
+        "hintPull": "Type a model tag — pull it from Settings once Ollama is installed."
+      }
     },
     "local": {
       "title": "Run models locally?",
