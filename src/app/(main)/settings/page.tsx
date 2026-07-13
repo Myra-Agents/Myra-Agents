@@ -12,6 +12,7 @@ import {
   CheckCircle2Icon,
   CopyIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   FlaskConicalIcon,
   Loader2Icon,
   PlusIcon,
@@ -72,7 +73,7 @@ import {
 } from "@/lib/default-page.client";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
-import { invoke, isTauri } from "@/lib/tauri";
+import { invoke, isTauri, openExternal } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import type { AgentPreset, AppSettings, EmbeddedLlmConfig } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
@@ -208,9 +209,19 @@ function EmbeddedAgentCard({
       </div>
       <p className="text-muted-foreground text-xs">{t("agents.embedded.description")}</p>
       <div className="space-y-1.5">
-        <Label className="text-xs" htmlFor="myra-api-key">
-          {t("agents.embedded.apiKeyLabel")}
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs" htmlFor="myra-api-key">
+            {t("agents.embedded.apiKeyLabel")}
+          </Label>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+            onClick={() => openExternal("https://openrouter.ai/workspaces/default/keys")}
+          >
+            <ExternalLinkIcon className="size-3" />
+            {t("agents.embedded.getKey")}
+          </button>
+        </div>
         <Input
           id="myra-api-key"
           type="password"
@@ -221,9 +232,19 @@ function EmbeddedAgentCard({
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs" htmlFor="myra-model">
-          {t("agents.embedded.modelLabel")}
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs" htmlFor="myra-model">
+            {t("agents.embedded.modelLabel")}
+          </Label>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+            onClick={() => openExternal("https://openrouter.ai/models")}
+          >
+            <ExternalLinkIcon className="size-3" />
+            {t("agents.embedded.browseModels")}
+          </button>
+        </div>
         <Input
           id="myra-model"
           placeholder="auto"

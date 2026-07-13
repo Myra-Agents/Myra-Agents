@@ -1118,10 +1118,12 @@
         "badge": "Intégré",
         "save": "Enregistrer",
         "description": "Agent intégré — sans installation ni CLI. Tourne sur le hub Myra, ou avec votre propre clé.",
-        "apiKeyLabel": "Clé API (optionnel)",
+        "apiKeyLabel": "Clé API OpenRouter",
         "apiKeyPlaceholder": "sk-or-…  — laisser vide pour utiliser le hub Myra",
         "modelLabel": "Modèle",
-        "modelHint": "Laisser vide ou « auto » pour laisser Myra choisir un modèle gratuit."
+        "modelHint": "Laisser vide ou « auto » pour laisser Myra choisir un modèle gratuit.",
+        "getKey": "Obtenir une clé",
+        "browseModels": "Parcourir les modèles"
       }
     },
     "preferences": {
