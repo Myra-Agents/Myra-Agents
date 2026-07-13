@@ -1526,9 +1526,7 @@
       "name": "Agent Myra",
       "cardDescription": "Fonctionne d'emblée sur le hub Myra, ou avec votre propre clé API.",
       "builtIn": "Intégré",
-      "checking": "Vérification…",
       "detected": "Détecté",
-      "notDetected": "Non détecté",
       "footnote": "Vous préférez votre propre CLI ? Ajoutez opencode, Claude, Copilot ou un binaire personnalisé à tout moment dans les Réglages."
     },
     "connect": {

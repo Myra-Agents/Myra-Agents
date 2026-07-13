@@ -1526,9 +1526,7 @@
       "name": "Myra agent",
       "cardDescription": "Runs on the Myra hub out of the box, or with your own API key.",
       "builtIn": "Built-in",
-      "checking": "Checking…",
       "detected": "Detected",
-      "notDetected": "Not detected",
       "footnote": "Prefer your own CLI? Add opencode, Claude, Copilot, or a custom binary anytime in Settings."
     },
     "connect": {

@@ -327,7 +327,11 @@ function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
   );
 }
 
-/** One CLI-agent row: probes the binary and reports detected+version or missing. */
+/**
+ * One CLI-agent row — rendered ONLY when the binary is actually detected on the
+ * machine (with its version). A missing (or still-checking) agent renders
+ * nothing, so the step stays clean when no extra CLI is installed.
+ */
 function DetectedAgentCard({
   t,
   binary,
@@ -337,8 +341,8 @@ function DetectedAgentCard({
   binary: string;
   name: string;
 }) {
-  const { status, checking, resolved } = useBinaryStatus(binary);
-  const found = status?.found === true;
+  const { status } = useBinaryStatus(binary);
+  if (status?.found !== true) return null;
 
   return (
     <div className="rounded-lg border border-border-cards bg-card-background p-4">
@@ -349,31 +353,17 @@ function DetectedAgentCard({
           </div>
           <div className="leading-tight">
             <p className="font-medium text-sm text-text-primary">{name}</p>
-            <p className="font-mono text-text-tertiary text-xs">
-              {!resolved || checking
-                ? t("agent.checking")
-                : found
-                  ? (status?.version ?? t("agent.detected"))
-                  : t("agent.notDetected")}
-            </p>
+            <p className="font-mono text-text-tertiary text-xs">{status.version ?? t("agent.detected")}</p>
           </div>
         </div>
-        {!resolved || checking ? (
-          <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
-        ) : found ? (
-          <Badge
-            variant="outline"
-            className="gap-1 border-green-500/30 bg-green-500/10 text-green-600"
-            title={status?.path}
-          >
-            <CheckIcon className="size-3" />
-            {t("agent.detected")}
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-text-tertiary">
-            {t("agent.notDetected")}
-          </Badge>
-        )}
+        <Badge
+          variant="outline"
+          className="gap-1 border-green-500/30 bg-green-500/10 text-green-600"
+          title={status.path}
+        >
+          <CheckIcon className="size-3" />
+          {t("agent.detected")}
+        </Badge>
       </div>
     </div>
   );
