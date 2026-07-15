@@ -1509,19 +1509,7 @@
     "getStarted": "Get started",
     "welcome": {
       "title": "Welcome to Myra Agents",
-      "description": "A board where your cards run coding agents. Write a prompt, drop it on the board, and Myra launches a CLI agent to do the work.",
-      "points": {
-        "board": "Write a prompt on a card, launch it, and watch the agent stream its work back.",
-        "agents": "Bring your own CLI agent — opencode, Claude, Copilot, or a custom binary.",
-        "patrols": "Schedule recurring runs so agents fire on a cron, daily, or interval basis."
-      },
-      "flow": {
-        "draft": "Draft",
-        "todo": "Todo",
-        "inProgress": "In Progress",
-        "review": "Review",
-        "done": "Done"
-      }
+      "description": "Myra Agents is a platform for automating the repetitive work you do. Create and monitor all your Myra agents in one place — local-first and open-source."
     },
     "agent": {
       "title": "Your agent is ready",
@@ -1547,31 +1535,27 @@
       "gifAlt": "Copying a model id from an OpenRouter model page",
       "gifCaption": "Every model on <link>openrouter.ai/models</link> shows its id under the name — copy it and paste it above.",
       "ollama": {
-        "needsInstall": "Ollama isn't installed yet — the next step can set it up. You can still pick a model now.",
+        "name": "Ollama",
+        "checking": "Checking…",
+        "installed": "Installed",
+        "notInstalled": "Not installed",
+        "ready": "Ready",
+        "installHint": "Ollama runs local models, private and offline. Install it in one click.",
+        "install": "Install Ollama",
+        "installing": "Installing…",
+        "learnMore": "Learn more",
         "modelLabel": "Ollama model",
         "modelPlaceholder": "e.g. qwen2.5-coder",
         "hintPulled": "Choose one of your pulled models, or type any tag.",
-        "hintPull": "Type a model tag — pull it from Settings once Ollama is installed."
+        "hintPull": "Type a model tag — pull it from Settings after Ollama is installed."
       }
-    },
-    "local": {
-      "title": "Run models locally?",
-      "description": "Optionally run models on your own machine with Ollama — private, offline, and free. You can always set this up later.",
-      "ollamaName": "Ollama",
-      "checking": "Checking…",
-      "installed": "Installed",
-      "notInstalled": "Not installed",
-      "ready": "Ready",
-      "optional": "Optional",
-      "installHint": "Install Ollama now to run local models, or skip and stay on the cloud model.",
-      "install": "Install Ollama",
-      "installing": "Installing…",
-      "learnMore": "Learn more",
-      "footnote": "Once installed, pick and pull local models anytime from Settings."
     },
     "folder": {
       "title": "Choose a working folder",
       "description": "Agents run inside this folder by default — typically the project or repo you want them to work on.",
+      "browse": "Choose a folder…",
+      "choose": "Browse",
+      "change": "Change",
       "placeholder": "/path/to/your/project",
       "hint": "You can override this per card and per patrol later. Leave it as your home folder to decide each time."
     },

@@ -1509,19 +1509,7 @@
     "getStarted": "Commencer",
     "welcome": {
       "title": "Bienvenue sur Myra Agents",
-      "description": "Un tableau où vos cartes exécutent des agents de code. Écrivez une consigne, déposez-la sur le tableau, et Myra lance un agent CLI pour faire le travail.",
-      "points": {
-        "board": "Écrivez une consigne sur une carte, lancez-la, et suivez le travail de l'agent en direct.",
-        "agents": "Utilisez votre propre agent CLI — opencode, Claude, Copilot ou un binaire personnalisé.",
-        "patrols": "Planifiez des exécutions récurrentes pour que les agents se déclenchent en cron, chaque jour ou à intervalle."
-      },
-      "flow": {
-        "draft": "Brouillon",
-        "todo": "À faire",
-        "inProgress": "En cours",
-        "review": "Revue",
-        "done": "Terminé"
-      }
+      "description": "Myra Agents est une plateforme pour automatiser le travail répétitif que vous faites. Créez et surveillez tous vos agents Myra au même endroit — local d'abord et open-source."
     },
     "agent": {
       "title": "Votre agent est prêt",
@@ -1547,31 +1535,27 @@
       "gifAlt": "Copie de l'identifiant d'un modèle sur une page modèle OpenRouter",
       "gifCaption": "Chaque modèle sur <link>openrouter.ai/models</link> affiche son identifiant sous son nom — copiez-le et collez-le ci-dessus.",
       "ollama": {
-        "needsInstall": "Ollama n'est pas encore installé — l'étape suivante peut le configurer. Vous pouvez déjà choisir un modèle.",
+        "name": "Ollama",
+        "checking": "Vérification…",
+        "installed": "Installé",
+        "notInstalled": "Non installé",
+        "ready": "Prêt",
+        "installHint": "Ollama exécute des modèles locaux, privés et hors ligne. Installez-le en un clic.",
+        "install": "Installer Ollama",
+        "installing": "Installation…",
+        "learnMore": "En savoir plus",
         "modelLabel": "Modèle Ollama",
         "modelPlaceholder": "ex. qwen2.5-coder",
         "hintPulled": "Choisissez un de vos modèles téléchargés, ou saisissez un tag.",
         "hintPull": "Saisissez un tag de modèle — téléchargez-le depuis les Réglages une fois Ollama installé."
       }
     },
-    "local": {
-      "title": "Lancer des modèles en local ?",
-      "description": "Exécutez si vous le souhaitez des modèles sur votre machine avec Ollama — privé, hors ligne et gratuit. Vous pourrez toujours le configurer plus tard.",
-      "ollamaName": "Ollama",
-      "checking": "Vérification…",
-      "installed": "Installé",
-      "notInstalled": "Non installé",
-      "ready": "Prêt",
-      "optional": "Optionnel",
-      "installHint": "Installez Ollama maintenant pour lancer des modèles locaux, ou passez et restez sur le modèle cloud.",
-      "install": "Installer Ollama",
-      "installing": "Installation…",
-      "learnMore": "En savoir plus",
-      "footnote": "Une fois installé, choisissez et téléchargez des modèles locaux à tout moment depuis les Réglages."
-    },
     "folder": {
       "title": "Choisissez un dossier de travail",
       "description": "Les agents s'exécutent dans ce dossier par défaut — généralement le projet ou le dépôt sur lequel vous voulez qu'ils travaillent.",
+      "browse": "Choisir un dossier…",
+      "choose": "Parcourir",
+      "change": "Changer",
       "placeholder": "/chemin/vers/votre/projet",
       "hint": "Vous pourrez le remplacer par carte et par patrouille plus tard. Laissez votre dossier personnel pour choisir à chaque fois."
     },

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { isTauri } from "@tauri-apps/api/core";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -46,9 +47,9 @@ const OLLAMA_URL = "https://ollama.com";
  * forced install). */
 const DETECTABLE_AGENTS = DEFAULT_AGENT_PRESETS.map((p) => ({ binary: p.binary, name: p.name }));
 
-type StepId = "welcome" | "agent" | "connect" | "local" | "folder" | "ready";
+type StepId = "welcome" | "agent" | "connect" | "folder" | "ready";
 
-const STEP_ORDER: StepId[] = ["welcome", "agent", "connect", "local", "folder", "ready"];
+const STEP_ORDER: StepId[] = ["welcome", "agent", "connect", "folder", "ready"];
 
 interface OnboardingWizardProps {
   /** Called once the wizard is dismissed (finished or skipped) so the host can unmount it. */
@@ -57,11 +58,11 @@ interface OnboardingWizardProps {
 
 /**
  * First-run wizard. Walks a new user from "what is this" to a runnable setup:
- * welcome → confirm the built-in agent (+ detect CLI agents) → connect an
- * OpenRouter key + model → optionally install Ollama for local models → pick a
- * working folder → ready. Gating (localStorage flag) lives in
- * {@link OnboardingBootstrap}; this component renders the flow and persists the
- * folder choice, the embedded LLM connection, and completion.
+ * welcome → confirm the built-in agent (+ detect CLI agents) → connect a model
+ * (cloud OpenRouter or a local Ollama the step can install) → pick a working
+ * folder → ready. Gating (localStorage flag) lives in {@link OnboardingBootstrap};
+ * this component renders the flow and persists the folder choice, the embedded
+ * LLM connection, and completion.
  */
 export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const t = useTranslations("onboarding");
@@ -272,7 +273,6 @@ function StepBody({
         setModel={setModel}
       />
     );
-  if (stepId === "local") return <LocalStep t={t} />;
   if (stepId === "folder") return <FolderStep t={t} homeFolder={homeFolder} setHomeFolder={setHomeFolder} />;
   return <ReadyStep t={t} homeFolder={homeFolder} apiKey={apiKey} model={model} />;
 }
@@ -292,28 +292,9 @@ function StepHeading({ icon, title, description }: { icon: React.ReactNode; titl
 }
 
 function WelcomeStep({ t }: { t: ReturnType<typeof useTranslations> }) {
-  const flow = ["draft", "todo", "inProgress", "review", "done"] as const;
   return (
     <div className="space-y-5">
       <StepHeading icon={<SparklesIcon />} title={t("welcome.title")} description={t("welcome.description")} />
-      <ul className="space-y-2.5">
-        {(["board", "agents", "patrols"] as const).map((key) => (
-          <li key={key} className="flex items-start gap-2.5 text-sm text-text-secondary">
-            <CheckIcon className="mt-0.5 size-4 shrink-0 text-primary" />
-            <span>{t(`welcome.points.${key}`)}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-muted/60 p-3">
-        {flow.map((stage, i) => (
-          <span key={stage} className="flex items-center gap-1.5">
-            <Badge variant="outline" className="font-normal text-text-tertiary">
-              {t(`welcome.flow.${stage}`)}
-            </Badge>
-            {i < flow.length - 1 && <ArrowRightIcon className="size-3 text-muted-foreground/50" />}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
@@ -546,7 +527,11 @@ function ConnectCloud({
   );
 }
 
-/** Local Ollama branch of the connect step: pick a pulled model tag. */
+/**
+ * Local Ollama branch of the connect step. Shows Ollama's install state and, when
+ * it's missing, offers a one-click install right here (the `ollama_install` rpc
+ * via {@link useOllama}) — then pick a local model tag.
+ */
 function ConnectOllama({
   t,
   model,
@@ -556,17 +541,55 @@ function ConnectOllama({
   model: string;
   setModel: (value: string) => void;
 }) {
-  const { status, loading } = useOllama();
+  const { status, loading, busy, install } = useOllama();
   const installed = status?.installed === true;
   const models = status?.models ?? [];
 
   return (
-    <div className="space-y-3">
-      {!loading && !installed && (
-        <p className="rounded-lg border border-border-cards bg-muted/40 px-3 py-2.5 text-sm text-text-secondary">
-          {t("connect.ollama.needsInstall")}
-        </p>
-      )}
+    <div className="space-y-4">
+      {/* Ollama runtime status + one-click install when missing. */}
+      <div className="rounded-lg border border-border-cards bg-card-background p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
+              <CpuIcon />
+            </div>
+            <div className="leading-tight">
+              <p className="font-medium text-sm text-text-primary">{t("connect.ollama.name")}</p>
+              <p className="font-mono text-text-tertiary text-xs">
+                {loading
+                  ? t("connect.ollama.checking")
+                  : installed
+                    ? (status?.version ?? t("connect.ollama.installed"))
+                    : t("connect.ollama.notInstalled")}
+              </p>
+            </div>
+          </div>
+          {loading ? (
+            <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+          ) : installed ? (
+            <Badge variant="outline" className="gap-1 border-green-500/30 bg-green-500/10 text-green-600">
+              <CheckIcon className="size-3" />
+              {t("connect.ollama.ready")}
+            </Badge>
+          ) : null}
+        </div>
+
+        {!loading && !installed && (
+          <div className="mt-4 space-y-2.5">
+            <p className="text-sm text-text-secondary">{t("connect.ollama.installHint")}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" onClick={() => void install()} disabled={busy}>
+                {busy ? <Loader2Icon className="animate-spin" /> : <DownloadIcon />}
+                {busy ? t("connect.ollama.installing") : t("connect.ollama.install")}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void openExternal(OLLAMA_URL)}>
+                {t("connect.ollama.learnMore")}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="space-y-1.5">
         <label htmlFor="onboarding-ollama-model" className="font-medium text-sm text-text-primary">
@@ -596,72 +619,6 @@ function ConnectOllama({
   );
 }
 
-/**
- * Local-models step. Optional: offers to run models locally with Ollama (private,
- * offline, free). If Ollama is already detected it's shown as ready; otherwise a
- * one-click install (the `ollama_install` rpc via {@link useOllama}) is offered.
- * Purely opt-in — skipping (Next) leaves nothing installed.
- */
-function LocalStep({ t }: { t: ReturnType<typeof useTranslations> }) {
-  const { status, loading, busy, install } = useOllama();
-  const installed = status?.installed === true;
-
-  return (
-    <div className="space-y-5">
-      <StepHeading icon={<CpuIcon />} title={t("local.title")} description={t("local.description")} />
-
-      <div className="rounded-lg border border-border-cards bg-card-background p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
-              <CpuIcon />
-            </div>
-            <div className="leading-tight">
-              <p className="font-medium text-sm text-text-primary">{t("local.ollamaName")}</p>
-              <p className="font-mono text-text-tertiary text-xs">
-                {loading
-                  ? t("local.checking")
-                  : installed
-                    ? (status?.version ?? t("local.installed"))
-                    : t("local.notInstalled")}
-              </p>
-            </div>
-          </div>
-          {loading ? (
-            <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
-          ) : installed ? (
-            <Badge variant="outline" className="gap-1 border-green-500/30 bg-green-500/10 text-green-600">
-              <CheckIcon className="size-3" />
-              {t("local.ready")}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-text-tertiary">
-              {t("local.optional")}
-            </Badge>
-          )}
-        </div>
-
-        {!loading && !installed && (
-          <div className="mt-4 space-y-2.5">
-            <p className="text-sm text-text-secondary">{t("local.installHint")}</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" onClick={() => void install()} disabled={busy}>
-                {busy ? <Loader2Icon className="animate-spin" /> : <DownloadIcon />}
-                {busy ? t("local.installing") : t("local.install")}
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={() => void openExternal(OLLAMA_URL)}>
-                {t("local.learnMore")}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <p className="text-text-tertiary text-xs leading-relaxed">{t("local.footnote")}</p>
-    </div>
-  );
-}
-
 function FolderStep({
   t,
   homeFolder,
@@ -671,11 +628,49 @@ function FolderStep({
   homeFolder: string;
   setHomeFolder: (value: string) => void;
 }) {
+  const selected = homeFolder.trim();
+
+  // Open the OS folder picker (Tauri dialog plugin) so the user never types a path.
+  const pickDirectory = useCallback(async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const chosen = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: homeFolder.trim() || undefined,
+      title: t("folder.title"),
+    });
+    if (typeof chosen === "string") setHomeFolder(chosen);
+  }, [homeFolder, setHomeFolder, t]);
+
   return (
     <div className="space-y-5">
       <StepHeading icon={<FolderOpenIcon />} title={t("folder.title")} description={t("folder.description")} />
       <div className="space-y-2">
-        <WorkingDirField value={homeFolder} onChange={setHomeFolder} placeholder={t("folder.placeholder")} />
+        {isTauri() ? (
+          // Native picker is the primary action — click to open the OS window.
+          <button
+            type="button"
+            onClick={() => void pickDirectory()}
+            className="flex w-full items-center gap-3 rounded-lg border border-border-cards bg-card-background px-4 py-3 text-left transition-colors hover:bg-muted/40"
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-icon-primary [&_svg]:size-4">
+              <FolderOpenIcon />
+            </span>
+            <span className="min-w-0 flex-1">
+              {selected ? (
+                <span className="block truncate font-mono text-sm text-text-primary">{selected}</span>
+              ) : (
+                <span className="block text-sm text-text-secondary">{t("folder.browse")}</span>
+              )}
+            </span>
+            <span className="shrink-0 font-medium text-primary text-xs">
+              {selected ? t("folder.change") : t("folder.choose")}
+            </span>
+          </button>
+        ) : (
+          // Browser dev (no Tauri): fall back to the editable field.
+          <WorkingDirField value={homeFolder} onChange={setHomeFolder} placeholder={t("folder.placeholder")} />
+        )}
         <p className="text-text-tertiary text-xs leading-relaxed">{t("folder.hint")}</p>
       </div>
     </div>
