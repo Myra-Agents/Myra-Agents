@@ -1545,9 +1545,18 @@
         "installing": "Installing…",
         "learnMore": "Learn more",
         "modelLabel": "Ollama model",
-        "modelPlaceholder": "e.g. qwen2.5-coder",
-        "hintPulled": "Choose one of your pulled models, or type any tag.",
-        "hintPull": "Type a model tag — pull it from Settings after Ollama is installed."
+        "selectPlaceholder": "Choose a local model",
+        "managePulled": "Download more models",
+        "noModels": "No local models yet — download one to run the agent.",
+        "downloadModel": "Download a model",
+        "manageTitle": "Local Ollama models"
+      },
+      "test": {
+        "button": "Test connection",
+        "testing": "Testing…",
+        "ok": "Connected",
+        "failed": "Test failed",
+        "devOnly": "Connection test runs in the desktop app."
       }
     },
     "folder": {

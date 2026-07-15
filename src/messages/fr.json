@@ -1545,9 +1545,18 @@
         "installing": "Installation…",
         "learnMore": "En savoir plus",
         "modelLabel": "Modèle Ollama",
-        "modelPlaceholder": "ex. qwen2.5-coder",
-        "hintPulled": "Choisissez un de vos modèles téléchargés, ou saisissez un tag.",
-        "hintPull": "Saisissez un tag de modèle — téléchargez-le depuis les Réglages une fois Ollama installé."
+        "selectPlaceholder": "Choisissez un modèle local",
+        "managePulled": "Télécharger d'autres modèles",
+        "noModels": "Aucun modèle local pour l'instant — téléchargez-en un pour lancer l'agent.",
+        "downloadModel": "Télécharger un modèle",
+        "manageTitle": "Modèles Ollama locaux"
+      },
+      "test": {
+        "button": "Tester la connexion",
+        "testing": "Test…",
+        "ok": "Connecté",
+        "failed": "Échec du test",
+        "devOnly": "Le test de connexion s'exécute dans l'application desktop."
       }
     },
     "folder": {

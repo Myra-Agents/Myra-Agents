@@ -14,6 +14,7 @@ import {
   KanbanIcon,
   KeyIcon,
   Loader2Icon,
+  PlugZapIcon,
   RocketIcon,
   SparklesIcon,
   TerminalIcon,
@@ -21,6 +22,7 @@ import {
 import { useTranslations } from "next-intl";
 
 import { useBinaryStatus } from "@/components/agents/binary-status";
+import { LocalModelManager } from "@/components/agents/ollama-local-models";
 import { WorkingDirField } from "@/components/agents/working-dir-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,12 +30,13 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { MyraMark } from "@/components/ui/myra-mark";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOllama } from "@/hooks/use-ollama";
 import { useSettings } from "@/hooks/use-settings";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
-import { openExternal } from "@/lib/tauri";
+import { invoke, isDevModeError, openExternal } from "@/lib/tauri";
 import { DEFAULT_AGENT_PRESETS, type EmbeddedLlmProvider } from "@/types/settings";
 
 /** Where users mint an OpenRouter key + browse model ids. */
@@ -436,6 +439,77 @@ function ConnectStep({
       ) : (
         <ConnectOllama t={t} model={model} setModel={setModel} />
       )}
+
+      {/* key on provider so switching cloud↔ollama clears the previous test result. */}
+      <TestConnectionButton key={provider} t={t} provider={provider} apiKey={apiKey} model={model} />
+    </div>
+  );
+}
+
+/**
+ * Tests the embedded agent's LLM wiring for real via the `test_embedded_llm` rpc
+ * — a tiny OpenRouter completion (cloud) or an Ollama generate (local). Reports
+ * success or the backend's error inline.
+ */
+function TestConnectionButton({
+  t,
+  provider,
+  apiKey,
+  model,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  provider: EmbeddedLlmProvider;
+  apiKey: string;
+  model: string;
+}) {
+  const [state, setState] = useState<"idle" | "testing" | "ok" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  const missingInput = provider === "ollama" ? !model.trim() : !apiKey.trim() && !model.trim();
+
+  const runTest = useCallback(async () => {
+    setState("testing");
+    setMessage("");
+    try {
+      await invoke("test_embedded_llm", {
+        provider,
+        apiKey: provider === "cloud" ? apiKey.trim() || undefined : undefined,
+        model: model.trim() || undefined,
+      });
+      setState("ok");
+    } catch (error) {
+      setState("error");
+      setMessage(
+        isDevModeError(error) ? t("connect.test.devOnly") : error instanceof Error ? error.message : String(error),
+      );
+    }
+  }, [provider, apiKey, model, t]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void runTest()}
+          disabled={state === "testing" || missingInput}
+        >
+          {state === "testing" ? <Loader2Icon className="animate-spin" /> : <PlugZapIcon />}
+          {state === "testing" ? t("connect.test.testing") : t("connect.test.button")}
+        </Button>
+        {state === "ok" && (
+          <span className="flex items-center gap-1 text-green-600 text-sm">
+            <CheckIcon className="size-4" />
+            {t("connect.test.ok")}
+          </span>
+        )}
+      </div>
+      {state === "error" && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-destructive text-xs leading-relaxed">
+          {message || t("connect.test.failed")}
+        </p>
+      )}
     </div>
   );
 }
@@ -541,9 +615,11 @@ function ConnectOllama({
   model: string;
   setModel: (value: string) => void;
 }) {
-  const { status, loading, busy, install } = useOllama();
+  const ollama = useOllama();
+  const { status, loading, busy, install } = ollama;
   const installed = status?.installed === true;
   const models = status?.models ?? [];
+  const [manageOpen, setManageOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -591,30 +667,51 @@ function ConnectOllama({
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor="onboarding-ollama-model" className="font-medium text-sm text-text-primary">
-          {t("connect.ollama.modelLabel")}
-        </label>
-        <Input
-          id="onboarding-ollama-model"
-          list="onboarding-ollama-models"
-          autoComplete="off"
-          spellCheck={false}
-          value={model}
-          onChange={(event) => setModel(event.target.value)}
-          placeholder={t("connect.ollama.modelPlaceholder")}
-        />
-        {models.length > 0 && (
-          <datalist id="onboarding-ollama-models">
-            {models.map((m) => (
-              <option key={m.name} value={m.name} />
-            ))}
-          </datalist>
-        )}
-        <p className="text-text-tertiary text-xs leading-relaxed">
-          {models.length > 0 ? t("connect.ollama.hintPulled") : t("connect.ollama.hintPull")}
-        </p>
-      </div>
+      {/* The model picker only appears once Ollama is installed — and lists the
+          real pulled models (same source as Settings), not a free-text guess. */}
+      {installed &&
+        (models.length > 0 ? (
+          <div className="space-y-1.5">
+            <label htmlFor="onboarding-ollama-model" className="font-medium text-sm text-text-primary">
+              {t("connect.ollama.modelLabel")}
+            </label>
+            <Select value={model || undefined} onValueChange={setModel}>
+              <SelectTrigger id="onboarding-ollama-model">
+                <SelectValue placeholder={t("connect.ollama.selectPlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((m) => (
+                  <SelectItem key={m.name} value={m.name} className="font-mono text-xs">
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              className="text-primary text-xs underline-offset-2 hover:underline"
+            >
+              {t("connect.ollama.managePulled")}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2.5 rounded-lg border border-border-cards bg-muted/40 px-3 py-3">
+            <p className="text-sm text-text-secondary">{t("connect.ollama.noModels")}</p>
+            <Button type="button" size="sm" onClick={() => setManageOpen(true)}>
+              <DownloadIcon />
+              {t("connect.ollama.downloadModel")}
+            </Button>
+          </div>
+        ))}
+
+      {/* Reuse the Settings model manager (install/pull/remove) for the real list. */}
+      <Dialog open={manageOpen} onOpenChange={setManageOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogTitle>{t("connect.ollama.manageTitle")}</DialogTitle>
+          <LocalModelManager ollama={ollama} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
