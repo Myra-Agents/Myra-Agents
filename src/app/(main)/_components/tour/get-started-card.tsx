@@ -65,7 +65,10 @@ export function GetStartedCard() {
   if (doneCount === steps.length) return null;
 
   return (
-    <Card size="sm" className="fixed right-4 bottom-4 z-40 w-72 shadow-md">
+    // Sits clear of the toast stack: sonner pins toasts to the bottom-right
+    // with a 24px offset, and the app toasts on every run start, so anchoring
+    // this at bottom-4 would leave it hidden under them.
+    <Card size="sm" className="fixed right-4 bottom-28 z-40 w-72 shadow-md">
       <button
         type="button"
         onClick={stop}
