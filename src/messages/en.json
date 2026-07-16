@@ -1661,7 +1661,8 @@
       },
       "patrolInstruction": {
         "title": "Write the instruction",
-        "body": "What you'd tell a teammate. This is the prompt the agent runs every time. Required."
+        "body": "What you'd tell a teammate — this is the prompt the agent runs every time. Required.",
+        "example": "Try: “Check the project for outdated dependencies, bump the safe ones, and summarise what changed.”"
       },
       "patrolAgent": {
         "title": "Choose the agent",
@@ -1670,6 +1671,10 @@
       "savePatrol": {
         "title": "Save it",
         "body": "That's everything — click the highlighted button to put it on the board."
+      },
+      "patrolTemplates": {
+        "title": "Next time, start here",
+        "body": "Ready-made patrols for common jobs. Pick one and it fills the editor in — no blank page."
       },
       "rowMenu": {
         "title": "Don't wait for the schedule",

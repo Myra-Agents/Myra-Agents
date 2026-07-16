@@ -22,11 +22,19 @@ export interface TourStep {
   /** `data-tour` value of the element to spotlight. */
   target: string;
   /**
-   * Advance only when the user really clicks the highlighted element, with no
+   * Advance only when the user really presses the highlighted element, with no
    * "Next" button. Used where there is one obvious thing to do — it's what
    * makes the tour guided rather than narrated.
    */
   interactive?: boolean;
+  /**
+   * Like {@link interactive}, but advance only once the target has left the
+   * DOM rather than on the press. For a button whose action can fail — Save
+   * rejects an incomplete patrol — the press proves nothing: advancing on it
+   * marches the user forward while an error toast says they didn't get
+   * anywhere. The target disappearing is the outcome we actually mean.
+   */
+  awaitVanish?: boolean;
   /** Extra px around the target rect, for elements whose hitbox is tight. */
   padding?: number;
 }
@@ -64,7 +72,14 @@ export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
     { id: "patrolTrigger", target: "patrol-trigger", padding: 4 },
     { id: "patrolInstruction", target: "patrol-instruction", padding: 8 },
     { id: "patrolAgent", target: "patrol-agent", padding: 4 },
-    { id: "savePatrol", target: "save-patrol", interactive: true, padding: 4 },
+    // Not `interactive`: Save refuses an incomplete patrol, and advancing on the
+    // press would push the user to the next step — which navigates — while the
+    // toast tells them it didn't save. Waiting for the button to leave the DOM
+    // waits for the editor to actually close.
+    { id: "savePatrol", target: "save-patrol", awaitVanish: true, padding: 4 },
+    // Add lands back on /schedules; close by showing that the next one needn't
+    // be built from a blank page at all.
+    { id: "patrolTemplates", route: "/schedules", target: "patrol-templates", padding: 8 },
   ],
   // Launch one by hand, then read it. Both steps self-skip when there's no
   // patrol to run, which is the state a user who skipped `patrol` is in.

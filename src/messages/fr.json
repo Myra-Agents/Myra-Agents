@@ -1661,7 +1661,8 @@
       },
       "patrolInstruction": {
         "title": "Écrivez la consigne",
-        "body": "Ce que vous diriez à un collègue. C'est la consigne que l'agent exécute à chaque fois. Obligatoire."
+        "body": "Ce que vous diriez à un collègue — c'est la consigne que l'agent exécute à chaque fois. Obligatoire.",
+        "example": "Essayez : « Vérifie les dépendances obsolètes du projet, mets à jour celles qui sont sûres, et résume ce qui a changé. »"
       },
       "patrolAgent": {
         "title": "Choisissez l'agent",
@@ -1670,6 +1671,10 @@
       "savePatrol": {
         "title": "Enregistrez-la",
         "body": "C'est tout — cliquez le bouton entouré pour l'ajouter au tableau."
+      },
+      "patrolTemplates": {
+        "title": "La prochaine fois, partez d'ici",
+        "body": "Des patrouilles toutes faites pour les tâches courantes. Choisissez-en une et l'éditeur se remplit — pas de page blanche."
       },
       "rowMenu": {
         "title": "N'attendez pas l'horaire",

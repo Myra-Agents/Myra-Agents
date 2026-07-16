@@ -106,11 +106,16 @@ export function SpotlightTour() {
     return () => targetEl.removeEventListener("pointerdown", onPress);
   }, [step?.interactive, targetEl, nextStep, index]);
 
-  // Escape always gets out.
+  // Escape gets out of the tour — but only when it isn't already dismissing
+  // something else. Steps ring dropdowns (the folder picker, the row menu), and
+  // Escape is how you close one; without this guard, closing a menu the tour
+  // just told you to open would kill the tour with it.
   useEffect(() => {
     if (!flow) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") endFlow();
+      if (e.key !== "Escape") return;
+      if (document.querySelector('[role="menu"], [role="listbox"]')) return;
+      endFlow();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -173,6 +178,13 @@ export function SpotlightTour() {
           </p>
           <p className="mt-1 font-medium text-sm">{t(`${step.id}.title`)}</p>
           <p className="mt-1 text-muted-foreground text-xs leading-relaxed">{t(`${step.id}.body`)}</p>
+          {/* Only some steps carry a worked example — `has` because t() throws
+              on a missing key rather than returning empty. */}
+          {t.has(`${step.id}.example`) && (
+            <p className="mt-2 rounded-md bg-muted px-2 py-1.5 text-muted-foreground text-xs italic leading-relaxed">
+              {t(`${step.id}.example`)}
+            </p>
+          )}
           <div className="mt-3 flex items-center justify-between">
             <div className="flex gap-1">
               {TOUR_FLOWS[flow].map((s, i) => (
@@ -189,9 +201,9 @@ export function SpotlightTour() {
               <Button type="button" variant="ghost" size="sm" onClick={skip}>
                 {t("skip")}
               </Button>
-              {/* Interactive steps have no Next — clicking the ringed element is
-                  the whole point, and a Next would let the user skip past it. */}
-              {!step.interactive && (
+              {/* Interactive steps have no Next — acting on the ringed element
+                  is the whole point, and a Next would let the user skip past it. */}
+              {!step.interactive && !step.awaitVanish && (
                 <Button type="button" size="sm" onClick={() => nextStep(index)}>
                   {isLast ? t("done") : t("next")}
                 </Button>

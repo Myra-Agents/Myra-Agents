@@ -772,7 +772,8 @@ export default function SchedulesPage() {
       </div>
 
       {/* Use-case ideas (Figma: category tabs + card grid, 40px below the table) */}
-      <div ref={setIdeasNode} className="mt-10 flex scroll-mt-4 flex-col gap-2">
+      {/* data-tour: spotlight-tour anchor — see lib/tour-steps.ts. */}
+      <div ref={setIdeasNode} data-tour="patrol-templates" className="mt-10 flex scroll-mt-4 flex-col gap-2">
         <div className="flex items-center gap-2">
           <LayoutTemplateIcon className="size-3.5 text-text-tertiary" />
           <h2 className="text-text-secondary text-xs font-medium">{t("templatesHeading")}</h2>
