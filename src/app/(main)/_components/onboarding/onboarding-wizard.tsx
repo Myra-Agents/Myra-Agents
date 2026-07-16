@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isTauri } from "@tauri-apps/api/core";
 import {
@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MyraLoader } from "@/components/ui/myra-loader";
 import { MyraMark } from "@/components/ui/myra-mark";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,6 +47,7 @@ import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke, isDevModeError, openExternal } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { useTourStore } from "@/stores/tour-store";
 import { type AppSettings, DEFAULT_AGENT_PRESETS, type EmbeddedLlmProvider } from "@/types/settings";
@@ -441,6 +443,14 @@ function PreferencesStep({
 }
 
 function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
+  const loaderVariant = usePreferencesStore((s) => s.loaderVariant);
+  // Each card probes its own binary. Count the answers so the list is revealed
+  // only once every probe has come back — otherwise agents pop in one by one
+  // over a second, which reads as a glitch rather than as a detection.
+  const [resolvedCount, setResolvedCount] = useState(0);
+  const onResolved = useCallback(() => setResolvedCount((c) => c + 1), []);
+  const probing = resolvedCount < DETECTABLE_AGENTS.length;
+
   return (
     <div className="space-y-5">
       <StepHeading icon={<MyraMark />} title={t("agent.title")} description={t("agent.description")} />
@@ -464,11 +474,27 @@ function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
           </div>
         </div>
 
+        {probing && (
+          <div className="flex items-center gap-2 rounded-lg border border-border-cards border-dashed p-4">
+            <MyraLoader size={16} variant={loaderVariant} className="text-primary" />
+            <p className="text-text-tertiary text-xs">{t("agent.detecting")}</p>
+          </div>
+        )}
+
         {/* Detected CLI agents already on the machine (e.g. opencode) — listed
-            with their version, never installed for the user here. */}
-        {DETECTABLE_AGENTS.map((agent) => (
-          <DetectedAgentCard key={agent.binary} t={t} binary={agent.binary} name={agent.name} />
-        ))}
+            with their version, never installed for the user here. Kept mounted
+            while probing (hidden, not unmounted) so the probes actually run. */}
+        <div className={cn("space-y-2", probing && "hidden")}>
+          {DETECTABLE_AGENTS.map((agent) => (
+            <DetectedAgentCard
+              key={agent.binary}
+              t={t}
+              binary={agent.binary}
+              name={agent.name}
+              onResolved={onResolved}
+            />
+          ))}
+        </div>
       </div>
 
       <p className="text-text-tertiary text-xs leading-relaxed">{t("agent.footnote")}</p>
@@ -480,17 +506,32 @@ function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
  * One CLI-agent row — rendered ONLY when the binary is actually detected on the
  * machine (with its version). A missing (or still-checking) agent renders
  * nothing, so the step stays clean when no extra CLI is installed.
+ *
+ * Calls `onResolved` once its probe has answered, either way, so the step can
+ * hold the list back behind a loader until every agent has been checked.
  */
 function DetectedAgentCard({
   t,
   binary,
   name,
+  onResolved,
 }: {
   t: ReturnType<typeof useTranslations>;
   binary: string;
   name: string;
+  onResolved: () => void;
 }) {
-  const { status } = useBinaryStatus(binary);
+  const { status, resolved } = useBinaryStatus(binary);
+  // Report exactly once — `resolved` stays true afterwards, and the parent
+  // counts answers, so a re-report would over-count and unblock the list early.
+  const reported = useRef(false);
+  useEffect(() => {
+    if (resolved && !reported.current) {
+      reported.current = true;
+      onResolved();
+    }
+  }, [resolved, onResolved]);
+
   if (status?.found !== true) return null;
 
   return (
