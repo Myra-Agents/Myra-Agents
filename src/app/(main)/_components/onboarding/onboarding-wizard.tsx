@@ -16,8 +16,12 @@ import {
   KanbanIcon,
   KeyIcon,
   Loader2Icon,
+  MonitorIcon,
+  MoonIcon,
   PlugZapIcon,
   RocketIcon,
+  SlidersHorizontalIcon,
+  SunIcon,
   TerminalIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -29,17 +33,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { MyraMark } from "@/components/ui/myra-mark";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOllama } from "@/hooks/use-ollama";
 import { useSettings } from "@/hooks/use-settings";
+import { useTheme } from "@/hooks/use-theme";
+import { getStoredLocale, setAppLocale } from "@/i18n/provider";
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
+import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke, isDevModeError, openExternal } from "@/lib/tauri";
+import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { useTourStore } from "@/stores/tour-store";
-import { DEFAULT_AGENT_PRESETS, type EmbeddedLlmProvider } from "@/types/settings";
+import { type AppSettings, DEFAULT_AGENT_PRESETS, type EmbeddedLlmProvider } from "@/types/settings";
+
+type AppLocale = AppSettings["locale"];
+type AppTheme = AppSettings["theme"];
 
 /** Where users mint an OpenRouter key + browse model ids. */
 const OPENROUTER_KEYS_URL = "https://openrouter.ai/keys";
@@ -52,9 +64,9 @@ const OLLAMA_URL = "https://ollama.com";
  * forced install). */
 const DETECTABLE_AGENTS = DEFAULT_AGENT_PRESETS.map((p) => ({ binary: p.binary, name: p.name }));
 
-type StepId = "welcome" | "agent" | "connect" | "folder" | "ready";
+type StepId = "welcome" | "preferences" | "agent" | "connect" | "folder" | "ready";
 
-const STEP_ORDER: StepId[] = ["welcome", "agent", "connect", "folder", "ready"];
+const STEP_ORDER: StepId[] = ["welcome", "preferences", "agent", "connect", "folder", "ready"];
 
 interface OnboardingWizardProps {
   /** Called once the wizard is dismissed (finished or skipped) so the host can unmount it. */
@@ -73,7 +85,11 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const t = useTranslations("onboarding");
   const { settings, save, loading: settingsLoading } = useSettings();
   const startTour = useTourStore((s) => s.start);
+  const themeMode = usePreferencesStore((s) => s.themeMode);
   const [stepIndex, setStepIndex] = useState(0);
+  // Seeded from what's already in effect (localStorage), not from settings —
+  // the language is live before the sidecar has answered.
+  const [locale, setLocale] = useState<AppLocale>(() => getStoredLocale());
   const [homeFolder, setHomeFolder] = useState("");
   const [provider, setProvider] = useState<EmbeddedLlmProvider>("cloud");
   const [apiKey, setApiKey] = useState("");
@@ -121,33 +137,39 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
       // Persist the folder choice regardless of how they leave — a set folder is
       // useful even for a skipper.
       if (homeFolder.trim()) setHomeFolderSetting(homeFolder);
-      // Persist the LLM connection too when anything was entered. save()
-      // round-trips through the sidecar; swallow failures (e.g. browser dev mode)
-      // so a dead backend never traps the user in the wizard.
       const key = apiKey.trim();
       const modelId = model.trim();
       // Ollama needs a model; cloud is usable with just a key OR model.
-      if ((provider === "ollama" && modelId) || key || modelId) {
-        void save({
-          ...settings,
-          embeddedLlm: {
-            ...settings.embeddedLlm,
-            provider,
-            // The key only applies to the cloud provider; drop it for Ollama.
-            apiKey: provider === "cloud" ? key || undefined : undefined,
-            model: modelId || undefined,
-          },
-        }).catch(() => {
-          /* backend unreachable (e.g. browser dev) — non-fatal for onboarding */
-        });
-      }
+      const hasLlm = (provider === "ollama" && modelId) || Boolean(key) || Boolean(modelId);
+      // One round-trip for everything. Language and theme already took effect
+      // (localStorage + cookie) the moment they were picked, so this only
+      // mirrors them into settings; swallow failures (e.g. browser dev mode) so
+      // a dead backend never traps the user in the wizard.
+      void save({
+        ...settings,
+        locale,
+        theme: themeMode,
+        ...(hasLlm
+          ? {
+              embeddedLlm: {
+                ...settings.embeddedLlm,
+                provider,
+                // The key only applies to the cloud provider; drop it for Ollama.
+                apiKey: provider === "cloud" ? key || undefined : undefined,
+                model: modelId || undefined,
+              },
+            }
+          : {}),
+      }).catch(() => {
+        /* backend unreachable (e.g. browser dev) — non-fatal for onboarding */
+      });
       // Opting in here is what makes the sidebar "Get started" checklist appear.
       if (guided) startTour();
       completeOnboarding();
       track(skipped ? "onboarding_skipped" : "onboarding_completed", { last_step: stepId, guided });
       onClose();
     },
-    [homeFolder, provider, apiKey, model, settings, save, stepId, onClose, startTour],
+    [homeFolder, locale, themeMode, provider, apiKey, model, settings, save, stepId, onClose, startTour],
   );
 
   const goNext = useCallback(() => {
@@ -183,6 +205,8 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
           <StepBody
             stepId={stepId}
             t={t}
+            locale={locale}
+            setLocale={setLocale}
             homeFolder={homeFolder}
             setHomeFolder={setHomeFolder}
             provider={provider}
@@ -253,6 +277,8 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
 interface StepBodyProps {
   stepId: StepId;
   t: ReturnType<typeof useTranslations>;
+  locale: AppLocale;
+  setLocale: (value: AppLocale) => void;
   homeFolder: string;
   setHomeFolder: (value: string) => void;
   provider: EmbeddedLlmProvider;
@@ -266,6 +292,8 @@ interface StepBodyProps {
 function StepBody({
   stepId,
   t,
+  locale,
+  setLocale,
   homeFolder,
   setHomeFolder,
   provider,
@@ -276,6 +304,7 @@ function StepBody({
   setModel,
 }: StepBodyProps) {
   if (stepId === "welcome") return <WelcomeStep t={t} />;
+  if (stepId === "preferences") return <PreferencesStep t={t} locale={locale} setLocale={setLocale} />;
   if (stepId === "agent") return <AgentStep t={t} />;
   if (stepId === "connect")
     return (
@@ -322,6 +351,95 @@ function WelcomeStep({ t }: { t: ReturnType<typeof useTranslations> }) {
  * and lists any it finds on PATH with their version, so a user who already has
  * e.g. opencode sees it recognised — never a forced install.
  */
+/**
+ * Language and theme, asked before anything else: they cost one click, they
+ * change how the rest of the wizard reads, and both apply live.
+ *
+ * Each choice takes effect immediately through the same path Settings uses, so
+ * it sticks in localStorage/cookie even if the sidecar save on finish fails.
+ */
+function PreferencesStep({
+  t,
+  locale,
+  setLocale,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  locale: AppLocale;
+  setLocale: (value: AppLocale) => void;
+}) {
+  const { setTheme } = useTheme();
+  const setThemeMode = usePreferencesStore((s) => s.setThemeMode);
+  const themeMode = usePreferencesStore((s) => s.themeMode);
+
+  const applyTheme = useCallback(
+    (next: AppTheme) => {
+      setTheme(next);
+      setThemeMode(next);
+      void persistPreference("theme_mode", next);
+    },
+    [setTheme, setThemeMode],
+  );
+
+  const applyLocale = useCallback(
+    (next: AppLocale) => {
+      setLocale(next);
+      // No reload — the provider re-renders in place, so the wizard keeps its
+      // step and whatever the user already typed.
+      setAppLocale(next);
+    },
+    [setLocale],
+  );
+
+  return (
+    <div className="space-y-5">
+      <StepHeading
+        icon={<SlidersHorizontalIcon />}
+        title={t("preferences.title")}
+        description={t("preferences.description")}
+      />
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">{t("preferences.languageLabel")}</Label>
+        <Select value={locale} onValueChange={(v) => applyLocale(v as AppLocale)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">{t("preferences.languageAuto")}</SelectItem>
+            <SelectItem value="en">{t("preferences.languageEn")}</SelectItem>
+            <SelectItem value="fr">{t("preferences.languageFr")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">{t("preferences.themeLabel")}</Label>
+        <div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-0.5">
+          {(
+            [
+              { id: "light", icon: SunIcon },
+              { id: "dark", icon: MoonIcon },
+              { id: "system", icon: MonitorIcon },
+            ] as const
+          ).map(({ id, icon: Icon }) => (
+            <Button
+              key={id}
+              type="button"
+              size="sm"
+              variant={themeMode === id ? "secondary" : "ghost"}
+              className="h-8 gap-1.5"
+              onClick={() => applyTheme(id)}
+            >
+              <Icon className="size-3.5" />
+              {t(`preferences.theme${id.charAt(0).toUpperCase()}${id.slice(1)}`)}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgentStep({ t }: { t: ReturnType<typeof useTranslations> }) {
   return (
     <div className="space-y-5">

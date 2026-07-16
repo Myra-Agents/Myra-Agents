@@ -1511,6 +1511,18 @@
     "next": "Next",
     "getStarted": "Get started",
     "guideMe": "Show me around",
+    "preferences": {
+      "title": "Make it yours",
+      "description": "Two quick ones. You can change either from Settings later.",
+      "languageLabel": "Language",
+      "languageAuto": "Auto-detect",
+      "languageEn": "English",
+      "languageFr": "Français",
+      "themeLabel": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeSystem": "System"
+    },
     "welcome": {
       "title": "Welcome to Myra Agents",
       "description": "Myra Agents is a platform for automating the repetitive work you do. Create and monitor all your Myra agents in one place — local-first and open-source."
