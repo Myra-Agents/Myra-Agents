@@ -5,6 +5,7 @@ import { AppSidebar } from "@/app/(main)/_components/sidebar/app-sidebar";
 // import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { RequirePro } from "@/components/require-pro";
 // import { RemoteAccessConsent } from "@/components/settings/remote-access-consent";
+import { SpotlightTour } from "@/components/tour/spotlight-tour";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       <OnboardingBootstrap />
       {/* Hydrates the "Get started" checklist and ticks it as routes are visited. */}
       <TourBootstrap />
+      {/* Spotlight walkthrough — renders only while a checklist flow is running. */}
+      <SpotlightTour />
       <TrayActionListener />
       {/* Global "Operation started" toast for every run start (manual or scheduled). */}
       <RunStartedToasts />

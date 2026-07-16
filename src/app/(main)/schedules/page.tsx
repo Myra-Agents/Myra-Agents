@@ -557,6 +557,8 @@ export default function SchedulesPage() {
         <button
           type="button"
           onClick={handleCreate}
+          // Spotlight-tour anchor — see lib/tour-steps.ts.
+          data-tour="new-patrol"
           className="flex h-6 items-center gap-1 rounded-md bg-primary px-2 font-medium text-[11px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
         >
           <PlusIcon className="size-3.5 shrink-0" />

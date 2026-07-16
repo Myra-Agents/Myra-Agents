@@ -24,6 +24,9 @@ export const TOUR_ROUTES = {
 
 export type TourRoute = (typeof TOUR_ROUTES)[keyof typeof TOUR_ROUTES];
 
+/** The checklist entries, and equally the spotlight flows keyed off them. */
+export type TourStepId = "explore" | "patrol" | "run";
+
 export interface TourState {
   /** The user asked to be guided. When false the checklist stays hidden. */
   enabled: boolean;

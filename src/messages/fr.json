@@ -1600,6 +1600,32 @@
         "title": "Suivre une exécution",
         "hint": "Ouvrez une exécution depuis l'Historique pour lire la discussion de l'agent, étape par étape."
       }
+    },
+    "spotlight": {
+      "progress": "Étape {current} sur {total}",
+      "skip": "Passer",
+      "next": "Suivant",
+      "done": "Terminé",
+      "operations": {
+        "title": "Opérations, c'est la vue en direct",
+        "body": "Tout ce qui tourne, groupé par statut — ce qui avance, ce qui bloque, ce qui vous attend."
+      },
+      "patrols": {
+        "title": "Les patrouilles tournent sans vous",
+        "body": "Une patrouille déclenche un agent selon un horaire ou un cron. C'est là que l'automatisation commence vraiment."
+      },
+      "history": {
+        "title": "L'historique garde chaque exécution",
+        "body": "Les exécutions passées de chaque patrouille, réussies ou échouées, avec les stats et toute la discussion de l'agent."
+      },
+      "newPatrol": {
+        "title": "Créez votre première patrouille",
+        "body": "Cliquez le bouton entouré pour ouvrir l'éditeur de patrouille."
+      },
+      "openRun": {
+        "title": "Ouvrez une exécution",
+        "body": "Cliquez la ligne entourée pour lire ce que l'agent a fait, étape par étape."
+      }
     }
   }
 }

@@ -1600,6 +1600,32 @@
         "title": "Follow a run",
         "hint": "Open a run from History to read the agent's discussion, step by step."
       }
+    },
+    "spotlight": {
+      "progress": "Step {current} of {total}",
+      "skip": "Skip",
+      "next": "Next",
+      "done": "Done",
+      "operations": {
+        "title": "Operations is the live view",
+        "body": "Everything currently running, grouped by status — what's going, what's stuck, what needs you."
+      },
+      "patrols": {
+        "title": "Patrols run without you",
+        "body": "A patrol fires an agent on a schedule or a cron trigger. This is where automation actually starts."
+      },
+      "history": {
+        "title": "History keeps every run",
+        "body": "Past runs of every patrol, succeeded or failed, with stats and the full agent discussion."
+      },
+      "newPatrol": {
+        "title": "Create your first patrol",
+        "body": "Click the highlighted button to open the patrol editor."
+      },
+      "openRun": {
+        "title": "Open a run",
+        "body": "Click the highlighted row to read what the agent did, step by step."
+      }
     }
   }
 }

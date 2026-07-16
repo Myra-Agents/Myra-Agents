@@ -84,7 +84,13 @@ const NavItemExpanded = ({
               isActive={isActive(item.url, undefined, item.matchPaths)}
               tooltip={itemTooltip(item)}
             >
-              <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
+              <Link
+                prefetch={false}
+                href={item.url}
+                target={item.newTab ? "_blank" : undefined}
+                // Spotlight-tour anchor — see lib/tour-steps.ts.
+                data-tour={`nav-${item.url}`}
+              >
                 {item.icon && <item.icon />}
                 <span>{item.title}</span>
                 {item.comingSoon && <IsComingSoon />}

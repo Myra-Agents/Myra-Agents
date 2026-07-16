@@ -537,9 +537,11 @@ export function RunsHistory({
                   </TableCell>
                 </TableRow>
               ) : (
-                visibleRows.map((r) => (
+                visibleRows.map((r, rowIndex) => (
                   <TableRow
                     key={`${r.cardId}:${r.runId}`}
+                    // Spotlight-tour anchor on the first row only — see lib/tour-steps.ts.
+                    data-tour={rowIndex === 0 ? "run-row" : undefined}
                     className="cursor-pointer border-border-cards hover:bg-secondary/40"
                     onClick={() => openRun(r)}
                   >

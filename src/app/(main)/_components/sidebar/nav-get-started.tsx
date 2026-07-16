@@ -2,8 +2,6 @@
 
 import { useMemo } from "react";
 
-import Link from "next/link";
-
 import { ActivityIcon, CheckIcon, HistoryIcon, RouteIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -16,7 +14,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useSchedules } from "@/hooks/use-schedules";
-import { TOUR_ROUTES } from "@/lib/tour.client";
+import { TOUR_ROUTES, type TourStepId } from "@/lib/tour.client";
 import { cn } from "@/lib/utils";
 import { useTourStore } from "@/stores/tour-store";
 
@@ -29,34 +27,33 @@ import { useTourStore } from "@/stores/tour-store";
  * route, or a patrol that really exists — never from a "next" click, so the
  * checklist can't congratulate the user for work they didn't do.
  *
+ * Clicking a line runs its spotlight walkthrough (<SpotlightTour />).
+ *
  * Shown only when the tour is on (opted in at the end of onboarding, or
  * replayed from Settings), and auto-hidden once every step is ticked.
  */
 export function NavGetStarted() {
   const t = useTranslations("tour");
-  const { enabled, hydrated, visited, stop } = useTourStore();
+  const { enabled, hydrated, visited, stop, startFlow } = useTourStore();
   const { schedules } = useSchedules();
 
   const steps = useMemo(
     () => [
       {
-        id: "explore",
+        id: "explore" as TourStepId,
         icon: ActivityIcon,
-        href: TOUR_ROUTES.runs,
         // Ticks only once all three views have been seen at least once.
         done: [TOUR_ROUTES.runs, TOUR_ROUTES.schedules, TOUR_ROUTES.history].every((r) => visited.includes(r)),
       },
       {
-        id: "patrol",
+        id: "patrol" as TourStepId,
         icon: RouteIcon,
-        href: TOUR_ROUTES.schedules,
         // Real state: a patrol exists on some server, however it got created.
         done: schedules.length > 0,
       },
       {
-        id: "run",
+        id: "run" as TourStepId,
         icon: HistoryIcon,
-        href: TOUR_ROUTES.history,
         // The run detail is unreachable without a run, so a visit proves both.
         done: visited.includes(TOUR_ROUTES.runDetail),
       },
@@ -94,19 +91,20 @@ export function NavGetStarted() {
         <SidebarMenu>
           {steps.map((step) => (
             <SidebarMenuItem key={step.id}>
+              {/* A line is the entry point to its spotlight walkthrough: the
+                  checklist is the menu, the spotlight is the execution. The
+                  flow's first step handles the navigation, so no link here. */}
               <SidebarMenuButton
-                asChild
                 tooltip={{ hidden: false, children: t(`steps.${step.id}.hint`) }}
                 className={cn("gap-2", step.done && "text-muted-foreground")}
+                onClick={() => startFlow(step.id)}
               >
-                <Link prefetch={false} href={step.href}>
-                  {step.done ? (
-                    <CheckIcon className="size-4 text-green-600 dark:text-green-500" />
-                  ) : (
-                    <step.icon className="size-4" />
-                  )}
-                  <span className={cn(step.done && "line-through")}>{t(`steps.${step.id}.title`)}</span>
-                </Link>
+                {step.done ? (
+                  <CheckIcon className="size-4 text-green-600 dark:text-green-500" />
+                ) : (
+                  <step.icon className="size-4" />
+                )}
+                <span className={cn(step.done && "line-through")}>{t(`steps.${step.id}.title`)}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
