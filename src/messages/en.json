@@ -1637,19 +1637,23 @@
       },
       "newPatrol": {
         "title": "Create your first patrol",
-        "body": "Click the highlighted button to open the patrol editor."
+        "body": "Click the highlighted button to open the patrol editor.",
+        "example": "Short on ideas? A good first one: have the agent tidy a messy folder every Friday. The next steps use it as the example."
       },
       "patrolName": {
         "title": "Name it",
-        "body": "What this patrol does, in a few words. It's what you'll see on the board."
+        "body": "What this patrol does, in a few words. It's what you'll see on the board.",
+        "example": "Try: “Sort out my Downloads”"
       },
       "patrolSubtitle": {
         "title": "Add a subtitle",
-        "body": "Optional — a line of context for your future self, under the name."
+        "body": "Optional — a line of context for your future self, under the name.",
+        "example": "Try: “Keep it from piling up again”"
       },
       "patrolTag": {
         "title": "Tag it",
-        "body": "Optional. Tags group patrols together and filter the board once you have a few."
+        "body": "Optional. Tags group patrols together and filter the board once you have a few.",
+        "example": "Try: “chores”"
       },
       "patrolFolder": {
         "title": "Pick the folder",
@@ -1657,12 +1661,13 @@
       },
       "patrolTrigger": {
         "title": "Set the trigger",
-        "body": "When it fires on its own: daily, weekly, a cron expression, or an incoming webhook."
+        "body": "When it fires on its own: daily, weekly, a cron expression, or an incoming webhook.",
+        "example": "Try: weekly, Friday at 17:00"
       },
       "patrolInstruction": {
         "title": "Write the instruction",
         "body": "What you'd tell a teammate — this is the prompt the agent runs every time. Required.",
-        "example": "Try: “Check the project for outdated dependencies, bump the safe ones, and summarise what changed.”"
+        "example": "Try: “Sort out this folder: group the files by type, rename them consistently, and move the obvious junk to the trash.”"
       },
       "patrolAgent": {
         "title": "Choose the agent",
