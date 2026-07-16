@@ -1639,8 +1639,20 @@
         "title": "Créez votre première patrouille",
         "body": "Cliquez le bouton entouré pour ouvrir l'éditeur de patrouille."
       },
+      "savePatrol": {
+        "title": "Enregistrez-la",
+        "body": "Donnez-lui un nom, une consigne et un horaire, puis cliquez le bouton entouré pour l'ajouter au tableau."
+      },
+      "rowMenu": {
+        "title": "N'attendez pas l'horaire",
+        "body": "Vous pouvez déclencher une patrouille à la main quand vous voulez. Ouvrez le menu entouré."
+      },
+      "runNow": {
+        "title": "Lancez-la maintenant",
+        "body": "Cliquez « Lancer maintenant » — l'agent démarre aussitôt, exactement comme il le ferait à son horaire."
+      },
       "openRun": {
-        "title": "Ouvrez une exécution",
+        "title": "Suivez-la",
         "body": "Cliquez la ligne entourée pour lire ce que l'agent a fait, étape par étape."
       }
     }

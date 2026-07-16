@@ -20,6 +20,7 @@ import { APP_CONFIG } from "@/config/app-config";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
+import { GetStartedCard } from "../tour/get-started-card";
 import { MacSidebarControls } from "../window-controls";
 import { NavMain } from "./nav-main";
 import { SearchButton } from "./search-dialog";
@@ -82,6 +83,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={sidebarItems} />
       </SidebarContent>
       <SidebarFooter>
+        {/* The tour checklist and the support card share this slot — only one is
+            ever up (see <SidebarSupportCard />). */}
+        <GetStartedCard />
         <SidebarSupportCard />
         {/* <NavUser /> — masqué pour le moment; restaurer en décommentant (voir nav-user.tsx) */}
         <SidebarMenu>

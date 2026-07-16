@@ -23,7 +23,6 @@ import { RunStartedToasts } from "./_components/run-started-toasts";
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
-import { GetStartedCard } from "./_components/tour/get-started-card";
 import { TourBootstrap } from "./_components/tour-bootstrap";
 import { TrayActionListener } from "./_components/tray-action-listener";
 import {
@@ -61,11 +60,9 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       <AgentTestBootstrap />
       {/* First-run onboarding wizard (localStorage-gated, shows once). */}
       <OnboardingBootstrap />
-      {/* Hydrates the "Get started" checklist and ticks it as routes are visited. */}
+      {/* Hydrates the "Get started" checklist and ticks it as routes are visited.
+          The card itself lives in the sidebar footer. */}
       <TourBootstrap />
-      {/* Floating "Get started" checklist, bottom-right. Self-hides unless the
-          user opted in, and once every step is ticked. */}
-      <GetStartedCard />
       {/* Spotlight walkthrough — renders only while a checklist flow is running. */}
       <SpotlightTour />
       <TrayActionListener />

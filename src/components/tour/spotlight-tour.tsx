@@ -92,13 +92,18 @@ export function SpotlightTour() {
     return () => cancelAnimationFrame(raf);
   }, [step, nextStep, index]);
 
-  // On interactive steps the user's real click on the target is what advances
+  // On interactive steps the user's real press on the target is what advances
   // the tour, so listen for it instead of rendering a "Next".
+  //
+  // `pointerdown`, not `click`: a Radix menu trigger opens on pointerdown and
+  // preventDefaults it, so the pointerup lands on the menu's dismissable layer
+  // and the trigger never emits a click at all — a click listener on it fires
+  // exactly zero times. Pressing the ringed element is the signal we mean.
   useEffect(() => {
     if (!step?.interactive || !targetEl) return;
-    const onClick = () => nextStep(index);
-    targetEl.addEventListener("click", onClick);
-    return () => targetEl.removeEventListener("click", onClick);
+    const onPress = () => nextStep(index);
+    targetEl.addEventListener("pointerdown", onPress);
+    return () => targetEl.removeEventListener("pointerdown", onPress);
   }, [step?.interactive, targetEl, nextStep, index]);
 
   // Escape always gets out.

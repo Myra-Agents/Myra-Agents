@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils";
 import { useTourStore } from "@/stores/tour-store";
 
 /**
- * The "Get started" checklist — the guided tour, as a floating card in the
- * bottom-right corner rather than a modal: it stays out of the way, survives a
- * reload, and lets the user do the steps in any order (or none).
+ * The "Get started" checklist — the guided tour, as a card in the sidebar
+ * footer rather than a modal: it stays out of the way, survives a reload, and
+ * lets the user do the steps in any order (or none).
  *
  * Every step's done-ness is derived from what actually happened — a visited
  * route, or a patrol that really exists — never from a "next" click, so the
@@ -25,11 +25,17 @@ import { useTourStore } from "@/stores/tour-store";
  * while a walkthrough is running.
  *
  * Shown only when the tour is on (opted in at the end of onboarding, or
- * replayed from Settings), and auto-hidden once every step is ticked.
+ * replayed from Settings), and auto-hidden once every step is ticked — at which
+ * point <SidebarSupportCard /> takes the slot back.
  */
-export function GetStartedCard() {
-  const t = useTranslations("tour");
-  const { enabled, hydrated, visited, stop, startFlow } = useTourStore();
+/**
+ * The checklist entries and whether the card is on screen. Exported because
+ * <SidebarSupportCard /> yields its slot to this card and must decide from the
+ * exact same answer — two copies of "is the tour showing?" would drift and
+ * either stack the cards or blank the slot.
+ */
+export function useGetStarted() {
+  const { enabled, hydrated, visited } = useTourStore();
   const { schedules } = useSchedules();
 
   const steps = useMemo(
@@ -58,17 +64,28 @@ export function GetStartedCard() {
 
   const doneCount = steps.filter((s) => s.done).length;
 
-  // Wait for hydration so the static export doesn't flash the card at users who
-  // never opted in.
-  if (!hydrated || !enabled) return null;
-  // Nothing left to guide — fold it away rather than leave a 3/3 trophy.
-  if (doneCount === steps.length) return null;
+  return {
+    steps,
+    doneCount,
+    // Hidden until hydration, so the static export never flashes the card at
+    // users who never opted in; and folded away once every box is ticked,
+    // rather than left as a 3/3 trophy.
+    visible: hydrated && enabled && doneCount < steps.length,
+  };
+}
+
+export function GetStartedCard() {
+  const t = useTranslations("tour");
+  const stop = useTourStore((s) => s.stop);
+  const startFlow = useTourStore((s) => s.startFlow);
+  const { steps, doneCount, visible } = useGetStarted();
+
+  if (!visible) return null;
 
   return (
-    // Sits clear of the toast stack: sonner pins toasts to the bottom-right
-    // with a 24px offset, and the app toasts on every run start, so anchoring
-    // this at bottom-4 would leave it hidden under them.
-    <Card size="sm" className="fixed right-4 bottom-28 z-40 w-72 shadow-md">
+    // Lives in the sidebar footer, in the support card's slot and its shape —
+    // that card steps aside while this one is up (see <SidebarSupportCard />).
+    <Card size="sm" className="relative shadow-none group-data-[collapsible=icon]:hidden">
       <button
         type="button"
         onClick={stop}

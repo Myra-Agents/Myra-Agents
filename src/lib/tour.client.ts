@@ -94,7 +94,10 @@ export function recordVisit(state: TourState, pathname: string): TourState | nul
   // otherwise the run-detail visit would also tick the plain History entry.
   const match = [...ALL_ROUTES].sort((a, b) => b.length - a.length).find((r) => pathname === r || pathname === `${r}/`);
   if (!isTourRoute(match) || state.visited.includes(match)) return null;
-  const next: TourState = { ...state, visited: [...state.visited, match] };
+  // Rebuilt field by field, not spread from `state`: callers pass the whole
+  // store, and spreading it would persist the ephemeral spotlight position
+  // (flow/index) — which must never survive a reload.
+  const next: TourState = { enabled: state.enabled, visited: [...state.visited, match] };
   writeTour(next);
   return next;
 }

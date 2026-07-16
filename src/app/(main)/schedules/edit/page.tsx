@@ -675,6 +675,8 @@ function ScheduleEditScreen() {
               : save
           }
           disabled={saving || (!draftMode && !dirty)}
+          // Spotlight-tour anchor — see lib/tour-steps.ts.
+          data-tour="save-patrol"
           className={cn(
             "rounded-md px-2 py-0.5 font-medium text-[11px] transition-colors",
             draftMode || dirty

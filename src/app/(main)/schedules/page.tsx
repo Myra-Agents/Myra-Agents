@@ -647,7 +647,7 @@ export default function SchedulesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((task) => {
+              rows.map((task, rowIndex) => {
                 const agent = task.agentPresetId ? agentById.get(task.agentPresetId) : undefined;
                 const source = scheduleSource(task.id);
                 const rel = task.enabled ? relativeParts(task.nextRunAt) : null;
@@ -717,6 +717,8 @@ export default function SchedulesPage() {
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
+                            // Spotlight-tour anchor, first row only — see lib/tour-steps.ts.
+                            data-tour={rowIndex === 0 ? "patrol-row-menu" : undefined}
                             className="flex size-7 items-center justify-center rounded-md text-icon-tertiary transition-colors hover:bg-secondary hover:text-icon-primary"
                             aria-label={t("actions.edit")}
                           >
@@ -724,7 +726,11 @@ export default function SchedulesPage() {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleTrigger(task.id)} disabled={triggering === task.id}>
+                          <DropdownMenuItem
+                            onClick={() => handleTrigger(task.id)}
+                            disabled={triggering === task.id}
+                            data-tour={rowIndex === 0 ? "run-now" : undefined}
+                          >
                             <PlayIcon className="size-3.5" />
                             {t("actions.runNow")}
                           </DropdownMenuItem>

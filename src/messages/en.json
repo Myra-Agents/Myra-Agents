@@ -1639,8 +1639,20 @@
         "title": "Create your first patrol",
         "body": "Click the highlighted button to open the patrol editor."
       },
+      "savePatrol": {
+        "title": "Save it",
+        "body": "Give it a name, a prompt and a schedule, then click the highlighted button to put it on the board."
+      },
+      "rowMenu": {
+        "title": "Don't wait for the schedule",
+        "body": "You can fire a patrol by hand any time. Open the highlighted menu."
+      },
+      "runNow": {
+        "title": "Run it now",
+        "body": "Click \"Run now\" — the agent starts immediately, exactly as it would on its schedule."
+      },
       "openRun": {
-        "title": "Open a run",
+        "title": "Follow it",
         "body": "Click the highlighted row to read what the agent did, step by step."
       }
     }

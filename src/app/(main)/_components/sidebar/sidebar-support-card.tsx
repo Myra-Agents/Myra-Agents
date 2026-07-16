@@ -6,6 +6,7 @@ import { StarIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { siGithub } from "simple-icons";
 
+import { useGetStarted } from "@/app/(main)/_components/tour/get-started-card";
 import { SimpleIcon } from "@/components/simple-icon";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_CONFIG } from "@/config/app-config";
@@ -17,9 +18,15 @@ const DISMISS_KEY = "myra.sidebar-support-dismissed";
  * Optional sidebar footer card pointing users to the repo. Dismissible — the
  * choice persists in localStorage so it stays hidden across launches. Hidden
  * when the sidebar is collapsed to icons.
+ *
+ * Yields the slot to the "Get started" checklist while a guided tour is on:
+ * both cards live in this corner, and a new user should be reading the tour
+ * rather than a plea for GitHub stars. It comes back once the tour is done or
+ * dismissed — hidden underneath, not dismissed itself.
  */
 export function SidebarSupportCard() {
   const t = useTranslations("nav.support");
+  const { visible: tourShowing } = useGetStarted();
   const [dismissed, setDismissed] = useState(true);
 
   // Read the persisted choice after mount to avoid an SSR/hydration flash.
@@ -39,7 +46,7 @@ export function SidebarSupportCard() {
     void openExternal(url);
   };
 
-  if (dismissed) return null;
+  if (dismissed || tourShowing) return null;
 
   return (
     <Card size="sm" className="relative shadow-none group-data-[collapsible=icon]:hidden">
