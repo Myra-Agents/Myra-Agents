@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { TARGET_TIMEOUT_MS, TOUR_FLOWS } from "@/lib/tour-steps";
+import { TARGET_TIMEOUT_MS, TOUR_APPLY_EVENT, TOUR_FLOWS } from "@/lib/tour-steps";
 import { useTourStore } from "@/stores/tour-store";
 
 interface Rect {
@@ -335,16 +335,24 @@ function ExampleValue({
     // itself for an autofocused input. Open it, fill it, and commit with Enter
     // the way a user would, then blur so the row settles back.
     const add = targetEl.querySelector<HTMLElement>("[data-tour-add-tag]");
-    if (!add) return;
-    add.click();
-    requestAnimationFrame(() => {
-      const revealed = document.activeElement;
-      if (!(revealed instanceof HTMLInputElement)) return;
-      setControlledValue(revealed, value);
-      revealed.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      revealed.blur();
-      setApplied(true);
-    });
+    if (add) {
+      add.click();
+      requestAnimationFrame(() => {
+        const revealed = document.activeElement;
+        if (!(revealed instanceof HTMLInputElement)) return;
+        setControlledValue(revealed, value);
+        revealed.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        revealed.blur();
+        setApplied(true);
+      });
+      return;
+    }
+
+    // Nothing to type into — hand it to whoever owns the state (the trigger is
+    // a schedule object, not text). No listener means no arrow, so a step that
+    // gets here has one.
+    targetEl.dispatchEvent(new CustomEvent(TOUR_APPLY_EVENT, { bubbles: false }));
+    setApplied(true);
   }, [targetEl, value]);
 
   // Back to the arrow, so applying again still reads as an action.

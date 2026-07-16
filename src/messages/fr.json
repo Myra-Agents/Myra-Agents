@@ -1665,7 +1665,7 @@
       "patrolTrigger": {
         "title": "Réglez le déclencheur",
         "body": "Quand elle part toute seule : chaque jour, chaque semaine, une expression cron, ou un webhook entrant.",
-        "example": "Pour l'exemple du dossier : chaque semaine, vendredi à 17:00."
+        "exampleValue": "Chaque semaine, vendredi à 17:00"
       },
       "patrolInstruction": {
         "title": "Écrivez la consigne",

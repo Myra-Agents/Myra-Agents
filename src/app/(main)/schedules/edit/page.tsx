@@ -70,6 +70,7 @@ import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
 import { getScheduleIdea } from "@/lib/schedule-ideas";
+import { TOUR_APPLY_EVENT } from "@/lib/tour-steps";
 import { cn } from "@/lib/utils";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import { useNavGuard } from "@/stores/nav-guard-store";
@@ -211,7 +212,10 @@ function ScheduleEditScreen() {
       agentPrompt: "",
       tags: [],
       schedule: { type: "daily", time: "09:00" },
-      enabled: false,
+      // Active like a template-created one: a patrol you just filled in is a
+      // patrol you meant to run, and starting it inactive only bought an extra
+      // "Activate this patrol?" prompt on the way out.
+      enabled: true,
       createdAt: "",
     };
   }, [blankMode, tSchedules]);
@@ -1331,11 +1335,29 @@ function SettingsTab({
   onPromptInput: () => void;
   t: ReturnType<typeof useTranslations>;
 }) {
+  // The guided tour's "fill this in for me" arrow can't reach a trigger the way
+  // it reaches a text field — a schedule is state, not a DOM value. So it fires
+  // TOUR_APPLY_EVENT at the ringed section and the shape stays here, where it's
+  // owned. Keep in step with the suggestion the tour prints
+  // (`tour.spotlight.patrolTrigger.exampleValue`).
+  const tourApplyCleanup = useRef<(() => void) | null>(null);
+  const setTourNode = useCallback(
+    (node: HTMLElement | null) => {
+      tourApplyCleanup.current?.();
+      tourApplyCleanup.current = null;
+      if (!node) return;
+      const onApply = () => setDraft((d) => (d ? { ...d, schedule: { type: "weekly", days: [5], time: "17:00" } } : d));
+      node.addEventListener(TOUR_APPLY_EVENT, onApply);
+      tourApplyCleanup.current = () => node.removeEventListener(TOUR_APPLY_EVENT, onApply);
+    },
+    [setDraft],
+  );
+
   return (
     <div className="flex flex-col gap-7">
       {/* Triggers */}
       {/* data-tour: spotlight-tour anchor — see lib/tour-steps.ts. */}
-      <section className="flex flex-col gap-2.5" data-tour="patrol-trigger">
+      <section className="flex flex-col gap-2.5" data-tour="patrol-trigger" ref={setTourNode}>
         <span className="px-2 text-[12px] text-text-secondary">{t("triggers")}</span>
         <TriggersCard
           schedule={draft.schedule}

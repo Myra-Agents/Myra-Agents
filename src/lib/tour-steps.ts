@@ -42,6 +42,14 @@ export interface TourStep {
 /** How long to wait for a step's target to show up before giving up on it. */
 export const TARGET_TIMEOUT_MS = 4000;
 
+/**
+ * Dispatched on a step's target when the user takes up its suggestion and the
+ * tour can't apply it by writing to a field — a trigger is React state, not a
+ * DOM value. The screen that owns the state listens and applies its own shape,
+ * rather than the tour reaching in and guessing at it.
+ */
+export const TOUR_APPLY_EVENT = "myra:tour-apply";
+
 export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
   // Each step opens its view rather than just ringing the link — otherwise the
   // walkthrough claims to show the views without ever showing them, and the

@@ -1665,7 +1665,7 @@
       "patrolTrigger": {
         "title": "Set the trigger",
         "body": "When it fires on its own: daily, weekly, a cron expression, or an incoming webhook.",
-        "example": "For the folder example: weekly, Friday at 17:00."
+        "exampleValue": "Weekly, Friday at 17:00"
       },
       "patrolInstruction": {
         "title": "Write the instruction",
