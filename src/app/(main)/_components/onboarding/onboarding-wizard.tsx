@@ -7,6 +7,7 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
+  CompassIcon,
   CpuIcon,
   DownloadIcon,
   ExternalLinkIcon,
@@ -37,6 +38,7 @@ import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/hom
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
 import { invoke, isDevModeError, openExternal } from "@/lib/tauri";
+import { useTourStore } from "@/stores/tour-store";
 import { DEFAULT_AGENT_PRESETS, type EmbeddedLlmProvider } from "@/types/settings";
 
 /** Where users mint an OpenRouter key + browse model ids. */
@@ -70,6 +72,7 @@ interface OnboardingWizardProps {
 export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const t = useTranslations("onboarding");
   const { settings, save, loading: settingsLoading } = useSettings();
+  const startTour = useTourStore((s) => s.start);
   const [stepIndex, setStepIndex] = useState(0);
   const [homeFolder, setHomeFolder] = useState("");
   const [provider, setProvider] = useState<EmbeddedLlmProvider>("cloud");
@@ -114,7 +117,7 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const progress = useMemo(() => ((stepIndex + 1) / STEP_ORDER.length) * 100, [stepIndex]);
 
   const finish = useCallback(
-    (skipped: boolean) => {
+    (skipped: boolean, guided = false) => {
       // Persist the folder choice regardless of how they leave — a set folder is
       // useful even for a skipper.
       if (homeFolder.trim()) setHomeFolderSetting(homeFolder);
@@ -138,11 +141,13 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
           /* backend unreachable (e.g. browser dev) — non-fatal for onboarding */
         });
       }
+      // Opting in here is what makes the sidebar "Get started" checklist appear.
+      if (guided) startTour();
       completeOnboarding();
-      track(skipped ? "onboarding_skipped" : "onboarding_completed", { last_step: stepId });
+      track(skipped ? "onboarding_skipped" : "onboarding_completed", { last_step: stepId, guided });
       onClose();
     },
-    [homeFolder, provider, apiKey, model, settings, save, stepId, onClose],
+    [homeFolder, provider, apiKey, model, settings, save, stepId, onClose, startTour],
   );
 
   const goNext = useCallback(() => {
@@ -214,6 +219,14 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
                 <Button type="button" variant="ghost" size="sm" onClick={goBack}>
                   <ArrowLeftIcon />
                   {t("back")}
+                </Button>
+              )}
+              {/* Offered only at the end — the checklist is about the app, and
+                  only makes sense once setup is out of the way. */}
+              {isLast && (
+                <Button type="button" size="sm" variant="outline" onClick={() => finish(false, true)}>
+                  <CompassIcon />
+                  {t("guideMe")}
                 </Button>
               )}
               <Button type="button" size="sm" onClick={goNext}>

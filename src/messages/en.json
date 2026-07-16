@@ -1164,6 +1164,9 @@
       },
       "openAtLogin": "Open at login",
       "openAtLoginHint": "Start Myra Agents automatically when you log in to your computer.",
+      "guidedTour": "Guided tour",
+      "guidedTourHint": "Bring back the \"Get started\" checklist in the sidebar and walk through the basics again.",
+      "guidedTourStart": "Start the tour",
       "appUpdate": {
         "title": "App updates",
         "description": "Update Myra Agents to the latest version, installed and verified automatically.",
@@ -1507,6 +1510,7 @@
     "back": "Back",
     "next": "Next",
     "getStarted": "Get started",
+    "guideMe": "Show me around",
     "welcome": {
       "title": "Welcome to Myra Agents",
       "description": "Myra Agents is a platform for automating the repetitive work you do. Create and monitor all your Myra agents in one place — local-first and open-source."
@@ -1577,7 +1581,25 @@
       "modelHub": "Myra hub (auto)",
       "folderRow": "Working folder",
       "folderUnset": "Home folder",
-      "cta": "Head to the board, add a card with a prompt, and launch your first run."
+      "cta": "Set up a patrol to have your agent run on its own, then watch it live under Operations."
+    }
+  },
+  "tour": {
+    "title": "Get started",
+    "dismiss": "Hide the checklist",
+    "steps": {
+      "explore": {
+        "title": "Explore the views",
+        "hint": "Operations, Patrols and History — open each one to see what lives where."
+      },
+      "patrol": {
+        "title": "Create your first patrol",
+        "hint": "A patrol is a recurring or cron-triggered run — it's how an agent fires on its own."
+      },
+      "run": {
+        "title": "Follow a run",
+        "hint": "Open a run from History to read the agent's discussion, step by step."
+      }
     }
   }
 }

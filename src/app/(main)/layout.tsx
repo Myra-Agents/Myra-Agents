@@ -22,6 +22,7 @@ import { RunStartedToasts } from "./_components/run-started-toasts";
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { TourBootstrap } from "./_components/tour-bootstrap";
 import { TrayActionListener } from "./_components/tray-action-listener";
 import {
   HeaderLeftControls,
@@ -58,6 +59,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       <AgentTestBootstrap />
       {/* First-run onboarding wizard (localStorage-gated, shows once). */}
       <OnboardingBootstrap />
+      {/* Hydrates the "Get started" checklist and ticks it as routes are visited. */}
+      <TourBootstrap />
       <TrayActionListener />
       {/* Global "Operation started" toast for every run start (manual or scheduled). */}
       <RunStartedToasts />

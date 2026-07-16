@@ -1164,6 +1164,9 @@
       },
       "openAtLogin": "Ouvrir à la connexion",
       "openAtLoginHint": "Lance Myra Agents automatiquement à l'ouverture de votre session.",
+      "guidedTour": "Visite guidée",
+      "guidedTourHint": "Réaffiche la checklist « Pour commencer » dans la barre latérale et repasse en revue les bases.",
+      "guidedTourStart": "Lancer la visite",
       "appUpdate": {
         "title": "Mises à jour de l'app",
         "description": "Mettez Myra Agents à jour vers la dernière version, installée et vérifiée automatiquement.",
@@ -1507,6 +1510,7 @@
     "back": "Retour",
     "next": "Suivant",
     "getStarted": "Commencer",
+    "guideMe": "Guidez-moi",
     "welcome": {
       "title": "Bienvenue sur Myra Agents",
       "description": "Myra Agents est une plateforme pour automatiser le travail répétitif que vous faites. Créez et surveillez tous vos agents Myra au même endroit — local d'abord et open-source."
@@ -1577,7 +1581,25 @@
       "modelHub": "Hub Myra (auto)",
       "folderRow": "Dossier de travail",
       "folderUnset": "Dossier personnel",
-      "cta": "Rendez-vous sur le tableau, ajoutez une carte avec une consigne et lancez votre première exécution."
+      "cta": "Créez une patrouille pour que votre agent s'exécute tout seul, puis suivez-la en direct dans Opérations."
+    }
+  },
+  "tour": {
+    "title": "Pour commencer",
+    "dismiss": "Masquer la checklist",
+    "steps": {
+      "explore": {
+        "title": "Explorer les vues",
+        "hint": "Opérations, Patrouilles et Historique — ouvrez chacune pour voir ce qui s'y trouve."
+      },
+      "patrol": {
+        "title": "Créer votre première patrouille",
+        "hint": "Une patrouille est une exécution récurrente ou déclenchée par cron — c'est ainsi qu'un agent part tout seul."
+      },
+      "run": {
+        "title": "Suivre une exécution",
+        "hint": "Ouvrez une exécution depuis l'Historique pour lire la discussion de l'agent, étape par étape."
+      }
     }
   }
 }

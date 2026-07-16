@@ -10,6 +10,7 @@ import {
 } from "@tauri-apps/plugin-autostart";
 import {
   CheckCircle2Icon,
+  CompassIcon,
   CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
@@ -75,6 +76,7 @@ import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/hom
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke, isTauri, openExternal } from "@/lib/tauri";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
+import { useTourStore } from "@/stores/tour-store";
 import type { AgentPreset, AppSettings, EmbeddedLlmConfig } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
 
@@ -567,6 +569,7 @@ export default function SettingsPage() {
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
   const loaderVariant = usePreferencesStore((state) => state.loaderVariant);
   const setLoaderVariant = usePreferencesStore((state) => state.setLoaderVariant);
+  const startTour = useTourStore((s) => s.start);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
@@ -970,6 +973,19 @@ export default function SettingsPage() {
                   <Switch checked={openAtLogin} onCheckedChange={(checked) => void toggleOpenAtLogin(checked)} />
                 </div>
               )}
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label>{t("preferences.guidedTour")}</Label>
+                  <p className="text-muted-foreground text-xs">{t("preferences.guidedTourHint")}</p>
+                </div>
+                {/* No toast on click — the checklist reappearing in the sidebar
+                    is the feedback. */}
+                <Button variant="outline" size="sm" onClick={startTour}>
+                  <CompassIcon className="size-3.5" />
+                  {t("preferences.guidedTourStart")}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
