@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { usePathname, useRouter } from "next/navigation";
 
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, CheckIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,11 @@ export function SpotlightTour() {
 
   const [rect, setRect] = useState<Rect | null>(null);
   const [targetEl, setTargetEl] = useState<HTMLElement | null>(null);
+  // Which side Radix actually landed on — it flips on collision, and the
+  // suggestion's arrow has to point back at the target, not at where we asked
+  // for the popover to go.
+  const [side, setSide] = useState<keyof typeof ARROW_FOR_SIDE>("right");
+  const contentRef = useRef<MutationObserver | null>(null);
   const step = flow ? TOUR_FLOWS[flow][index] : null;
   const isLast = flow ? index + 1 >= TOUR_FLOWS[flow].length : false;
 
@@ -122,6 +127,24 @@ export function SpotlightTour() {
     return () => window.removeEventListener("keydown", onKey);
   }, [flow, endFlow]);
 
+  // Radix writes the resolved side onto the content as `data-side` and rewrites
+  // it when it flips, so watch the attribute rather than re-deriving its
+  // collision logic here and drifting from it. A callback ref, not an effect:
+  // the content mounts only once a rect exists, long after this component does.
+  const setContentNode = useCallback((node: HTMLDivElement | null) => {
+    contentRef.current?.disconnect();
+    contentRef.current = null;
+    if (!node) return;
+    const read = () => {
+      const s = node.dataset.side;
+      if (s && s in ARROW_FOR_SIDE) setSide(s as keyof typeof ARROW_FOR_SIDE);
+    };
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(node, { attributes: true, attributeFilter: ["data-side"] });
+    contentRef.current = observer;
+  }, []);
+
   const skip = useCallback(() => endFlow(), [endFlow]);
 
   if (!flow || !step || !rect) return null;
@@ -167,6 +190,7 @@ export function SpotlightTour() {
           />
         </PopoverAnchor>
         <PopoverContent
+          ref={setContentNode}
           side="right"
           align="start"
           sideOffset={12}
@@ -189,7 +213,9 @@ export function SpotlightTour() {
               {t(`${step.id}.example`)}
             </p>
           )}
-          {t.has(`${step.id}.exampleValue`) && <ExampleValue t={t} value={t(`${step.id}.exampleValue`)} />}
+          {t.has(`${step.id}.exampleValue`) && (
+            <ExampleValue t={t} value={t(`${step.id}.exampleValue`)} targetEl={targetEl} side={side} />
+          )}
           <div className="mt-3 flex items-center justify-between">
             <div className="flex gap-1">
               {TOUR_FLOWS[flow].map((s, i) => (
@@ -222,31 +248,88 @@ export function SpotlightTour() {
 }
 
 /**
- * A suggested value for the ringed field, with a one-click copy.
+ * Write a value into a React-controlled field.
  *
- * The quotes and the "Try:" label are chrome, not content — the message holds
- * the bare value so what lands on the clipboard is exactly what the user can
- * paste, rather than `Try: “…”` they'd then have to clean up.
+ * Assigning `.value` is invisible to React — it tracks the previous value on the
+ * node and skips the change. Going through the prototype's native setter is what
+ * makes the dispatched `input` event look like real typing, so `onChange` fires
+ * and the draft actually updates.
  */
-function ExampleValue({ t, value }: { t: ReturnType<typeof useTranslations>; value: string }) {
-  const [copied, setCopied] = useState(false);
+function setControlledValue(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  setter?.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
-  const copy = useCallback(() => {
-    void navigator.clipboard
-      .writeText(value)
-      .then(() => setCopied(true))
-      .catch(() => {
-        /* clipboard denied — not worth a toast over a tour popover; the icon
-           just won't change, and the text is right there to select by hand */
-      });
-  }, [value]);
+/** Popover side → the arrow that points back at the ringed element. */
+const ARROW_FOR_SIDE = {
+  right: ArrowLeftIcon,
+  left: ArrowRightIcon,
+  top: ArrowDownIcon,
+  bottom: ArrowUpIcon,
+} as const;
 
-  // Fall back to the idle icon so a second copy still reads as an action.
+/**
+ * A suggested value for the ringed field, with an arrow that points at it and
+ * fills it in — the suggestion applies itself rather than asking the user to
+ * retype or paste it.
+ *
+ * The quotes and the "Try:" label are chrome, not content: the message holds the
+ * bare value, so what reaches the field is exactly the suggestion.
+ */
+function ExampleValue({
+  t,
+  value,
+  targetEl,
+  side,
+}: {
+  t: ReturnType<typeof useTranslations>;
+  value: string;
+  targetEl: HTMLElement | null;
+  side: keyof typeof ARROW_FOR_SIDE;
+}) {
+  const [applied, setApplied] = useState(false);
+  const Arrow = ARROW_FOR_SIDE[side];
+
+  const apply = useCallback(() => {
+    if (!targetEl) return;
+
+    // The ringed element is usually the field itself, but a step may ring a row
+    // that contains it.
+    const field =
+      targetEl instanceof HTMLInputElement || targetEl instanceof HTMLTextAreaElement
+        ? targetEl
+        : targetEl.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
+    if (field) {
+      setControlledValue(field, value);
+      field.focus();
+      setApplied(true);
+      return;
+    }
+
+    // Tags have no standing field: the row shows an "add" button that swaps
+    // itself for an autofocused input. Open it, fill it, and commit with Enter
+    // the way a user would, then blur so the row settles back.
+    const add = targetEl.querySelector<HTMLElement>("[data-tour-add-tag]");
+    if (!add) return;
+    add.click();
+    requestAnimationFrame(() => {
+      const revealed = document.activeElement;
+      if (!(revealed instanceof HTMLInputElement)) return;
+      setControlledValue(revealed, value);
+      revealed.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      revealed.blur();
+      setApplied(true);
+    });
+  }, [targetEl, value]);
+
+  // Back to the arrow, so applying again still reads as an action.
   useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1600);
+    if (!applied) return;
+    const timer = setTimeout(() => setApplied(false), 1600);
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [applied]);
 
   return (
     <div className="mt-2 flex items-start gap-1.5 rounded-md bg-muted px-2 py-1.5">
@@ -255,14 +338,16 @@ function ExampleValue({ t, value }: { t: ReturnType<typeof useTranslations>; val
       </p>
       <button
         type="button"
-        onClick={copy}
-        aria-label={copied ? t("copied") : t("copyExample")}
-        className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+        onClick={apply}
+        disabled={!targetEl}
+        aria-label={applied ? t("applied") : t("applyExample")}
+        title={applied ? t("applied") : t("applyExample")}
+        className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
       >
-        {copied ? (
+        {applied ? (
           <CheckIcon className="size-3.5 text-green-600 dark:text-green-500" />
         ) : (
-          <CopyIcon className="size-3.5" />
+          <Arrow className="size-3.5" />
         )}
       </button>
     </div>

@@ -1053,7 +1053,11 @@ function TagsEditor({
   const BASE_CHIP = "flex h-6 items-center gap-1 rounded-2xl border px-2 text-[12px]";
 
   return (
-    <div className="flex items-center gap-2 pt-4">
+    // data-tour anchors the row, not the "New tag" button: the button is swapped
+    // out for the inline field the moment it's pressed, and a target that
+    // vanishes reads to the tour as "the user navigated away" (see
+    // lib/tour-steps.ts).
+    <div className="flex items-center gap-2 pt-4" data-tour="patrol-tag">
       <span className="pr-1 text-[12px] text-text-tertiary">{t("tags")}</span>
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((tag) => {
@@ -1162,8 +1166,8 @@ function TagsEditor({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            // Spotlight-tour anchor — see lib/tour-steps.ts.
-            data-tour="patrol-tag"
+            // The tour's "fill this in" reaches for this inside the ringed row.
+            data-tour-add-tag=""
             className="flex h-6 items-center rounded-2xl border border-border-cards bg-muted/30 px-2 text-[12px] text-text-secondary transition-colors hover:text-text-primary"
           >
             {t("newTag")}

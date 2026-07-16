@@ -1624,8 +1624,8 @@
       "next": "Next",
       "done": "Done",
       "tryThis": "Try:",
-      "copyExample": "Copy this example",
-      "copied": "Copied",
+      "applyExample": "Fill this in for me",
+      "applied": "Filled in",
       "operations": {
         "title": "Operations is the live view",
         "body": "Everything currently running, grouped by status — what's going, what's stuck, what needs you."

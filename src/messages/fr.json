@@ -1624,8 +1624,8 @@
       "next": "Suivant",
       "done": "Terminé",
       "tryThis": "Essayez :",
-      "copyExample": "Copier cet exemple",
-      "copied": "Copié",
+      "applyExample": "Remplir le champ pour moi",
+      "applied": "Rempli",
       "operations": {
         "title": "Opérations, c'est la vue en direct",
         "body": "Tout ce qui tourne, groupé par statut — ce qui avance, ce qui bloque, ce qui vous attend."
