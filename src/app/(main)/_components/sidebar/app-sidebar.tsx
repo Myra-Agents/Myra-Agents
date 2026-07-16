@@ -21,7 +21,6 @@ import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { MacSidebarControls } from "../window-controls";
-import { NavGetStarted } from "./nav-get-started";
 import { NavMain } from "./nav-main";
 import { SearchButton } from "./search-dialog";
 // import { NavUser } from "./nav-user";
@@ -81,8 +80,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={sidebarItems} />
-        {/* Guided tour — self-hides unless the user opted in, and once done. */}
-        <NavGetStarted />
       </SidebarContent>
       <SidebarFooter>
         <SidebarSupportCard />
