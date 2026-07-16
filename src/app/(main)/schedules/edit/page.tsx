@@ -802,6 +802,8 @@ function ScheduleEditScreen() {
           onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
           placeholder={t("namePlaceholder")}
           aria-label={t("nameLabel")}
+          // Spotlight-tour anchor — see lib/tour-steps.ts.
+          data-tour="patrol-name"
           className="-ml-1.5 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 font-medium text-[16px] text-text-primary leading-tight outline-none transition-colors placeholder:text-text-tertiary hover:border-border/60 focus:border-border focus:bg-card-background"
         />
         <textarea
@@ -809,6 +811,7 @@ function ScheduleEditScreen() {
           onChange={(e) => setDraft((d) => (d ? { ...d, cardDescription: e.target.value } : d))}
           placeholder={t("subtitle")}
           aria-label={t("descriptionLabel")}
+          data-tour="patrol-subtitle"
           rows={1}
           className="-ml-1.5 resize-none rounded-md border border-transparent bg-transparent px-1.5 py-0.5 font-light text-[12px] text-text-secondary leading-tight outline-none transition-colors placeholder:text-text-tertiary hover:border-border/60 focus:border-border focus:bg-card-background"
         />
@@ -829,7 +832,8 @@ function ScheduleEditScreen() {
           />
           <span className="text-[12px] text-text-secondary">{draft.enabled ? t("active") : t("inactive")}</span>
         </div>
-        <div className="flex items-center border-border border-r px-2">
+        {/* data-tour: spotlight-tour anchor — see lib/tour-steps.ts. */}
+        <div className="flex items-center border-border border-r px-2" data-tour="patrol-folder">
           <FolderSelect
             scheduleId={task.id}
             // Template / blank drafts start fresh every time — don't seed or
@@ -1158,6 +1162,8 @@ function TagsEditor({
           <button
             type="button"
             onClick={() => setAdding(true)}
+            // Spotlight-tour anchor — see lib/tour-steps.ts.
+            data-tour="patrol-tag"
             className="flex h-6 items-center rounded-2xl border border-border-cards bg-muted/30 px-2 text-[12px] text-text-secondary transition-colors hover:text-text-primary"
           >
             {t("newTag")}
@@ -1324,7 +1330,8 @@ function SettingsTab({
   return (
     <div className="flex flex-col gap-7">
       {/* Triggers */}
-      <section className="flex flex-col gap-2.5">
+      {/* data-tour: spotlight-tour anchor — see lib/tour-steps.ts. */}
+      <section className="flex flex-col gap-2.5" data-tour="patrol-trigger">
         <span className="px-2 text-[12px] text-text-secondary">{t("triggers")}</span>
         <TriggersCard
           schedule={draft.schedule}
@@ -1351,10 +1358,12 @@ function SettingsTab({
               setDraft((d) => (d ? { ...d, agentPrompt: e.target.value } : d));
             }}
             spellCheck={false}
+            // Spotlight-tour anchor — see lib/tour-steps.ts.
+            data-tour="patrol-instruction"
             className="min-h-[182px] resize-y border-0 bg-transparent p-0 text-[12px] text-text-primary shadow-none focus-visible:ring-0 dark:bg-transparent"
             placeholder={t("instructionPlaceholder")}
           />
-          <div className="border-border border-t pt-4">
+          <div className="border-border border-t pt-4" data-tour="patrol-agent">
             <AgentPresetSection
               draft={draft}
               setDraft={setDraft}

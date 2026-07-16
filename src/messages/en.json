@@ -1639,9 +1639,37 @@
         "title": "Create your first patrol",
         "body": "Click the highlighted button to open the patrol editor."
       },
+      "patrolName": {
+        "title": "Name it",
+        "body": "What this patrol does, in a few words. It's what you'll see on the board."
+      },
+      "patrolSubtitle": {
+        "title": "Add a subtitle",
+        "body": "Optional — a line of context for your future self, under the name."
+      },
+      "patrolTag": {
+        "title": "Tag it",
+        "body": "Optional. Tags group patrols together and filter the board once you have a few."
+      },
+      "patrolFolder": {
+        "title": "Pick the folder",
+        "body": "Where the agent works — the project it opens. Required: a patrol without one won't save."
+      },
+      "patrolTrigger": {
+        "title": "Set the trigger",
+        "body": "When it fires on its own: daily, weekly, a cron expression, or an incoming webhook."
+      },
+      "patrolInstruction": {
+        "title": "Write the instruction",
+        "body": "What you'd tell a teammate. This is the prompt the agent runs every time. Required."
+      },
+      "patrolAgent": {
+        "title": "Choose the agent",
+        "body": "Who runs it — the built-in Myra agent, or any CLI you've set up. The default is fine to start."
+      },
       "savePatrol": {
         "title": "Save it",
-        "body": "Give it a name, a prompt and a schedule, then click the highlighted button to put it on the board."
+        "body": "That's everything — click the highlighted button to put it on the board."
       },
       "rowMenu": {
         "title": "Don't wait for the schedule",

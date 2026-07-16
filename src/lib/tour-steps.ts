@@ -43,13 +43,27 @@ export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
     { id: "patrols", route: "/schedules", target: "nav-/schedules" },
     { id: "history", route: "/history", target: "nav-/history" },
   ],
-  // Through to a saved patrol: the "New patrol" click only opens the editor, and
-  // stopping there leaves nothing on the board and the box unticked.
+  // Through to a saved patrol, field by field: opening the editor and pointing
+  // at Save taught nothing — an empty patrol can't even be saved (the trigger
+  // and the instruction are required), so the box would never tick.
+  //
+  // Only the two ends are interactive. The middle steps ask the user to *type*,
+  // and there's no press to wait for — a "Next" they control is the honest
+  // affordance, and it lets them skip a field they don't want.
   patrol: [
     // Portaled into the shared top bar by the schedules page, so it only exists
     // once we're actually on /schedules.
     { id: "newPatrol", route: "/schedules", target: "new-patrol", interactive: true, padding: 4 },
     // The click above lands on the editor; no route of our own to push.
+    { id: "patrolName", target: "patrol-name", padding: 2 },
+    { id: "patrolSubtitle", target: "patrol-subtitle", padding: 2 },
+    { id: "patrolTag", target: "patrol-tag", padding: 4 },
+    // Save refuses a patrol with no working folder, and a blank draft has none —
+    // leaving this out would walk the user into a Save that just errors.
+    { id: "patrolFolder", target: "patrol-folder", padding: 2 },
+    { id: "patrolTrigger", target: "patrol-trigger", padding: 4 },
+    { id: "patrolInstruction", target: "patrol-instruction", padding: 8 },
+    { id: "patrolAgent", target: "patrol-agent", padding: 4 },
     { id: "savePatrol", target: "save-patrol", interactive: true, padding: 4 },
   ],
   // Launch one by hand, then read it. Both steps self-skip when there's no

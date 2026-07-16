@@ -1639,9 +1639,37 @@
         "title": "Créez votre première patrouille",
         "body": "Cliquez le bouton entouré pour ouvrir l'éditeur de patrouille."
       },
+      "patrolName": {
+        "title": "Nommez-la",
+        "body": "Ce que fait cette patrouille, en quelques mots. C'est ce que vous verrez sur le tableau."
+      },
+      "patrolSubtitle": {
+        "title": "Ajoutez un sous-titre",
+        "body": "Optionnel — une ligne de contexte pour votre vous futur, sous le nom."
+      },
+      "patrolTag": {
+        "title": "Ajoutez un tag",
+        "body": "Optionnel. Les tags regroupent les patrouilles et filtrent le tableau dès que vous en avez plusieurs."
+      },
+      "patrolFolder": {
+        "title": "Choisissez le dossier",
+        "body": "Là où l'agent travaille — le projet qu'il ouvre. Obligatoire : sans lui, la patrouille ne s'enregistre pas."
+      },
+      "patrolTrigger": {
+        "title": "Réglez le déclencheur",
+        "body": "Quand elle part toute seule : chaque jour, chaque semaine, une expression cron, ou un webhook entrant."
+      },
+      "patrolInstruction": {
+        "title": "Écrivez la consigne",
+        "body": "Ce que vous diriez à un collègue. C'est la consigne que l'agent exécute à chaque fois. Obligatoire."
+      },
+      "patrolAgent": {
+        "title": "Choisissez l'agent",
+        "body": "Qui l'exécute — l'agent Myra intégré, ou n'importe quelle CLI que vous avez configurée. Le défaut suffit pour démarrer."
+      },
       "savePatrol": {
         "title": "Enregistrez-la",
-        "body": "Donnez-lui un nom, une consigne et un horaire, puis cliquez le bouton entouré pour l'ajouter au tableau."
+        "body": "C'est tout — cliquez le bouton entouré pour l'ajouter au tableau."
       },
       "rowMenu": {
         "title": "N'attendez pas l'horaire",
