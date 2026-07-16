@@ -1611,11 +1611,11 @@
       },
       "patrol": {
         "title": "Créer votre première patrouille",
-        "hint": "Une patrouille est une exécution récurrente ou déclenchée par cron — c'est ainsi qu'un agent part tout seul."
+        "hint": "Une patrouille est une opération récurrente ou déclenchée par cron — c'est ainsi qu'un agent part tout seul."
       },
       "run": {
-        "title": "Suivre une exécution",
-        "hint": "Ouvrez une exécution depuis l'Historique pour lire la discussion de l'agent, étape par étape."
+        "title": "Suivre une opération",
+        "hint": "Ouvrez une opération depuis l'Historique pour lire la discussion de l'agent, étape par étape."
       }
     },
     "spotlight": {
@@ -1632,8 +1632,8 @@
         "body": "Une patrouille déclenche un agent selon un horaire ou un cron. C'est là que l'automatisation commence vraiment."
       },
       "history": {
-        "title": "L'historique garde chaque exécution",
-        "body": "Les exécutions passées de chaque patrouille, réussies ou échouées, avec les stats et toute la discussion de l'agent."
+        "title": "L'historique garde chaque opération",
+        "body": "Les opérations passées de chaque patrouille, réussies ou échouées, avec les stats et toute la discussion de l'agent."
       },
       "newPatrol": {
         "title": "Créez votre première patrouille",

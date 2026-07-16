@@ -1611,11 +1611,11 @@
       },
       "patrol": {
         "title": "Create your first patrol",
-        "hint": "A patrol is a recurring or cron-triggered run — it's how an agent fires on its own."
+        "hint": "A patrol is a recurring or cron-triggered operation — it's how an agent fires on its own."
       },
       "run": {
-        "title": "Follow a run",
-        "hint": "Open a run from History to read the agent's discussion, step by step."
+        "title": "Follow an operation",
+        "hint": "Open an operation from History to read the agent's discussion, step by step."
       }
     },
     "spotlight": {
@@ -1632,8 +1632,8 @@
         "body": "A patrol fires an agent on a schedule or a cron trigger. This is where automation actually starts."
       },
       "history": {
-        "title": "History keeps every run",
-        "body": "Past runs of every patrol, succeeded or failed, with stats and the full agent discussion."
+        "title": "History keeps every operation",
+        "body": "Past operations of every patrol, succeeded or failed, with stats and the full agent discussion."
       },
       "newPatrol": {
         "title": "Create your first patrol",
