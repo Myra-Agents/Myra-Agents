@@ -79,7 +79,30 @@ export function SpotlightTour() {
         setTargetEl((prev) => (prev === el ? prev : el));
         const r = el.getBoundingClientRect();
         const pad = step.padding ?? 0;
-        setRect({ top: r.top - pad, left: r.left - pad, width: r.width + pad * 2, height: r.height + pad * 2 });
+        let top = r.top - pad;
+        let left = r.left - pad;
+        let right = r.right + pad;
+        let bottom = r.bottom + pad;
+        // A control that opens a menu means the menu is now part of the thing
+        // being pointed at: fold it into the rect so it's lit rather than dimmed,
+        // and so the popover is placed clear of it instead of straight on top —
+        // both anchor to this control, so they collide by construction.
+        // Any menu open during a step is the one the step just asked for.
+        //
+        // Not when the target lives *inside* the menu (the "Run now" item): the
+        // rect is the ring too, and swallowing the menu would blur a precise
+        // point-at-this into a box around everything.
+        const menu = document.querySelector<HTMLElement>('[role="menu"], [role="listbox"]');
+        if (menu && !menu.contains(el)) {
+          const m = menu.getBoundingClientRect();
+          if (m.width > 0 && m.height > 0) {
+            top = Math.min(top, m.top);
+            left = Math.min(left, m.left);
+            right = Math.max(right, m.right);
+            bottom = Math.max(bottom, m.bottom);
+          }
+        }
+        setRect({ top, left, width: right - left, height: bottom - top });
       } else if (!found && performance.now() - startedAt > TARGET_TIMEOUT_MS) {
         // Never appeared — move on rather than hold the user under a dimmed
         // screen pointing at nothing.

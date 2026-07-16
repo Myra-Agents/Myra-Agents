@@ -1659,8 +1659,8 @@
         "exampleValue": "ménage"
       },
       "patrolFolder": {
-        "title": "Choisissez le dossier",
-        "body": "Là où l'agent travaille — le projet qu'il ouvre. Obligatoire : sans lui, la patrouille ne s'enregistre pas."
+        "title": "Choisissez le dossier à traiter",
+        "body": "L'agent ouvre ce dossier et travaille dedans — pour notre exemple, c'est le dossier en pagaille que vous voulez faire ranger. Obligatoire : sans lui, la patrouille ne s'enregistre pas."
       },
       "patrolTrigger": {
         "title": "Réglez le déclencheur",

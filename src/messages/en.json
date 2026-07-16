@@ -1659,8 +1659,8 @@
         "exampleValue": "chores"
       },
       "patrolFolder": {
-        "title": "Pick the folder",
-        "body": "Where the agent works — the project it opens. Required: a patrol without one won't save."
+        "title": "Pick the folder to work on",
+        "body": "The agent opens this folder and works inside it — for our example, that's the messy folder you want tidied. Required: a patrol without one won't save."
       },
       "patrolTrigger": {
         "title": "Set the trigger",
