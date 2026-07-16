@@ -11,12 +11,12 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
+  HandIcon,
   KanbanIcon,
   KeyIcon,
   Loader2Icon,
   PlugZapIcon,
   RocketIcon,
-  SparklesIcon,
   TerminalIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -297,7 +297,7 @@ function StepHeading({ icon, title, description }: { icon: React.ReactNode; titl
 function WelcomeStep({ t }: { t: ReturnType<typeof useTranslations> }) {
   return (
     <div className="space-y-5">
-      <StepHeading icon={<SparklesIcon />} title={t("welcome.title")} description={t("welcome.description")} />
+      <StepHeading icon={<HandIcon />} title={t("welcome.title")} description={t("welcome.description")} />
     </div>
   );
 }
