@@ -23,6 +23,7 @@ import { RunStartedToasts } from "./_components/run-started-toasts";
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { TourCelebration } from "./_components/tour/tour-celebration";
 import { TourBootstrap } from "./_components/tour-bootstrap";
 import { TrayActionListener } from "./_components/tray-action-listener";
 import {
@@ -65,6 +66,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       <TourBootstrap />
       {/* Spotlight walkthrough — renders only while a checklist flow is running. */}
       <SpotlightTour />
+      {/* Confetti on the last checklist box ticking; nothing otherwise. */}
+      <TourCelebration />
       <TrayActionListener />
       {/* Global "Operation started" toast for every run start (manual or scheduled). */}
       <RunStartedToasts />
