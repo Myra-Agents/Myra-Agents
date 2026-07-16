@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { usePathname, useRouter } from "next/navigation";
 
+import { CheckIcon, CopyIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -179,12 +180,16 @@ export function SpotlightTour() {
           <p className="mt-1 font-medium text-sm">{t(`${step.id}.title`)}</p>
           <p className="mt-1 text-muted-foreground text-xs leading-relaxed">{t(`${step.id}.body`)}</p>
           {/* Only some steps carry a worked example — `has` because t() throws
-              on a missing key rather than returning empty. */}
+              on a missing key rather than returning empty.
+              `example` is prose (a hint about a step you can't paste into);
+              `exampleValue` is a literal the user can lift straight into the
+              ringed field, so it gets the quotes and the copy button. */}
           {t.has(`${step.id}.example`) && (
             <p className="mt-2 rounded-md bg-muted px-2 py-1.5 text-muted-foreground text-xs italic leading-relaxed">
               {t(`${step.id}.example`)}
             </p>
           )}
+          {t.has(`${step.id}.exampleValue`) && <ExampleValue t={t} value={t(`${step.id}.exampleValue`)} />}
           <div className="mt-3 flex items-center justify-between">
             <div className="flex gap-1">
               {TOUR_FLOWS[flow].map((s, i) => (
@@ -213,5 +218,53 @@ export function SpotlightTour() {
         </PopoverContent>
       </Popover>
     </>
+  );
+}
+
+/**
+ * A suggested value for the ringed field, with a one-click copy.
+ *
+ * The quotes and the "Try:" label are chrome, not content — the message holds
+ * the bare value so what lands on the clipboard is exactly what the user can
+ * paste, rather than `Try: “…”` they'd then have to clean up.
+ */
+function ExampleValue({ t, value }: { t: ReturnType<typeof useTranslations>; value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = useCallback(() => {
+    void navigator.clipboard
+      .writeText(value)
+      .then(() => setCopied(true))
+      .catch(() => {
+        /* clipboard denied — not worth a toast over a tour popover; the icon
+           just won't change, and the text is right there to select by hand */
+      });
+  }, [value]);
+
+  // Fall back to the idle icon so a second copy still reads as an action.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <div className="mt-2 flex items-start gap-1.5 rounded-md bg-muted px-2 py-1.5">
+      <p className="min-w-0 flex-1 text-muted-foreground text-xs italic leading-relaxed">
+        {t("tryThis")} “{value}”
+      </p>
+      <button
+        type="button"
+        onClick={copy}
+        aria-label={copied ? t("copied") : t("copyExample")}
+        className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {copied ? (
+          <CheckIcon className="size-3.5 text-green-600 dark:text-green-500" />
+        ) : (
+          <CopyIcon className="size-3.5" />
+        )}
+      </button>
+    </div>
   );
 }

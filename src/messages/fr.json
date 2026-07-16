@@ -1623,6 +1623,9 @@
       "skip": "Passer",
       "next": "Suivant",
       "done": "Terminé",
+      "tryThis": "Essayez :",
+      "copyExample": "Copier cet exemple",
+      "copied": "Copié",
       "operations": {
         "title": "Opérations, c'est la vue en direct",
         "body": "Tout ce qui tourne, groupé par statut — ce qui avance, ce qui bloque, ce qui vous attend."
@@ -1643,17 +1646,17 @@
       "patrolName": {
         "title": "Nommez-la",
         "body": "Ce que fait cette patrouille, en quelques mots. C'est ce que vous verrez sur le tableau.",
-        "example": "Essayez : « Ranger mes téléchargements »"
+        "exampleValue": "Ranger mes téléchargements"
       },
       "patrolSubtitle": {
         "title": "Ajoutez un sous-titre",
         "body": "Optionnel — une ligne de contexte pour votre vous futur, sous le nom.",
-        "example": "Essayez : « Éviter que ça s'entasse à nouveau »"
+        "exampleValue": "Éviter que ça s'entasse à nouveau"
       },
       "patrolTag": {
         "title": "Ajoutez un tag",
         "body": "Optionnel. Les tags regroupent les patrouilles et filtrent le tableau dès que vous en avez plusieurs.",
-        "example": "Essayez : « ménage »"
+        "exampleValue": "ménage"
       },
       "patrolFolder": {
         "title": "Choisissez le dossier",
@@ -1662,12 +1665,12 @@
       "patrolTrigger": {
         "title": "Réglez le déclencheur",
         "body": "Quand elle part toute seule : chaque jour, chaque semaine, une expression cron, ou un webhook entrant.",
-        "example": "Essayez : chaque semaine, vendredi à 17:00"
+        "example": "Pour l'exemple du dossier : chaque semaine, vendredi à 17:00."
       },
       "patrolInstruction": {
         "title": "Écrivez la consigne",
         "body": "Ce que vous diriez à un collègue — c'est la consigne que l'agent exécute à chaque fois. Obligatoire.",
-        "example": "Essayez : « Range ce dossier : regroupe les fichiers par type, renomme-les de façon cohérente, et mets à la corbeille ce qui est manifestement inutile. »"
+        "exampleValue": "Range ce dossier : regroupe les fichiers par type, renomme-les de façon cohérente, et mets à la corbeille ce qui est manifestement inutile."
       },
       "patrolAgent": {
         "title": "Choisissez l'agent",

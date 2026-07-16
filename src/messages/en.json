@@ -1623,6 +1623,9 @@
       "skip": "Skip",
       "next": "Next",
       "done": "Done",
+      "tryThis": "Try:",
+      "copyExample": "Copy this example",
+      "copied": "Copied",
       "operations": {
         "title": "Operations is the live view",
         "body": "Everything currently running, grouped by status — what's going, what's stuck, what needs you."
@@ -1643,17 +1646,17 @@
       "patrolName": {
         "title": "Name it",
         "body": "What this patrol does, in a few words. It's what you'll see on the board.",
-        "example": "Try: “Sort out my Downloads”"
+        "exampleValue": "Sort out my Downloads"
       },
       "patrolSubtitle": {
         "title": "Add a subtitle",
         "body": "Optional — a line of context for your future self, under the name.",
-        "example": "Try: “Keep it from piling up again”"
+        "exampleValue": "Keep it from piling up again"
       },
       "patrolTag": {
         "title": "Tag it",
         "body": "Optional. Tags group patrols together and filter the board once you have a few.",
-        "example": "Try: “chores”"
+        "exampleValue": "chores"
       },
       "patrolFolder": {
         "title": "Pick the folder",
@@ -1662,12 +1665,12 @@
       "patrolTrigger": {
         "title": "Set the trigger",
         "body": "When it fires on its own: daily, weekly, a cron expression, or an incoming webhook.",
-        "example": "Try: weekly, Friday at 17:00"
+        "example": "For the folder example: weekly, Friday at 17:00."
       },
       "patrolInstruction": {
         "title": "Write the instruction",
         "body": "What you'd tell a teammate — this is the prompt the agent runs every time. Required.",
-        "example": "Try: “Sort out this folder: group the files by type, rename them consistently, and move the obvious junk to the trash.”"
+        "exampleValue": "Sort out this folder: group the files by type, rename them consistently, and move the obvious junk to the trash."
       },
       "patrolAgent": {
         "title": "Choose the agent",
