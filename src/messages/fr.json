@@ -1164,8 +1164,11 @@
       },
       "openAtLogin": "Ouvrir à la connexion",
       "openAtLoginHint": "Lance Myra Agents automatiquement à l'ouverture de votre session.",
+      "setupWizard": "Assistant de configuration",
+      "setupWizardHint": "Repasse la configuration initiale — langue, thème, agent, modèle et dossier de travail.",
+      "setupWizardStart": "Ouvrir l'assistant",
       "guidedTour": "Visite guidée",
-      "guidedTourHint": "Réaffiche la checklist « Pour commencer » dans la barre latérale et repasse en revue les bases.",
+      "guidedTourHint": "Réaffiche la checklist « Pour commencer » et repasse en revue les bases.",
       "guidedTourStart": "Lancer la visite",
       "appUpdate": {
         "title": "Mises à jour de l'app",

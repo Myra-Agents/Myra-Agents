@@ -1164,8 +1164,11 @@
       },
       "openAtLogin": "Open at login",
       "openAtLoginHint": "Start Myra Agents automatically when you log in to your computer.",
+      "setupWizard": "Setup wizard",
+      "setupWizardHint": "Walk through the first-run setup again — language, theme, agent, model and working folder.",
+      "setupWizardStart": "Open the wizard",
       "guidedTour": "Guided tour",
-      "guidedTourHint": "Bring back the \"Get started\" checklist in the sidebar and walk through the basics again.",
+      "guidedTourHint": "Bring back the \"Get started\" checklist and walk through the basics again.",
       "guidedTourStart": "Start the tour",
       "appUpdate": {
         "title": "App updates",

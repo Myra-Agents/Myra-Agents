@@ -35,12 +35,3 @@ export function completeOnboarding(): void {
     /* localStorage unavailable */
   }
 }
-
-/** Clear the flag so the wizard shows again on next mount (Settings → replay). */
-export function resetOnboarding(): void {
-  try {
-    window.localStorage.removeItem(ONBOARDING_KEY);
-  } catch {
-    /* localStorage unavailable */
-  }
-}

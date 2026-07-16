@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 
-import { isOnboardingComplete } from "@/lib/onboarding.client";
+import { useOnboardingStore } from "@/stores/onboarding-store";
 
 import { OnboardingWizard } from "./onboarding-wizard";
 
@@ -11,16 +11,19 @@ import { OnboardingWizard } from "./onboarding-wizard";
  * flag *after* mount (never during SSR/static export, where `window` is absent)
  * so the static Tauri build hydrates cleanly, then shows the wizard once for a
  * fresh install. Mounted globally from the (main) layout.
+ *
+ * Visibility lives in {@link useOnboardingStore} rather than local state so
+ * Settings can replay the wizard without a reload.
  */
 export function OnboardingBootstrap() {
-  const [show, setShow] = useState(false);
+  const open = useOnboardingStore((s) => s.open);
+  const hydrate = useOnboardingStore((s) => s.hydrate);
+  const close = useOnboardingStore((s) => s.close);
 
   useEffect(() => {
-    if (!isOnboardingComplete()) setShow(true);
-  }, []);
+    hydrate();
+  }, [hydrate]);
 
-  const handleClose = useCallback(() => setShow(false), []);
-
-  if (!show) return null;
-  return <OnboardingWizard onClose={handleClose} />;
+  if (!open) return null;
+  return <OnboardingWizard onClose={close} />;
 }

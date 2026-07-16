@@ -15,6 +15,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   FlaskConicalIcon,
+  HandIcon,
   Loader2Icon,
   PlusIcon,
   SaveIcon,
@@ -75,6 +76,7 @@ import {
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke, isTauri, openExternal } from "@/lib/tauri";
+import { useOnboardingStore } from "@/stores/onboarding-store";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { useTourStore } from "@/stores/tour-store";
 import type { AgentPreset, AppSettings, EmbeddedLlmConfig } from "@/types/settings";
@@ -570,6 +572,7 @@ export default function SettingsPage() {
   const loaderVariant = usePreferencesStore((state) => state.loaderVariant);
   const setLoaderVariant = usePreferencesStore((state) => state.setLoaderVariant);
   const startTour = useTourStore((s) => s.start);
+  const replayOnboarding = useOnboardingStore((s) => s.replay);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
@@ -976,11 +979,22 @@ export default function SettingsPage() {
 
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-0.5">
+                  <Label>{t("preferences.setupWizard")}</Label>
+                  <p className="text-muted-foreground text-xs">{t("preferences.setupWizardHint")}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={replayOnboarding}>
+                  <HandIcon className="size-3.5" />
+                  {t("preferences.setupWizardStart")}
+                </Button>
+              </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
                   <Label>{t("preferences.guidedTour")}</Label>
                   <p className="text-muted-foreground text-xs">{t("preferences.guidedTourHint")}</p>
                 </div>
-                {/* No toast on click — the checklist reappearing in the sidebar
-                    is the feedback. */}
+                {/* No toast on either — the wizard opening, and the checklist
+                    reappearing bottom-right, are the feedback. */}
                 <Button variant="outline" size="sm" onClick={startTour}>
                   <CompassIcon className="size-3.5" />
                   {t("preferences.guidedTourStart")}
