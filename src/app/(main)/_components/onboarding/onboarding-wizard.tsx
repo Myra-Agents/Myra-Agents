@@ -58,6 +58,8 @@ type AppTheme = AppSettings["theme"];
 /** Where users mint an OpenRouter key + browse model ids. */
 const OPENROUTER_KEYS_URL = "https://openrouter.ai/keys";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/models";
+/** Same catalog, filtered to the $0 models — the ones a new user should start on. */
+const OPENROUTER_FREE_MODELS_URL = "https://openrouter.ai/models?max_price=0";
 /** Docs for the local-models runtime we offer to install. */
 const OLLAMA_URL = "https://ollama.com";
 
@@ -731,9 +733,21 @@ function ConnectCloud({
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="onboarding-openrouter-model" className="font-medium text-sm text-text-primary">
-            {t("connect.modelLabel")}
-          </label>
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="onboarding-openrouter-model" className="font-medium text-sm text-text-primary">
+              {t("connect.modelLabel")}
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto gap-1 px-1.5 py-0.5 text-primary text-xs"
+              onClick={() => void openExternal(OPENROUTER_FREE_MODELS_URL)}
+            >
+              {t("connect.freeModels")}
+              <ExternalLinkIcon className="size-3" />
+            </Button>
+          </div>
           <Input
             id="onboarding-openrouter-model"
             autoComplete="off"

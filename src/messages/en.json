@@ -1551,6 +1551,7 @@
       "getKey": "Get a key",
       "keyPlaceholder": "sk-or-…",
       "modelLabel": "Model",
+      "freeModels": "Free models",
       "modelPlaceholder": "e.g. openai/gpt-4o-mini",
       "gifAlt": "Copying a model id from an OpenRouter model page",
       "gifCaption": "Every model on <link>openrouter.ai/models</link> shows its id under the name — copy it and paste it above.",
