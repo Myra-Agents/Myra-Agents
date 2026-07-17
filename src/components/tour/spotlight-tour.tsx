@@ -186,25 +186,17 @@ export function SpotlightTour() {
 
   return (
     <>
-      {/* The four panels around the hole. They block clicks; the hole doesn't.
-          A step that's about the page behind drops them entirely — see `dim`. */}
-      {step.dim !== false && (
-        <>
-          <div
-            className={panel}
-            style={{ top, left: 0, right: 0, height: `max(0px, calc(${rect.top}px - ${top}))`, zIndex: 60 }}
-          />
-          <div className={panel} style={{ top: rect.top + rect.height, left: 0, right: 0, bottom: 0, zIndex: 60 }} />
-          <div
-            className={panel}
-            style={{ top: rect.top, left: 0, width: rect.left, height: rect.height, zIndex: 60 }}
-          />
-          <div
-            className={panel}
-            style={{ top: rect.top, left: rect.left + rect.width, right: 0, height: rect.height, zIndex: 60 }}
-          />
-        </>
-      )}
+      {/* The four panels around the hole. They block clicks; the hole doesn't. */}
+      <div
+        className={panel}
+        style={{ top, left: 0, right: 0, height: `max(0px, calc(${rect.top}px - ${top}))`, zIndex: 60 }}
+      />
+      <div className={panel} style={{ top: rect.top + rect.height, left: 0, right: 0, bottom: 0, zIndex: 60 }} />
+      <div className={panel} style={{ top: rect.top, left: 0, width: rect.left, height: rect.height, zIndex: 60 }} />
+      <div
+        className={panel}
+        style={{ top: rect.top, left: rect.left + rect.width, right: 0, height: rect.height, zIndex: 60 }}
+      />
 
       {/* The ring. Pointer-events off so it never eats the click it invites. */}
       <div
