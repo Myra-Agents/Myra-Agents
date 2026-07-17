@@ -1181,7 +1181,7 @@
       "setupWizardStart": "Open the wizard",
       "guidedTour": "Guided tour",
       "guidedTourHint": "Bring back the \"Get started\" checklist and walk through the basics again.",
-      "guidedTourStart": "Start the tour",
+      "guidedTourStart": "Show me around",
       "appUpdate": {
         "title": "App updates",
         "description": "Update Myra Agents to the latest version, installed and verified automatically.",
@@ -1583,13 +1583,6 @@
         "noModels": "No local models yet — download one to run the agent.",
         "downloadModel": "Download a model",
         "manageTitle": "Local Ollama models"
-      },
-      "test": {
-        "button": "Test connection",
-        "testing": "Testing…",
-        "ok": "Connected",
-        "failed": "Test failed",
-        "devOnly": "Connection test runs in the desktop app."
       }
     },
     "folder": {

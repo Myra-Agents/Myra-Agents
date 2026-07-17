@@ -18,7 +18,6 @@ import {
   Loader2Icon,
   MonitorIcon,
   MoonIcon,
-  PlugZapIcon,
   SlidersHorizontalIcon,
   SunIcon,
   TerminalIcon,
@@ -45,7 +44,7 @@ import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/hom
 import { completeOnboarding } from "@/lib/onboarding.client";
 import { track } from "@/lib/posthog/events";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
-import { invoke, isDevModeError, openExternal } from "@/lib/tauri";
+import { openExternal } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { useTourStore } from "@/stores/tour-store";
@@ -615,77 +614,6 @@ function ConnectStep({
         <ConnectCloud t={t} apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />
       ) : (
         <ConnectOllama t={t} model={model} setModel={setModel} />
-      )}
-
-      {/* key on provider so switching cloud↔ollama clears the previous test result. */}
-      <TestConnectionButton key={provider} t={t} provider={provider} apiKey={apiKey} model={model} />
-    </div>
-  );
-}
-
-/**
- * Tests the embedded agent's LLM wiring for real via the `test_embedded_llm` rpc
- * — a tiny OpenRouter completion (cloud) or an Ollama generate (local). Reports
- * success or the backend's error inline.
- */
-function TestConnectionButton({
-  t,
-  provider,
-  apiKey,
-  model,
-}: {
-  t: ReturnType<typeof useTranslations>;
-  provider: EmbeddedLlmProvider;
-  apiKey: string;
-  model: string;
-}) {
-  const [state, setState] = useState<"idle" | "testing" | "ok" | "error">("idle");
-  const [message, setMessage] = useState("");
-
-  const missingInput = provider === "ollama" ? !model.trim() : !apiKey.trim() && !model.trim();
-
-  const runTest = useCallback(async () => {
-    setState("testing");
-    setMessage("");
-    try {
-      await invoke("test_embedded_llm", {
-        provider,
-        apiKey: provider === "cloud" ? apiKey.trim() || undefined : undefined,
-        model: model.trim() || undefined,
-      });
-      setState("ok");
-    } catch (error) {
-      setState("error");
-      setMessage(
-        isDevModeError(error) ? t("connect.test.devOnly") : error instanceof Error ? error.message : String(error),
-      );
-    }
-  }, [provider, apiKey, model, t]);
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2.5">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => void runTest()}
-          disabled={state === "testing" || missingInput}
-        >
-          {state === "testing" ? <Loader2Icon className="animate-spin" /> : <PlugZapIcon />}
-          {state === "testing" ? t("connect.test.testing") : t("connect.test.button")}
-        </Button>
-        {state === "ok" && (
-          <span className="flex items-center gap-1 text-green-600 text-sm">
-            <CheckIcon className="size-4" />
-            {t("connect.test.ok")}
-          </span>
-        )}
-      </div>
-      {state === "error" && (
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-destructive text-xs leading-relaxed">
-          {message || t("connect.test.failed")}
-        </p>
       )}
     </div>
   );

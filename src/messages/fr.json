@@ -1583,13 +1583,6 @@
         "noModels": "Aucun modèle local pour l'instant — téléchargez-en un pour lancer l'agent.",
         "downloadModel": "Télécharger un modèle",
         "manageTitle": "Modèles Ollama locaux"
-      },
-      "test": {
-        "button": "Tester la connexion",
-        "testing": "Test…",
-        "ok": "Connecté",
-        "failed": "Échec du test",
-        "devOnly": "Le test de connexion s'exécute dans l'application desktop."
       }
     },
     "folder": {
