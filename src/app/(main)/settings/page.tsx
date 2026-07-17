@@ -63,6 +63,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // import { useEntitlement } from "@/hooks/use-entitlement"; // user connection disabled
+import { useConfirm } from "@/hooks/use-confirm";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -573,6 +574,7 @@ export default function SettingsPage() {
   const setLoaderVariant = usePreferencesStore((state) => state.setLoaderVariant);
   const startTour = useTourStore((s) => s.start);
   const replayOnboarding = useOnboardingStore((s) => s.replay);
+  const { confirm: confirmAction, confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
@@ -763,7 +765,9 @@ export default function SettingsPage() {
   }, [t]);
 
   const handleClearLogs = useCallback(async () => {
-    if (!window.confirm(t("data.clearLogsConfirm"))) {
+    // Not window.confirm: the Tauri webview rejects it (no dialog permission),
+    // so the guard threw and the logs could never be cleared. See useConfirm.
+    if (!(await confirmAction({ description: t("data.clearLogsConfirm") }))) {
       return;
     }
 
@@ -778,7 +782,7 @@ export default function SettingsPage() {
     } finally {
       setDataAction(null);
     }
-  }, [t]);
+  }, [t, confirmAction]);
 
   const addCustomPreset = () => {
     const preset: AgentPreset = {
@@ -848,6 +852,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
+      {confirmDialog}
       <div className="flex items-center gap-3">
         <SettingsIcon className="size-5 text-muted-foreground" />
         <h1 className="font-semibold text-xl tracking-tight">{t("title")}</h1>
