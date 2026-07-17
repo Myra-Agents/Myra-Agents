@@ -1629,15 +1629,15 @@
       "applied": "Rempli",
       "operations": {
         "title": "Opérations, c'est la vue en direct",
-        "body": "Tout ce qui tourne, groupé par statut — ce qui avance, ce qui bloque, ce qui vous attend."
+        "body": "Tout ce qui tourne, groupé par statut — ce qui avance, ce qui bloque, ce qui vous attend. Cliquez pour l'ouvrir."
       },
       "patrols": {
         "title": "Les patrouilles tournent sans vous",
-        "body": "Une patrouille déclenche un agent selon un horaire ou un cron. C'est là que l'automatisation commence vraiment."
+        "body": "Une patrouille déclenche un agent selon un horaire ou un cron. C'est là que l'automatisation commence vraiment — cliquez pour continuer."
       },
       "history": {
         "title": "L'historique garde chaque opération",
-        "body": "Les opérations passées de chaque patrouille, réussies ou échouées, avec les stats et toute la discussion de l'agent."
+        "body": "Les opérations passées de chaque patrouille, réussies ou échouées, avec les stats et toute la discussion de l'agent. Cliquez pour la dernière étape."
       },
       "newPatrol": {
         "title": "Créez votre première patrouille",
