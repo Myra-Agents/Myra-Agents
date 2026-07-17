@@ -1604,6 +1604,7 @@
   "tour": {
     "title": "Pour commencer",
     "dismiss": "Masquer la checklist",
+    "locked": "Terminez d'abord l'étape au-dessus",
     "steps": {
       "explore": {
         "title": "Explorer les vues",

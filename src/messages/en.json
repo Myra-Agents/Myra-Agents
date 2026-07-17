@@ -1604,6 +1604,7 @@
   "tour": {
     "title": "Get started",
     "dismiss": "Hide the checklist",
+    "locked": "Finish the step above first",
     "steps": {
       "explore": {
         "title": "Explore the views",

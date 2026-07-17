@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import { ActivityIcon, CheckIcon, HistoryIcon, RouteIcon, XIcon } from "lucide-react";
+import { ActivityIcon, CheckIcon, HistoryIcon, LockIcon, RouteIcon, XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,8 @@ import { useTourStore } from "@/stores/tour-store";
 /**
  * The "Get started" checklist — the guided tour, as a card in the sidebar
  * footer rather than a modal: it stays out of the way, survives a reload, and
- * lets the user do the steps in any order (or none).
+ * walks the steps strictly in order — each entry unlocks when the one above it
+ * is done, since they build on each other.
  *
  * Every step's done-ness is derived from what actually happened — a visited
  * route, or a patrol that really exists — never from a "next" click, so the
@@ -102,27 +103,38 @@ export function GetStartedCard() {
           </span>
         </CardTitle>
         <div className="mt-2 flex flex-col gap-0.5">
-          {steps.map((step) => (
-            // A line is the entry point to its spotlight walkthrough: the card
-            // is the menu, the spotlight is the execution.
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => startFlow(step.id)}
-              title={t(`steps.${step.id}.hint`)}
-              className={cn(
-                "-mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent",
-                step.done && "text-muted-foreground",
-              )}
-            >
-              {step.done ? (
-                <CheckIcon className="size-4 shrink-0 text-green-600 dark:text-green-500" />
-              ) : (
-                <step.icon className="size-4 shrink-0" />
-              )}
-              <span className={cn(step.done && "line-through")}>{t(`steps.${step.id}.title`)}</span>
-            </button>
-          ))}
+          {steps.map((step, i) => {
+            // Strictly in order: each entry stays locked until everything above
+            // it is done. The steps build on each other — you can't follow an
+            // operation before a patrol exists to launch — and a locked entry
+            // that says so beats a walkthrough that dead-ends half way.
+            const locked = steps.slice(0, i).some((s) => !s.done);
+            return (
+              // A line is the entry point to its spotlight walkthrough: the
+              // card is the menu, the spotlight is the execution.
+              <button
+                key={step.id}
+                type="button"
+                disabled={locked}
+                onClick={() => startFlow(step.id)}
+                title={locked ? t("locked") : t(`steps.${step.id}.hint`)}
+                className={cn(
+                  "-mx-2 flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                  locked ? "cursor-not-allowed opacity-45" : "hover:bg-accent",
+                  step.done && "text-muted-foreground",
+                )}
+              >
+                {step.done ? (
+                  <CheckIcon className="size-4 shrink-0 text-green-600 dark:text-green-500" />
+                ) : locked ? (
+                  <LockIcon className="size-4 shrink-0" />
+                ) : (
+                  <step.icon className="size-4 shrink-0" />
+                )}
+                <span className={cn(step.done && "line-through")}>{t(`steps.${step.id}.title`)}</span>
+              </button>
+            );
+          })}
         </div>
       </CardHeader>
     </Card>
