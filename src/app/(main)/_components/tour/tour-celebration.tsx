@@ -47,12 +47,17 @@ export function TourCelebration() {
     <Confetti
       // Mounting is what fires it — the component bursts on mount unless
       // `manualstart`, so there's no ref to poke here.
-      className="pointer-events-none fixed inset-0 z-[70]"
+      // `size-full` is load-bearing: a canvas is a replaced element, so
+      // `inset-0` alone leaves it at its intrinsic 300×150 in the corner and
+      // the whole burst plays out in a stamp-sized box.
+      className="pointer-events-none fixed inset-0 z-[70] size-full"
       options={{
         particleCount: 120,
         spread: 90,
-        startVelocity: 45,
-        origin: { x: 0.5, y: 0.7 },
+        // Launched from the bottom-center edge, so the burst rises through the
+        // app; the higher velocity is what carries it into view from down there.
+        startVelocity: 55,
+        origin: { x: 0.5, y: 1 },
       }}
     />
   );
