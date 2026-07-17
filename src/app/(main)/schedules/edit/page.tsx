@@ -836,8 +836,14 @@ function ScheduleEditScreen() {
           />
           <span className="text-[12px] text-text-secondary">{draft.enabled ? t("active") : t("inactive")}</span>
         </div>
-        {/* data-tour: spotlight-tour anchor — see lib/tour-steps.ts. */}
-        <div className="flex items-center border-border border-r px-2" data-tour="patrol-folder">
+        {/* data-tour: spotlight-tour anchor. `data-tour-satisfied` is what holds
+            that step's "Next" back until a folder is really chosen — the tour
+            can't read the draft. See lib/tour-steps.ts. */}
+        <div
+          className="flex items-center border-border border-r px-2"
+          data-tour="patrol-folder"
+          data-tour-satisfied={hasFolder ? "true" : "false"}
+        >
           <FolderSelect
             scheduleId={task.id}
             // Template / blank drafts start fresh every time — don't seed or

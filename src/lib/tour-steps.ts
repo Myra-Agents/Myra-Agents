@@ -37,6 +37,16 @@ export interface TourStep {
   awaitVanish?: boolean;
   /** Extra px around the target rect, for elements whose hitbox is tight. */
   padding?: number;
+  /**
+   * Hold "Next" back until the target carries `data-tour-satisfied="true"`.
+   *
+   * For a step the user must actually complete rather than merely read: the
+   * folder is required to save, so offering Next beside an empty picker invites
+   * them to walk past it and hit the error at the end. The screen that owns the
+   * state sets the attribute — the tour can't tell a chosen folder from an
+   * unchosen one by looking at the DOM. Skip still gets out.
+   */
+  requireSatisfied?: boolean;
 }
 
 /** How long to wait for a step's target to show up before giving up on it. */
@@ -75,8 +85,9 @@ export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
     { id: "patrolSubtitle", target: "patrol-subtitle", padding: 2 },
     { id: "patrolTag", target: "patrol-tag", padding: 4 },
     // Save refuses a patrol with no working folder, and a blank draft has none —
-    // leaving this out would walk the user into a Save that just errors.
-    { id: "patrolFolder", target: "patrol-folder", padding: 2 },
+    // leaving this out would walk the user into a Save that just errors, so the
+    // step holds Next until one is really picked.
+    { id: "patrolFolder", target: "patrol-folder", padding: 2, requireSatisfied: true },
     { id: "patrolTrigger", target: "patrol-trigger", padding: 4 },
     { id: "patrolInstruction", target: "patrol-instruction", padding: 8 },
     { id: "patrolAgent", target: "patrol-agent", padding: 4 },

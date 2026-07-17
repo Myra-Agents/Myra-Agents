@@ -42,6 +42,9 @@ export function SpotlightTour() {
 
   const [rect, setRect] = useState<Rect | null>(null);
   const [targetEl, setTargetEl] = useState<HTMLElement | null>(null);
+  // Whether a `requireSatisfied` step's condition is met yet, as reported by the
+  // screen that owns the state.
+  const [satisfied, setSatisfied] = useState(false);
   // Which side Radix actually landed on — it flips on collision, and the
   // suggestion's arrow has to point back at the target, not at where we asked
   // for the popover to go.
@@ -77,6 +80,10 @@ export function SpotlightTour() {
           el.scrollIntoView({ block: "nearest", behavior: "smooth" });
         }
         setTargetEl((prev) => (prev === el ? prev : el));
+        // Read alongside the rect: the app flips this as its own state changes,
+        // and the same frame loop that tracks the target already runs.
+        const ok = el.dataset.tourSatisfied === "true";
+        setSatisfied((prev) => (prev === ok ? prev : ok));
         const r = el.getBoundingClientRect();
         const pad = step.padding ?? 0;
         let top = r.top - pad;
@@ -256,8 +263,9 @@ export function SpotlightTour() {
                 {t("skip")}
               </Button>
               {/* Interactive steps have no Next — acting on the ringed element
-                  is the whole point, and a Next would let the user skip past it. */}
-              {!step.interactive && !step.awaitVanish && (
+                  is the whole point, and a Next would let the user skip past it.
+                  Same for a step that isn't satisfied yet. */}
+              {!step.interactive && !step.awaitVanish && (!step.requireSatisfied || satisfied) && (
                 <Button type="button" size="sm" onClick={() => nextStep(index)}>
                   {isLast ? t("done") : t("next")}
                 </Button>
