@@ -612,6 +612,7 @@ const STATUS_DOT: Record<AgentRun["status"], string> = {
   awaiting_review: "bg-task-status-needs-you",
   completed: "bg-emerald-500",
   failed: "bg-destructive",
+  canceled: "bg-muted-foreground",
 };
 
 function StatusDot({ status }: { status: AgentRun["status"] }) {
@@ -622,6 +623,7 @@ function StatusDot({ status }: { status: AgentRun["status"] }) {
     awaiting_review: t("status.needsYou"),
     completed: t("status.completed"),
     failed: t("status.failed"),
+    canceled: t("status.canceled"),
   };
   return (
     <span className="flex items-center gap-2 text-xs">
@@ -662,9 +664,11 @@ function runStatusFromCard(status: KanbanStatus): AgentRun["status"] | null {
 
 // A run's status is a snapshot from when the agent stopped. For the card's most
 // recent run, the card's live status is the source of truth (e.g. approved →
-// done); failures always stay visible. Older runs keep their snapshot.
+// done); failures and cancellations always stay visible — both leave the card
+// in Done same as a success, so without this guard runStatusFromCard would
+// relabel them "completed". Older runs keep their snapshot.
 function displayRunStatus(card: KanbanCard, run: AgentRun, isLatest: boolean): AgentRun["status"] {
-  if (run.status === "failed") return "failed";
+  if (run.status === "failed" || run.status === "canceled") return run.status;
   if (isLatest) return runStatusFromCard(card.status) ?? run.status;
   return run.status;
 }
@@ -680,6 +684,7 @@ function RunStatusBadge({ status }: { status: AgentRun["status"] }) {
     awaiting_review: { label: t("status.needsYou"), variant: "outline" },
     completed: { label: t("status.completed"), variant: "default" },
     failed: { label: t("status.failed"), variant: "destructive" },
+    canceled: { label: t("status.canceled"), variant: "secondary" },
   };
   const v = variants[status] ?? { label: status, variant: "outline" as const };
   return (
