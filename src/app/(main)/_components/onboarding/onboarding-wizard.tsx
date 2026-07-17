@@ -19,7 +19,6 @@ import {
   MonitorIcon,
   MoonIcon,
   PlugZapIcon,
-  RocketIcon,
   SlidersHorizontalIcon,
   SunIcon,
   TerminalIcon,
@@ -89,6 +88,7 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const t = useTranslations("onboarding");
   const { settings, save, loading: settingsLoading } = useSettings();
   const startTour = useTourStore((s) => s.start);
+  const startFlow = useTourStore((s) => s.startFlow);
   const themeMode = usePreferencesStore((s) => s.themeMode);
   const [stepIndex, setStepIndex] = useState(0);
   // Seeded from what's already in effect (localStorage), not from settings —
@@ -167,13 +167,18 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
       }).catch(() => {
         /* backend unreachable (e.g. browser dev) — non-fatal for onboarding */
       });
-      // Opting in here is what makes the sidebar "Get started" checklist appear.
-      if (guided) startTour();
+      // Opting in shows the "Get started" checklist — and drops the user
+      // straight into its first walkthrough rather than leaving them to find
+      // the card and click a line themselves.
+      if (guided) {
+        startTour();
+        startFlow("explore");
+      }
       completeOnboarding();
       track(skipped ? "onboarding_skipped" : "onboarding_completed", { last_step: stepId, guided });
       onClose();
     },
-    [homeFolder, locale, themeMode, provider, apiKey, model, settings, save, stepId, onClose, startTour],
+    [homeFolder, locale, themeMode, provider, apiKey, model, settings, save, stepId, onClose, startTour, startFlow],
   );
 
   const goNext = useCallback(() => {
@@ -249,27 +254,25 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
                   {t("back")}
                 </Button>
               )}
-              {/* Offered only at the end — the checklist is about the app, and
-                  only makes sense once setup is out of the way. */}
-              {isLast && (
-                <Button type="button" size="sm" variant="outline" onClick={() => finish(false, true)}>
-                  <CompassIcon />
-                  {t("guideMe")}
+              {/* The tour is the primary way out — setup is done, and the next
+                  thing a new user needs is to be shown around. Close is for
+                  those who'd rather explore alone. */}
+              {isLast ? (
+                <>
+                  <Button type="button" size="sm" variant="outline" onClick={() => finish(false)}>
+                    {t("close")}
+                  </Button>
+                  <Button type="button" size="sm" onClick={() => finish(false, true)}>
+                    <CompassIcon />
+                    {t("guideMe")}
+                  </Button>
+                </>
+              ) : (
+                <Button type="button" size="sm" onClick={goNext}>
+                  {t("next")}
+                  <ArrowRightIcon />
                 </Button>
               )}
-              <Button type="button" size="sm" onClick={goNext}>
-                {isLast ? (
-                  <>
-                    {t("getStarted")}
-                    <RocketIcon />
-                  </>
-                ) : (
-                  <>
-                    {t("next")}
-                    <ArrowRightIcon />
-                  </>
-                )}
-              </Button>
             </div>
           </div>
         </div>
