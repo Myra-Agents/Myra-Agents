@@ -38,6 +38,14 @@ export interface TourStep {
   /** Extra px around the target rect, for elements whose hitbox is tight. */
   padding?: number;
   /**
+   * Dim everything but the target. On by default.
+   *
+   * Off for steps whose whole point is the page behind: dimming the content to
+   * spotlight a nav link means the user clicks it, the view changes, and they
+   * can't see a thing — the ring alone carries them.
+   */
+  dim?: boolean;
+  /**
    * Hold "Next" back until the target carries `data-tour-satisfied="true"`.
    *
    * For a step the user must actually complete rather than merely read: the
@@ -65,10 +73,13 @@ export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
   // `route` of our own: navigating for them and then asking for a Next is a
   // slideshow, and the point is that they come away knowing where these live.
   // Their click is also what records the visit the checklist entry needs.
+  //
+  // Undimmed: these steps are *about* the page that appears. Blacking it out to
+  // spotlight the link would hide the only thing worth looking at.
   explore: [
-    { id: "operations", target: "nav-/runs", interactive: true, padding: 2 },
-    { id: "patrols", target: "nav-/schedules", interactive: true, padding: 2 },
-    { id: "history", target: "nav-/history", interactive: true, padding: 2 },
+    { id: "operations", target: "nav-/runs", interactive: true, padding: 2, dim: false },
+    { id: "patrols", target: "nav-/schedules", interactive: true, padding: 2, dim: false },
+    { id: "history", target: "nav-/history", interactive: true, padding: 2, dim: false },
   ],
   // Through to a saved patrol, field by field: opening the editor and pointing
   // at Save taught nothing — an empty patrol can't even be saved (the trigger
