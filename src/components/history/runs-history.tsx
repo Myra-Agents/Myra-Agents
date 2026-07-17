@@ -97,8 +97,11 @@ export function RunsHistory({
     const all = pastRunsFromCards(cards);
     // Patrol "Operations & History" tab shows every run — live, awaiting-human,
     // and finished. The standalone History page shows only runs with a final
-    // verdict (completed / failed); anything not yet "Done" is filtered out.
-    return includeLive ? all : all.filter((r) => r.status === "completed" || r.status === "failed");
+    // verdict (completed / failed / canceled); anything not yet "Done" is
+    // filtered out.
+    return includeLive
+      ? all
+      : all.filter((r) => r.status === "completed" || r.status === "failed" || r.status === "canceled");
   }, [cards, includeLive]);
   const inRange = useMemo(() => allRuns.filter((r) => withinRange(r, range, now)), [allRuns, range, now]);
 
@@ -106,8 +109,9 @@ export function RunsHistory({
     const total = inRange.length;
     const success = inRange.filter((r) => r.ok).length;
     // Failures are explicit failures only — live, awaiting_review, needs_feedback
-    // and cancelled runs are neither success nor failure.
-    const failed = inRange.filter((r) => r.status === "failed" && !r.canceled).length;
+    // and cancelled runs are neither success nor failure. `canceled` is now its
+    // own status, so this no longer needs to exclude it explicitly.
+    const failed = inRange.filter((r) => r.status === "failed").length;
     const tokens = inRange.reduce((sum, r) => sum + (r.tokens ?? 0), 0);
     return { total, success, failed, tokens };
   }, [inRange]);
@@ -868,17 +872,18 @@ const STATUS_DOT: Record<StatusBucket, { dot: string; labelKey: string }> = {
  *  "Needs you". */
 function runBucket(run: PastRun): StatusBucket {
   if (run.live) return "running";
-  // A cancelled run lands its card in Done, so it belongs in the Done bucket.
+  // A cancelled or failed run both land their card in Done — a failure is
+  // terminal, not pending, so it no longer bounces back to the backlog. There's
+  // no distinct "failed" bucket in this 4-bucket model (Operations has the same
+  // limit); the red "Failed" text elsewhere on the row is what actually flags it.
   if (run.canceled) return "done";
   switch (run.status) {
     case "completed":
+    case "failed":
       return "done";
     case "awaiting_review":
     case "needs_feedback":
       return "needsYou";
-    case "failed":
-      // A failed run bounces its card back to Todo (the backlog).
-      return "backlog";
     default:
       return "running";
   }

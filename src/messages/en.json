@@ -715,6 +715,7 @@
     "triggered": "Triggered {date}",
     "result": {
       "failed": "Failed",
+      "canceled": "Canceled",
       "success": "Success",
       "running": "Running",
       "needsYou": "Needs you",
@@ -773,6 +774,7 @@
       "running": "Running",
       "completed": "Completed",
       "failed": "Failed",
+      "canceled": "Canceled",
       "needsYou": "Needs you",
       "needsFeedback": "Needs feedback",
       "awaitingReview": "Awaiting review"

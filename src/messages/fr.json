@@ -715,6 +715,7 @@
     "triggered": "Déclenchée le {date}",
     "result": {
       "failed": "Échouée",
+      "canceled": "Annulée",
       "success": "Réussie",
       "running": "En cours",
       "needsYou": "Votre attention",
@@ -773,6 +774,7 @@
       "running": "En cours",
       "completed": "Terminé",
       "failed": "Échoué",
+      "canceled": "Annulé",
       "needsYou": "Votre attention",
       "needsFeedback": "Retour nécessaire",
       "awaitingReview": "En attente de vérification"
