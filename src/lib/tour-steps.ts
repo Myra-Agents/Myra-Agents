@@ -61,14 +61,13 @@ export const TARGET_TIMEOUT_MS = 4000;
 export const TOUR_APPLY_EVENT = "myra:tour-apply";
 
 export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
-  // The user opens each view themselves, by clicking the ringed nav link. No
-  // `route` of our own: navigating for them and then asking for a Next is a
-  // slideshow, and the point is that they come away knowing where these live.
-  // Their click is also what records the visit the checklist entry needs.
+  // Each step opens its view rather than just ringing the link — otherwise the
+  // walkthrough claims to show the views without ever showing them, and the
+  // checklist entry (which needs all three visited) never ticks.
   explore: [
-    { id: "operations", target: "nav-/runs", interactive: true, padding: 2 },
-    { id: "patrols", target: "nav-/schedules", interactive: true, padding: 2 },
-    { id: "history", target: "nav-/history", interactive: true, padding: 2 },
+    { id: "operations", route: "/runs", target: "nav-/runs" },
+    { id: "patrols", route: "/schedules", target: "nav-/schedules" },
+    { id: "history", route: "/history", target: "nav-/history" },
   ],
   // Through to a saved patrol, field by field: opening the editor and pointing
   // at Save taught nothing — an empty patrol can't even be saved (the trigger

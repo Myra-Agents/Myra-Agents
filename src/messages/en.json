@@ -1629,15 +1629,15 @@
       "applied": "Filled in",
       "operations": {
         "title": "Operations is the live view",
-        "body": "Everything currently running, grouped by status — what's going, what's stuck, what needs you. Click it to open."
+        "body": "Everything currently running, grouped by status — what's going, what's stuck, what needs you."
       },
       "patrols": {
         "title": "Patrols run without you",
-        "body": "A patrol fires an agent on a schedule or a cron trigger. This is where automation actually starts — click through."
+        "body": "A patrol fires an agent on a schedule or a cron trigger. This is where automation actually starts."
       },
       "history": {
         "title": "History keeps every operation",
-        "body": "Past operations of every patrol, succeeded or failed, with stats and the full agent discussion. Click it for the last stop."
+        "body": "Past operations of every patrol, succeeded or failed, with stats and the full agent discussion."
       },
       "newPatrol": {
         "title": "Create your first patrol",
