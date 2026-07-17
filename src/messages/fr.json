@@ -1621,6 +1621,7 @@
     "spotlight": {
       "progress": "Étape {current} sur {total}",
       "skip": "Passer",
+      "back": "Retour",
       "next": "Suivant",
       "done": "Terminé",
       "tryThis": "Essayez :",

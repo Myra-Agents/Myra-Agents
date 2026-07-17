@@ -38,7 +38,7 @@ export function SpotlightTour() {
   const t = useTranslations("tour.spotlight");
   const router = useRouter();
   const pathname = usePathname();
-  const { flow, index, nextStep, endFlow } = useTourStore();
+  const { flow, index, nextStep, prevStep, endFlow } = useTourStore();
 
   const [rect, setRect] = useState<Rect | null>(null);
   const [targetEl, setTargetEl] = useState<HTMLElement | null>(null);
@@ -258,7 +258,16 @@ export function SpotlightTour() {
                 />
               ))}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {/* Not on the first step, where there's nowhere back to. Sits
+                  alongside Skip rather than replacing it: Skip is the only way
+                  out of an interactive step, so it can never be traded away. */}
+              {index > 0 && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => prevStep(index)}>
+                  <ArrowLeftIcon />
+                  {t("back")}
+                </Button>
+              )}
               <Button type="button" variant="ghost" size="sm" onClick={skip}>
                 {t("skip")}
               </Button>

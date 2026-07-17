@@ -36,6 +36,8 @@ type TourStore = TourState & {
    * the following step.
    */
   nextStep: (fromIndex?: number) => void;
+  /** Step back one. Same stale-caller guard; a no-op on the first step. */
+  prevStep: (fromIndex?: number) => void;
   endFlow: () => void;
 };
 
@@ -62,6 +64,12 @@ export const useTourStore = create<TourStore>((set, get) => ({
     // from real state, so there is nothing to mark as done here.
     if (index + 1 >= TOUR_FLOWS[flow].length) set({ flow: null, index: 0 });
     else set({ index: index + 1 });
+  },
+  prevStep: (fromIndex) => {
+    const { flow, index } = get();
+    if (!flow || index === 0) return;
+    if (fromIndex !== undefined && fromIndex !== index) return;
+    set({ index: index - 1 });
   },
   endFlow: () => set({ flow: null, index: 0 }),
 }));
