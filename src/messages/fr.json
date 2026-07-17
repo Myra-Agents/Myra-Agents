@@ -578,6 +578,16 @@
       "stop": "Arrêter",
       "stopped": "Opération arrêtée."
     },
+    "stopAll": {
+      "label": "Tout arrêter",
+      "stopping": "Arrêt…",
+      "title": "Arrêter toutes les opérations en cours ?",
+      "description": "Ceci va interrompre {count, plural, one {# opération en cours} other {# opérations en cours}}. Cette action est irréversible.",
+      "cancel": "Annuler",
+      "confirm": "Tout arrêter",
+      "stopped": "{count, plural, one {# opération arrêtée} other {# opérations arrêtées}}.",
+      "failed": "Échec de l’arrêt de {failed, plural, one {# opération} other {# opérations}}."
+    },
     "summary": {
       "backlog": {
         "label": "Backlog",

@@ -578,6 +578,16 @@
       "stop": "Stop",
       "stopped": "Operation stopped."
     },
+    "stopAll": {
+      "label": "Stop all",
+      "stopping": "Stopping…",
+      "title": "Stop all running operations?",
+      "description": "{count, plural, one {# running operation} other {# running operations}} will be aborted. This cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Stop all",
+      "stopped": "{count, plural, one {# operation} other {# operations}} stopped.",
+      "failed": "Failed to stop {failed, plural, one {# operation} other {# operations}}."
+    },
     "summary": {
       "backlog": {
         "label": "Backlog",

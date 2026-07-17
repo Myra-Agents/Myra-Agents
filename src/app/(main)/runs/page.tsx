@@ -44,6 +44,16 @@ import { toast } from "sonner";
 
 import { HeaderActions } from "@/app/(main)/_components/header-actions";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -328,6 +338,22 @@ export default function RunsPage() {
       .then(() => toast.success(t("kanban.stopped")))
       .catch((e) => toast.error(String(e)));
 
+  // "Stop all" — every genuinely running card, gated behind a confirm dialog.
+  const runningCards = useMemo(() => listed.filter((c) => bucketOf(c) === "running"), [listed]);
+  const [confirmStopAll, setConfirmStopAll] = useState(false);
+  const [stoppingAll, setStoppingAll] = useState(false);
+  const stopAllRuns = async () => {
+    setStoppingAll(true);
+    try {
+      const results = await Promise.allSettled(runningCards.map((c) => cancelAgent(c.id)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) toast.error(t("stopAll.failed", { failed }));
+      else toast.success(t("stopAll.stopped", { count: results.length }));
+    } finally {
+      setStoppingAll(false);
+    }
+  };
+
   // True when a card/column/tag/search filter is narrowing the list (sort excluded —
   // it never empties results). Drives the "Clear filters" affordance.
   const narrowed =
@@ -539,6 +565,18 @@ export default function RunsPage() {
           })}
         </div>
         <div className="flex items-center gap-2 text-icon-primary">
+          {/* Stop all — only while at least one run is live; confirmed via dialog. */}
+          {runningCards.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirmStopAll(true)}
+              disabled={stoppingAll}
+              className="flex h-6 items-center gap-1.5 text-text-secondary text-xs transition-colors hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+            >
+              <CircleStopIcon className="size-4" />
+              {t(stoppingAll ? "stopAll.stopping" : "stopAll.label")}
+            </button>
+          )}
           {view === "list" && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -838,6 +876,27 @@ export default function RunsPage() {
           onReorder={reorderCard}
         />
       )}
+
+      {/* Stop-all guard — aborting every live run is not undoable. */}
+      <AlertDialog open={confirmStopAll} onOpenChange={setConfirmStopAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("stopAll.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("stopAll.description", { count: runningCards.length })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("stopAll.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmStopAll(false);
+                void stopAllRuns();
+              }}
+            >
+              {t("stopAll.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
