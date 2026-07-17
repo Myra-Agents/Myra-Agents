@@ -755,10 +755,13 @@ export default function RunsPage() {
                                 editDisabled={!card.linkedTaskId}
                                 // Stop only for genuinely running rows.
                                 onStop={bucket === "running" ? () => stopRun(card.id) : undefined}
+                                onTrash={() => trashRun(card.id)}
+                                archive={bucket === "done"}
                                 labels={{
                                   view: t("rowMenu.viewOperation"),
                                   edit: t("rowMenu.editPatrol"),
                                   stop: t("rowMenu.stop"),
+                                  trash: t(bucket === "done" ? "kanban.archive" : "kanban.trash"),
                                 }}
                               />
                             </TableCell>
@@ -1002,6 +1005,8 @@ function RowMenu({
   onView,
   onEdit,
   onStop,
+  onTrash,
+  archive = false,
   editDisabled = false,
   labels,
 }: {
@@ -1009,10 +1014,14 @@ function RowMenu({
   onEdit?: () => void;
   // Present only for running rows — stops the live run.
   onStop?: () => void;
+  // Trash (or archive, for Done rows) the run — mirrors the Kanban card's
+  // hover affordance so the List view offers the same action.
+  onTrash: () => void;
+  archive?: boolean;
   // "Edit Patrol" needs an owning schedule — grey it out when the run isn't
   // linked to one (mirrors the History row menu).
   editDisabled?: boolean;
-  labels: { view: string; edit: string; stop: string };
+  labels: { view: string; edit: string; stop: string; trash: string };
 }) {
   return (
     <DropdownMenu>
@@ -1041,6 +1050,11 @@ function RowMenu({
             {labels.edit}
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={onTrash} className="whitespace-nowrap">
+          {archive ? <ArchiveIcon className="size-3.5" /> : <Trash2Icon className="size-3.5" />}
+          {labels.trash}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
