@@ -32,7 +32,6 @@ import {
   MessageSquareIcon,
   MoreHorizontalIcon,
   PencilIcon,
-  PlayIcon,
   SearchIcon,
   Settings2Icon,
   TerminalIcon,
@@ -66,7 +65,6 @@ import { MyraMark } from "@/components/ui/myra-mark";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useKanban } from "@/hooks/use-kanban";
 import { type RunsColumnId, TOGGLEABLE_COLUMNS, useRunsColumns } from "@/hooks/use-runs-columns";
-import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { connIdOf } from "@/lib/aggregate/global-id";
 import { tagClassName } from "@/lib/kanban-tags";
@@ -216,9 +214,6 @@ export default function RunsPage() {
   const [statusFilter, setStatusFilter] = useState<RunBucket[]>([]);
   const [agentFilter, setAgentFilter] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
-
-  const agentNameOf = (card: KanbanCard) =>
-    settings.agents.find((a) => a.id === (card.agentPresetId ?? settings.defaultAgentId))?.name ?? "";
 
   const listed = useMemo(
     () => cards.filter((c) => LISTED.includes(c.status)).sort((a, b) => triggeredAt(b).localeCompare(triggeredAt(a))),
@@ -1153,7 +1148,7 @@ function RunsKanbanBoard({
   onTrash: (id: string) => void;
   onEdit: (card: KanbanCard) => void;
   onStop: (id: string) => void;
-  onMove: (id: string, status: KanbanStatus) => void | Promise<unknown>;
+  onMove: (id: string, status: KanbanStatus) => undefined | Promise<unknown>;
   onReorder: (id: string, newPosition: number, status?: KanbanStatus) => void;
 }) {
   const t = useTranslations("runs");
@@ -1431,9 +1426,8 @@ function KanbanRunCard({
         <span className={cn("mt-0.5 size-2 shrink-0 rounded-full", DOT_OF[bucket])} />
         <div className="flex items-center gap-1 text-icon-tertiary opacity-0 transition group-hover/card:opacity-100">
           {bucket !== "done" && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={(e) => {
                 stop(e);
                 onEdit();
@@ -1442,11 +1436,10 @@ function KanbanRunCard({
               className="rounded p-0.5 transition-colors hover:text-icon-primary"
             >
               <PencilIcon className="size-3.5" />
-            </span>
+            </button>
           )}
-          <span
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             onClick={(e) => {
               stop(e);
               onTrash();
@@ -1455,7 +1448,7 @@ function KanbanRunCard({
             className="rounded p-0.5 transition-colors hover:text-destructive"
           >
             {bucket === "done" ? <ArchiveIcon className="size-3.5" /> : <Trash2Icon className="size-3.5" />}
-          </span>
+          </button>
         </div>
       </div>
 
@@ -1475,9 +1468,8 @@ function KanbanRunCard({
             </div>
             <span className="truncate text-text-tertiary text-xs">{t("kanban.waitingOutput")}</span>
             {onStop && (
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 onClick={(e) => {
                   stop(e);
                   onStop();
@@ -1486,7 +1478,7 @@ function KanbanRunCard({
               >
                 <CircleStopIcon className="size-3.5" />
                 {t("kanban.stop")}
-              </span>
+              </button>
             )}
           </div>
         </>
@@ -1505,9 +1497,8 @@ function KanbanRunCard({
               <span className="text-text-tertiary text-xs tabular-nums">{durationOf(card)}</span>
             </div>
             {card.agentQuestion && <p className="text-text-secondary text-xs leading-relaxed">{card.agentQuestion}</p>}
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={(e) => {
                 stop(e);
                 onOpen();
@@ -1516,7 +1507,7 @@ function KanbanRunCard({
             >
               {t("kanban.answer")}
               <LogInIcon className="size-3.5" />
-            </span>
+            </button>
           </div>
         </>
       )}
@@ -1541,6 +1532,7 @@ function KanbanRunCard({
 
 /** Comparator for a sortable column (ascending). */
 function compareBy(key: SortKey, a: KanbanCard, b: KanbanCard, agentName: (c: KanbanCard) => string): number {
+  // biome-ignore lint/nursery/noUnnecessaryConditions: the rule misreads a switch over a string-literal union as an always-truthy boolean condition.
   switch (key) {
     case "task":
       return a.title.localeCompare(b.title);
