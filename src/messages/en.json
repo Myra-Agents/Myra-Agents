@@ -1622,7 +1622,7 @@
       },
       "run": {
         "title": "Follow an operation",
-        "hint": "Open an operation from History to read the agent's discussion, step by step."
+        "hint": "Open it from Operations to read the agent's discussion, step by step."
       }
     },
     "spotlight": {

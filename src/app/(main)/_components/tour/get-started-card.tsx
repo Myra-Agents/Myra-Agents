@@ -56,8 +56,10 @@ export function useGetStarted() {
       {
         id: "run" as TourStepId,
         icon: HistoryIcon,
-        // The run detail is unreachable without a run, so a visit proves both.
-        done: visited.includes(TOUR_ROUTES.runDetail),
+        // Neither detail view is reachable without a run, so a visit to either
+        // proves both — the tour sends the user through Operations (`logs`),
+        // but a run followed from History still counts.
+        done: visited.includes(TOUR_ROUTES.runDetail) || visited.includes(TOUR_ROUTES.logs),
       },
     ],
     [visited, schedules.length],

@@ -105,6 +105,8 @@ export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
   run: [
     { id: "rowMenu", route: "/schedules", target: "patrol-row-menu", interactive: true, padding: 2 },
     { id: "runNow", target: "run-now", interactive: true },
-    { id: "openRun", route: "/history", target: "run-row", interactive: true },
+    // Operations, not History: a just-launched run is live, and Operations is
+    // the live view — History is where it goes once it's done.
+    { id: "openRun", route: "/runs", target: "operations-row", interactive: true },
   ],
 };
