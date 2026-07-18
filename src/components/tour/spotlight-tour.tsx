@@ -68,6 +68,12 @@ export function SpotlightTour() {
       setTargetEl(null);
       return;
     }
+    // Clear the previous step's rect right away — otherwise a target that's
+    // slow to appear (or never does, e.g. a run that hasn't synced back yet)
+    // leaves the old ring floating over whatever used to be there instead of
+    // just showing nothing while this step looks for its own target.
+    setRect(null);
+    setTargetEl(null);
     let raf = 0;
     let found = false;
     const startedAt = performance.now();
