@@ -557,6 +557,8 @@ export default function SchedulesPage() {
         <button
           type="button"
           onClick={handleCreate}
+          // Spotlight-tour anchor — see lib/tour-steps.ts.
+          data-tour="new-patrol"
           className="flex h-6 items-center gap-1 rounded-md bg-primary px-2 font-medium text-[11px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
         >
           <PlusIcon className="size-3.5 shrink-0" />
@@ -645,7 +647,7 @@ export default function SchedulesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((task) => {
+              rows.map((task, rowIndex) => {
                 const agent = task.agentPresetId ? agentById.get(task.agentPresetId) : undefined;
                 const source = scheduleSource(task.id);
                 const rel = task.enabled ? relativeParts(task.nextRunAt) : null;
@@ -715,6 +717,8 @@ export default function SchedulesPage() {
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
+                            // Spotlight-tour anchor, first row only — see lib/tour-steps.ts.
+                            data-tour={rowIndex === 0 ? "patrol-row-menu" : undefined}
                             className="flex size-7 items-center justify-center rounded-md text-icon-tertiary transition-colors hover:bg-secondary hover:text-icon-primary"
                             aria-label={t("actions.edit")}
                           >
@@ -722,7 +726,11 @@ export default function SchedulesPage() {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleTrigger(task.id)} disabled={triggering === task.id}>
+                          <DropdownMenuItem
+                            onClick={() => handleTrigger(task.id)}
+                            disabled={triggering === task.id}
+                            data-tour={rowIndex === 0 ? "run-now" : undefined}
+                          >
                             <PlayIcon className="size-3.5" />
                             {t("actions.runNow")}
                           </DropdownMenuItem>
@@ -764,7 +772,8 @@ export default function SchedulesPage() {
       </div>
 
       {/* Use-case ideas (Figma: category tabs + card grid, 40px below the table) */}
-      <div ref={setIdeasNode} className="mt-10 flex scroll-mt-4 flex-col gap-2">
+      {/* data-tour: spotlight-tour anchor — see lib/tour-steps.ts. */}
+      <div ref={setIdeasNode} data-tour="patrol-templates" className="mt-10 flex scroll-mt-4 flex-col gap-2">
         <div className="flex items-center gap-2">
           <LayoutTemplateIcon className="size-3.5 text-text-tertiary" />
           <h2 className="text-text-secondary text-xs font-medium">{t("templatesHeading")}</h2>

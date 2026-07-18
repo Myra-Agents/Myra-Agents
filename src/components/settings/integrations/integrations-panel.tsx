@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useConnections } from "@/hooks/use-connections";
 import { connectionManager } from "@/lib/connections/manager";
 import { aggregateInstances, deployInstance, removeInstance } from "@/lib/integrations/deploy";
@@ -35,6 +36,7 @@ function eventLabel(status: string): string {
 export function IntegrationsPanel() {
   const t = useTranslations("settings.integrations");
   const { connections } = useConnections();
+  const { confirm, confirmDialog } = useConfirm();
   const [catalog, setCatalog] = useState<PluginInfo[]>([]);
   const [instances, setInstances] = useState<Record<string, PluginInstance>>({});
   const [membership, setMembership] = useState<Record<string, string[]>>({});
@@ -113,7 +115,7 @@ export function IntegrationsPanel() {
 
   const remove = useCallback(
     async (instance: PluginInstance) => {
-      if (!window.confirm(t("deleteConfirm", { label: instance.label }))) return;
+      if (!(await confirm({ description: t("deleteConfirm", { label: instance.label }) }))) return;
       const allConnIds = connections.map((c) => c.id);
       const results = await removeInstance({
         instanceId: instance.id,
@@ -123,7 +125,7 @@ export function IntegrationsPanel() {
       if (results.some((r) => !r.ok)) toast.error(t("deletePartial"));
       void load();
     },
-    [connections, secretKeysFor, load, t],
+    [connections, secretKeysFor, load, t, confirm],
   );
 
   const list = Object.values(instances);
@@ -131,6 +133,7 @@ export function IntegrationsPanel() {
 
   return (
     <Card>
+      {confirmDialog}
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-base">{t("title")}</CardTitle>

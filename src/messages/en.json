@@ -578,6 +578,16 @@
       "stop": "Stop",
       "stopped": "Operation stopped."
     },
+    "stopAll": {
+      "label": "Stop all",
+      "stopping": "Stopping…",
+      "title": "Stop all running operations?",
+      "description": "{count, plural, one {# running operation} other {# running operations}} will be aborted. This cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Stop all",
+      "stopped": "{count, plural, one {# operation} other {# operations}} stopped.",
+      "failed": "Failed to stop {failed, plural, one {# operation} other {# operations}}."
+    },
     "summary": {
       "backlog": {
         "label": "Backlog",
@@ -715,6 +725,7 @@
     "triggered": "Triggered {date}",
     "result": {
       "failed": "Failed",
+      "canceled": "Canceled",
       "success": "Success",
       "running": "Running",
       "needsYou": "Needs you",
@@ -773,6 +784,7 @@
       "running": "Running",
       "completed": "Completed",
       "failed": "Failed",
+      "canceled": "Canceled",
       "needsYou": "Needs you",
       "needsFeedback": "Needs feedback",
       "awaitingReview": "Awaiting review"
@@ -832,6 +844,7 @@
       "showMore": "Show {count} more characters",
       "tokens": "tokens",
       "turns": "{count} turns",
+      "openAgentSettings": "Open Settings → Agents",
       "review": {
         "awaitingTitle": "This run is awaiting your review",
         "questionTitle": "The agent is waiting for your input",
@@ -1118,10 +1131,13 @@
         "badge": "Built-in",
         "save": "Save",
         "description": "Embedded agent — no install, no CLI. Runs on the Myra hub, or with your own key.",
+        "providerCloud": "Cloud (OpenRouter)",
+        "providerOllama": "Local (Ollama)",
         "apiKeyLabel": "OpenRouter API key",
         "apiKeyPlaceholder": "sk-or-…  — leave empty to use the Myra hub",
         "modelLabel": "Model",
         "modelHint": "Leave empty or \"auto\" to let Myra pick a free model.",
+        "ollamaModelHint": "The local Ollama model tag to run (e.g. qwen2.5-coder). Requires Ollama installed.",
         "getKey": "Get a key",
         "browseModels": "Browse models"
       }
@@ -1161,6 +1177,12 @@
       },
       "openAtLogin": "Open at login",
       "openAtLoginHint": "Start Myra Agents automatically when you log in to your computer.",
+      "setupWizard": "Setup wizard",
+      "setupWizardHint": "Walk through the first-run setup again — language, theme, agent, model and working folder.",
+      "setupWizardStart": "Open the wizard",
+      "guidedTour": "Guided tour",
+      "guidedTourHint": "Bring back the \"Get started\" checklist and walk through the basics again.",
+      "guidedTourStart": "Show me around",
       "appUpdate": {
         "title": "App updates",
         "description": "Update Myra Agents to the latest version, installed and verified automatically.",
@@ -1498,5 +1520,190 @@
     "cancel": "Cancel",
     "createTag": "Create \"{tag}\"",
     "createTagHint": "Type a name to create a new tag"
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "guideMe": "Show me around",
+    "preferences": {
+      "title": "Make it yours",
+      "description": "Two quick ones. You can change either from Settings later.",
+      "languageLabel": "Language",
+      "languageAuto": "Auto-detect",
+      "languageEn": "English",
+      "languageFr": "Français",
+      "themeLabel": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeSystem": "System"
+    },
+    "welcome": {
+      "title": "Welcome to Myra Agents",
+      "description": "Myra Agents is a platform for automating the repetitive work you do. Create and monitor all your Myra agents in one place — local-first and open-source."
+    },
+    "agent": {
+      "title": "Your agent is ready",
+      "description": "Myra ships with a built-in agent — no install, no CLI to set up.",
+      "name": "Myra agent",
+      "cardDescription": "Runs on the Myra hub out of the box, or with your own API key.",
+      "builtIn": "Built-in",
+      "detected": "Detected",
+      "detecting": "Looking for agents already installed on this machine…",
+      "footnote": "Prefer your own CLI? Add opencode, Claude, Copilot, or a custom binary anytime in Settings."
+    },
+    "connect": {
+      "title": "Connect a model",
+      "description": "The built-in agent runs on an LLM. Use a cloud model via OpenRouter, or a local model via Ollama.",
+      "provider": {
+        "cloud": "Cloud (OpenRouter)",
+        "ollama": "Local (Ollama)"
+      },
+      "keyLabel": "OpenRouter API key",
+      "getKey": "Get a key",
+      "keyPlaceholder": "sk-or-…",
+      "modelLabel": "Model",
+      "freeModels": "Free models",
+      "modelPlaceholder": "e.g. openai/gpt-4o-mini",
+      "gifAlt": "Copying a model id from an OpenRouter model page",
+      "gifCaption": "Every model on <link>openrouter.ai/models</link> shows its id under the name — copy it and paste it above.",
+      "ollama": {
+        "name": "Ollama",
+        "checking": "Checking…",
+        "installed": "Installed",
+        "notInstalled": "Not installed",
+        "ready": "Ready",
+        "installHint": "Ollama runs local models, private and offline. Install it in one click.",
+        "install": "Install Ollama",
+        "installing": "Installing…",
+        "learnMore": "Learn more",
+        "modelLabel": "Ollama model",
+        "selectPlaceholder": "Choose a local model",
+        "managePulled": "Download more models",
+        "noModels": "No local models yet — download one to run the agent.",
+        "downloadModel": "Download a model",
+        "manageTitle": "Local Ollama models"
+      }
+    },
+    "folder": {
+      "title": "Choose a working folder",
+      "description": "Agents run inside this folder by default — typically the project or repo you want them to work on.",
+      "browse": "Choose a folder…",
+      "choose": "Browse",
+      "change": "Change",
+      "placeholder": "/path/to/your/project",
+      "hint": "You can override this per card and per patrol later. Leave it as your home folder to decide each time."
+    },
+    "ready": {
+      "title": "You're all set",
+      "description": "Here's your setup. You can change any of it from Settings whenever you like.",
+      "agentRow": "Agent",
+      "modelRow": "Model",
+      "modelUnset": "Not set",
+      "modelHub": "Myra hub (auto)",
+      "folderRow": "Working folder",
+      "folderUnset": "Home folder",
+      "cta": "Set up a patrol to have your agent run on its own, then watch it live under Operations."
+    }
+  },
+  "tour": {
+    "title": "Get started",
+    "dismiss": "Hide the checklist",
+    "locked": "Finish the step above first",
+    "steps": {
+      "explore": {
+        "title": "Explore the views",
+        "hint": "Operations, Patrols and History — open each one to see what lives where."
+      },
+      "patrol": {
+        "title": "Create your first patrol",
+        "hint": "A patrol is a recurring or cron-triggered operation — it's how an agent fires on its own."
+      },
+      "run": {
+        "title": "Follow an operation",
+        "hint": "Open an operation from History to read the agent's discussion, step by step."
+      }
+    },
+    "spotlight": {
+      "progress": "Step {current} of {total}",
+      "skip": "Skip",
+      "back": "Back",
+      "next": "Next",
+      "done": "Done",
+      "tryThis": "Try:",
+      "applyExample": "Fill this in for me",
+      "applied": "Filled in",
+      "operations": {
+        "title": "Operations is the live view",
+        "body": "Everything currently running, grouped by status — what's going, what's stuck, what needs you."
+      },
+      "patrols": {
+        "title": "Patrols run without you",
+        "body": "A patrol fires an agent on a schedule or a cron trigger. This is where automation actually starts."
+      },
+      "history": {
+        "title": "History keeps every operation",
+        "body": "Past operations of every patrol, succeeded or failed, with stats and the full agent discussion."
+      },
+      "newPatrol": {
+        "title": "Create your first patrol",
+        "body": "Click the highlighted button to open the patrol editor.",
+        "example": "Short on ideas? A good first one: have the agent tidy a messy folder every Friday. The next steps use it as the example."
+      },
+      "patrolName": {
+        "title": "Name it",
+        "body": "What this patrol does, in a few words. It's what you'll see on the board.",
+        "exampleValue": "Sort out my Downloads"
+      },
+      "patrolSubtitle": {
+        "title": "Add a subtitle",
+        "body": "Optional — a line of context for your future self, under the name.",
+        "exampleValue": "Keep it from piling up again"
+      },
+      "patrolTag": {
+        "title": "Tag it",
+        "body": "Optional. Tags group patrols together and filter the board once you have a few.",
+        "exampleValue": "chores"
+      },
+      "patrolFolder": {
+        "title": "Pick the folder to work on",
+        "body": "The agent opens this folder and works inside it — for our example, that's the messy folder you want tidied. Required: a patrol without one won't save."
+      },
+      "patrolTrigger": {
+        "title": "Set the trigger",
+        "body": "When it fires on its own: daily, weekly, a cron expression, or an incoming webhook.",
+        "exampleValue": "Weekly, Friday at 17:00"
+      },
+      "patrolInstruction": {
+        "title": "Write the instruction",
+        "body": "What you'd tell a teammate — this is the prompt the agent runs every time. Required.",
+        "exampleValue": "Sort out this folder: group the files by type, rename them consistently, and move the obvious junk to the trash."
+      },
+      "patrolAgent": {
+        "title": "Choose the agent",
+        "body": "Who runs it — the built-in Myra agent, or any CLI you've set up. The default is fine to start."
+      },
+      "savePatrol": {
+        "title": "Save it",
+        "body": "That's everything — click the highlighted button to put it on the board."
+      },
+      "patrolTemplates": {
+        "title": "Next time, start here",
+        "body": "Ready-made patrols for common jobs. Pick one and it fills the editor in — no blank page."
+      },
+      "rowMenu": {
+        "title": "Don't wait for the schedule",
+        "body": "You can fire a patrol by hand any time. Open the highlighted menu."
+      },
+      "runNow": {
+        "title": "Run it now",
+        "body": "Click \"Run now\" — the agent starts immediately, exactly as it would on its schedule."
+      },
+      "openRun": {
+        "title": "Follow it",
+        "body": "Click the highlighted row to read what the agent did, step by step."
+      }
+    }
   }
 }

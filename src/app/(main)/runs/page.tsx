@@ -32,7 +32,6 @@ import {
   MessageSquareIcon,
   MoreHorizontalIcon,
   PencilIcon,
-  PlayIcon,
   SearchIcon,
   Settings2Icon,
   TerminalIcon,
@@ -43,6 +42,16 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { HeaderActions } from "@/app/(main)/_components/header-actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -56,7 +65,6 @@ import { MyraMark } from "@/components/ui/myra-mark";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useKanban } from "@/hooks/use-kanban";
 import { type RunsColumnId, TOGGLEABLE_COLUMNS, useRunsColumns } from "@/hooks/use-runs-columns";
-import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { connIdOf } from "@/lib/aggregate/global-id";
 import { tagClassName } from "@/lib/kanban-tags";
@@ -207,9 +215,6 @@ export default function RunsPage() {
   const [agentFilter, setAgentFilter] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
 
-  const agentNameOf = (card: KanbanCard) =>
-    settings.agents.find((a) => a.id === (card.agentPresetId ?? settings.defaultAgentId))?.name ?? "";
-
   const listed = useMemo(
     () => cards.filter((c) => LISTED.includes(c.status)).sort((a, b) => triggeredAt(b).localeCompare(triggeredAt(a))),
     [cards],
@@ -327,6 +332,22 @@ export default function RunsPage() {
     void cancelAgent(id)
       .then(() => toast.success(t("kanban.stopped")))
       .catch((e) => toast.error(String(e)));
+
+  // "Stop all" — every genuinely running card, gated behind a confirm dialog.
+  const runningCards = useMemo(() => listed.filter((c) => bucketOf(c) === "running"), [listed]);
+  const [confirmStopAll, setConfirmStopAll] = useState(false);
+  const [stoppingAll, setStoppingAll] = useState(false);
+  const stopAllRuns = async () => {
+    setStoppingAll(true);
+    try {
+      const results = await Promise.allSettled(runningCards.map((c) => cancelAgent(c.id)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) toast.error(t("stopAll.failed", { failed }));
+      else toast.success(t("stopAll.stopped", { count: results.length }));
+    } finally {
+      setStoppingAll(false);
+    }
+  };
 
   // True when a card/column/tag/search filter is narrowing the list (sort excluded —
   // it never empties results). Drives the "Clear filters" affordance.
@@ -539,6 +560,18 @@ export default function RunsPage() {
           })}
         </div>
         <div className="flex items-center gap-2 text-icon-primary">
+          {/* Stop all — only while at least one run is live; confirmed via dialog. */}
+          {runningCards.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setConfirmStopAll(true)}
+              disabled={stoppingAll}
+              className="flex h-6 items-center gap-1.5 text-text-secondary text-xs transition-colors hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+            >
+              <CircleStopIcon className="size-4" />
+              {t(stoppingAll ? "stopAll.stopping" : "stopAll.label")}
+            </button>
+          )}
           {view === "list" && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -755,10 +788,13 @@ export default function RunsPage() {
                                 editDisabled={!card.linkedTaskId}
                                 // Stop only for genuinely running rows.
                                 onStop={bucket === "running" ? () => stopRun(card.id) : undefined}
+                                onTrash={() => trashRun(card.id)}
+                                archive={bucket === "done"}
                                 labels={{
                                   view: t("rowMenu.viewOperation"),
                                   edit: t("rowMenu.editPatrol"),
                                   stop: t("rowMenu.stop"),
+                                  trash: t(bucket === "done" ? "kanban.archive" : "kanban.trash"),
                                 }}
                               />
                             </TableCell>
@@ -838,6 +874,27 @@ export default function RunsPage() {
           onReorder={reorderCard}
         />
       )}
+
+      {/* Stop-all guard — aborting every live run is not undoable. */}
+      <AlertDialog open={confirmStopAll} onOpenChange={setConfirmStopAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("stopAll.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("stopAll.description", { count: runningCards.length })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("stopAll.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmStopAll(false);
+                void stopAllRuns();
+              }}
+            >
+              {t("stopAll.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1002,6 +1059,8 @@ function RowMenu({
   onView,
   onEdit,
   onStop,
+  onTrash,
+  archive = false,
   editDisabled = false,
   labels,
 }: {
@@ -1009,10 +1068,14 @@ function RowMenu({
   onEdit?: () => void;
   // Present only for running rows — stops the live run.
   onStop?: () => void;
+  // Trash (or archive, for Done rows) the run — mirrors the Kanban card's
+  // hover affordance so the List view offers the same action.
+  onTrash: () => void;
+  archive?: boolean;
   // "Edit Patrol" needs an owning schedule — grey it out when the run isn't
   // linked to one (mirrors the History row menu).
   editDisabled?: boolean;
-  labels: { view: string; edit: string; stop: string };
+  labels: { view: string; edit: string; stop: string; trash: string };
 }) {
   return (
     <DropdownMenu>
@@ -1041,6 +1104,11 @@ function RowMenu({
             {labels.edit}
           </DropdownMenuItem>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={onTrash} className="whitespace-nowrap">
+          {archive ? <ArchiveIcon className="size-3.5" /> : <Trash2Icon className="size-3.5" />}
+          {labels.trash}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1080,7 +1148,7 @@ function RunsKanbanBoard({
   onTrash: (id: string) => void;
   onEdit: (card: KanbanCard) => void;
   onStop: (id: string) => void;
-  onMove: (id: string, status: KanbanStatus) => void | Promise<unknown>;
+  onMove: (id: string, status: KanbanStatus) => undefined | Promise<unknown>;
   onReorder: (id: string, newPosition: number, status?: KanbanStatus) => void;
 }) {
   const t = useTranslations("runs");
@@ -1358,9 +1426,8 @@ function KanbanRunCard({
         <span className={cn("mt-0.5 size-2 shrink-0 rounded-full", DOT_OF[bucket])} />
         <div className="flex items-center gap-1 text-icon-tertiary opacity-0 transition group-hover/card:opacity-100">
           {bucket !== "done" && (
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={(e) => {
                 stop(e);
                 onEdit();
@@ -1369,11 +1436,10 @@ function KanbanRunCard({
               className="rounded p-0.5 transition-colors hover:text-icon-primary"
             >
               <PencilIcon className="size-3.5" />
-            </span>
+            </button>
           )}
-          <span
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             onClick={(e) => {
               stop(e);
               onTrash();
@@ -1382,7 +1448,7 @@ function KanbanRunCard({
             className="rounded p-0.5 transition-colors hover:text-destructive"
           >
             {bucket === "done" ? <ArchiveIcon className="size-3.5" /> : <Trash2Icon className="size-3.5" />}
-          </span>
+          </button>
         </div>
       </div>
 
@@ -1402,9 +1468,8 @@ function KanbanRunCard({
             </div>
             <span className="truncate text-text-tertiary text-xs">{t("kanban.waitingOutput")}</span>
             {onStop && (
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 onClick={(e) => {
                   stop(e);
                   onStop();
@@ -1413,7 +1478,7 @@ function KanbanRunCard({
               >
                 <CircleStopIcon className="size-3.5" />
                 {t("kanban.stop")}
-              </span>
+              </button>
             )}
           </div>
         </>
@@ -1432,9 +1497,8 @@ function KanbanRunCard({
               <span className="text-text-tertiary text-xs tabular-nums">{durationOf(card)}</span>
             </div>
             {card.agentQuestion && <p className="text-text-secondary text-xs leading-relaxed">{card.agentQuestion}</p>}
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               onClick={(e) => {
                 stop(e);
                 onOpen();
@@ -1443,7 +1507,7 @@ function KanbanRunCard({
             >
               {t("kanban.answer")}
               <LogInIcon className="size-3.5" />
-            </span>
+            </button>
           </div>
         </>
       )}
@@ -1468,6 +1532,7 @@ function KanbanRunCard({
 
 /** Comparator for a sortable column (ascending). */
 function compareBy(key: SortKey, a: KanbanCard, b: KanbanCard, agentName: (c: KanbanCard) => string): number {
+  // biome-ignore lint/nursery/noUnnecessaryConditions: the rule misreads a switch over a string-literal union as an always-truthy boolean condition.
   switch (key) {
     case "task":
       return a.title.localeCompare(b.title);

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useSync } from "@/hooks/use-sync";
 
 /**
@@ -26,6 +27,7 @@ export function SyncPanel() {
   const t = useTranslations("settings.sync");
   const { isAuthenticated: authed } = useAuth();
   const { status, busy, error, available, setUp, unlock, join, revoke, leave, syncNow } = useSync();
+  const { confirm, confirmDialog } = useConfirm();
 
   const [label, setLabel] = useState("");
   const [recoveryInput, setRecoveryInput] = useState("");
@@ -67,6 +69,7 @@ export function SyncPanel() {
 
   return (
     <Card>
+      {confirmDialog}
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -164,7 +167,7 @@ export function SyncPanel() {
                         variant="ghost"
                         disabled={busy}
                         onClick={async () => {
-                          if (!window.confirm(t("revokeConfirm", { label: d.label }))) return;
+                          if (!(await confirm({ description: t("revokeConfirm", { label: d.label }) }))) return;
                           showRecovery(await revoke(d.deviceId));
                           toast.success(t("revoked", { label: d.label }));
                         }}

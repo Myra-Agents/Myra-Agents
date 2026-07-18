@@ -5,6 +5,7 @@ import { AppSidebar } from "@/app/(main)/_components/sidebar/app-sidebar";
 // import { AuthBootstrap } from "@/components/auth-bootstrap";
 import { RequirePro } from "@/components/require-pro";
 // import { RemoteAccessConsent } from "@/components/settings/remote-access-consent";
+import { SpotlightTour } from "@/components/tour/spotlight-tour";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { cn } from "@/lib/utils";
@@ -15,12 +16,15 @@ import { GlobalShortcuts } from "./_components/global-shortcuts";
 import { HEADER_ACTIONS_ID } from "./_components/header-actions";
 import { HeaderBreadcrumb } from "./_components/header-breadcrumb";
 import { NavHistoryControls } from "./_components/nav-history-controls";
+import { OnboardingBootstrap } from "./_components/onboarding/onboarding-bootstrap";
 import { RefreshOnNavigate } from "./_components/refresh-on-navigate";
 import { RunStartedToasts } from "./_components/run-started-toasts";
 // Theme/layout preferences popover removed — theme is changed from Settings → Preferences.
 // import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { TourCelebration } from "./_components/tour/tour-celebration";
+import { TourBootstrap } from "./_components/tour-bootstrap";
 import { TrayActionListener } from "./_components/tray-action-listener";
 import {
   HeaderLeftControls,
@@ -55,6 +59,15 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       <AppUpdateBootstrap />
       {/* One-shot auto connectivity test for installed-but-never-tested agents. */}
       <AgentTestBootstrap />
+      {/* First-run onboarding wizard (localStorage-gated, shows once). */}
+      <OnboardingBootstrap />
+      {/* Hydrates the "Get started" checklist and ticks it as routes are visited.
+          The card itself lives in the sidebar footer. */}
+      <TourBootstrap />
+      {/* Spotlight walkthrough — renders only while a checklist flow is running. */}
+      <SpotlightTour />
+      {/* Confetti on the last checklist box ticking; nothing otherwise. */}
+      <TourCelebration />
       <TrayActionListener />
       {/* Global "Operation started" toast for every run start (manual or scheduled). */}
       <RunStartedToasts />

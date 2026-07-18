@@ -578,6 +578,16 @@
       "stop": "Arrêter",
       "stopped": "Opération arrêtée."
     },
+    "stopAll": {
+      "label": "Tout arrêter",
+      "stopping": "Arrêt…",
+      "title": "Arrêter toutes les opérations en cours ?",
+      "description": "Ceci va interrompre {count, plural, one {# opération en cours} other {# opérations en cours}}. Cette action est irréversible.",
+      "cancel": "Annuler",
+      "confirm": "Tout arrêter",
+      "stopped": "{count, plural, one {# opération arrêtée} other {# opérations arrêtées}}.",
+      "failed": "Échec de l’arrêt de {failed, plural, one {# opération} other {# opérations}}."
+    },
     "summary": {
       "backlog": {
         "label": "Backlog",
@@ -715,6 +725,7 @@
     "triggered": "Déclenchée le {date}",
     "result": {
       "failed": "Échouée",
+      "canceled": "Annulée",
       "success": "Réussie",
       "running": "En cours",
       "needsYou": "Votre attention",
@@ -773,6 +784,7 @@
       "running": "En cours",
       "completed": "Terminé",
       "failed": "Échoué",
+      "canceled": "Annulé",
       "needsYou": "Votre attention",
       "needsFeedback": "Retour nécessaire",
       "awaitingReview": "En attente de vérification"
@@ -832,6 +844,7 @@
       "showMore": "Afficher {count} caractères de plus",
       "tokens": "jetons",
       "turns": "{count} tours",
+      "openAgentSettings": "Ouvrir Réglages → Agents",
       "review": {
         "awaitingTitle": "Cette exécution attend votre vérification",
         "questionTitle": "L'agent attend votre réponse",
@@ -1118,10 +1131,13 @@
         "badge": "Intégré",
         "save": "Enregistrer",
         "description": "Agent intégré — sans installation ni CLI. Tourne sur le hub Myra, ou avec votre propre clé.",
+        "providerCloud": "Cloud (OpenRouter)",
+        "providerOllama": "Local (Ollama)",
         "apiKeyLabel": "Clé API OpenRouter",
         "apiKeyPlaceholder": "sk-or-…  — laisser vide pour utiliser le hub Myra",
         "modelLabel": "Modèle",
         "modelHint": "Laisser vide ou « auto » pour laisser Myra choisir un modèle gratuit.",
+        "ollamaModelHint": "Le tag du modèle Ollama local à exécuter (ex. qwen2.5-coder). Nécessite Ollama installé.",
         "getKey": "Obtenir une clé",
         "browseModels": "Parcourir les modèles"
       }
@@ -1161,6 +1177,12 @@
       },
       "openAtLogin": "Ouvrir à la connexion",
       "openAtLoginHint": "Lance Myra Agents automatiquement à l'ouverture de votre session.",
+      "setupWizard": "Assistant de configuration",
+      "setupWizardHint": "Repasse la configuration initiale — langue, thème, agent, modèle et dossier de travail.",
+      "setupWizardStart": "Ouvrir l'assistant",
+      "guidedTour": "Visite guidée",
+      "guidedTourHint": "Réaffiche la checklist « Pour commencer » et repasse en revue les bases.",
+      "guidedTourStart": "Lancer la visite",
       "appUpdate": {
         "title": "Mises à jour de l'app",
         "description": "Mettez Myra Agents à jour vers la dernière version, installée et vérifiée automatiquement.",
@@ -1498,5 +1520,190 @@
     "cancel": "Annuler",
     "createTag": "Créer « {tag} »",
     "createTagHint": "Tape un nom pour créer un nouveau tag"
+  },
+  "onboarding": {
+    "skip": "Passer",
+    "back": "Retour",
+    "next": "Suivant",
+    "close": "Fermer",
+    "guideMe": "Guidez-moi",
+    "preferences": {
+      "title": "À votre main",
+      "description": "Deux réglages rapides. Vous pourrez les changer depuis les Réglages plus tard.",
+      "languageLabel": "Langue",
+      "languageAuto": "Détection automatique",
+      "languageEn": "English",
+      "languageFr": "Français",
+      "themeLabel": "Thème",
+      "themeLight": "Clair",
+      "themeDark": "Sombre",
+      "themeSystem": "Système"
+    },
+    "welcome": {
+      "title": "Bienvenue sur Myra Agents",
+      "description": "Myra Agents est une plateforme pour automatiser le travail répétitif que vous faites. Créez et surveillez tous vos agents Myra au même endroit — local d'abord et open-source."
+    },
+    "agent": {
+      "title": "Votre agent est prêt",
+      "description": "Myra intègre un agent natif — aucune installation, aucune CLI à configurer.",
+      "name": "Agent Myra",
+      "cardDescription": "Fonctionne d'emblée sur le hub Myra, ou avec votre propre clé API.",
+      "builtIn": "Intégré",
+      "detected": "Détecté",
+      "detecting": "Recherche des agents déjà installés sur cette machine…",
+      "footnote": "Vous préférez votre propre CLI ? Ajoutez opencode, Claude, Copilot ou un binaire personnalisé à tout moment dans les Réglages."
+    },
+    "connect": {
+      "title": "Connectez un modèle",
+      "description": "L'agent intégré fonctionne avec un LLM. Utilisez un modèle cloud via OpenRouter, ou un modèle local via Ollama.",
+      "provider": {
+        "cloud": "Cloud (OpenRouter)",
+        "ollama": "Local (Ollama)"
+      },
+      "keyLabel": "Clé API OpenRouter",
+      "getKey": "Obtenir une clé",
+      "keyPlaceholder": "sk-or-…",
+      "modelLabel": "Modèle",
+      "freeModels": "Modèles gratuits",
+      "modelPlaceholder": "ex. openai/gpt-4o-mini",
+      "gifAlt": "Copie de l'identifiant d'un modèle sur une page modèle OpenRouter",
+      "gifCaption": "Chaque modèle sur <link>openrouter.ai/models</link> affiche son identifiant sous son nom — copiez-le et collez-le ci-dessus.",
+      "ollama": {
+        "name": "Ollama",
+        "checking": "Vérification…",
+        "installed": "Installé",
+        "notInstalled": "Non installé",
+        "ready": "Prêt",
+        "installHint": "Ollama exécute des modèles locaux, privés et hors ligne. Installez-le en un clic.",
+        "install": "Installer Ollama",
+        "installing": "Installation…",
+        "learnMore": "En savoir plus",
+        "modelLabel": "Modèle Ollama",
+        "selectPlaceholder": "Choisissez un modèle local",
+        "managePulled": "Télécharger d'autres modèles",
+        "noModels": "Aucun modèle local pour l'instant — téléchargez-en un pour lancer l'agent.",
+        "downloadModel": "Télécharger un modèle",
+        "manageTitle": "Modèles Ollama locaux"
+      }
+    },
+    "folder": {
+      "title": "Choisissez un dossier de travail",
+      "description": "Les agents s'exécutent dans ce dossier par défaut — généralement le projet ou le dépôt sur lequel vous voulez qu'ils travaillent.",
+      "browse": "Choisir un dossier…",
+      "choose": "Parcourir",
+      "change": "Changer",
+      "placeholder": "/chemin/vers/votre/projet",
+      "hint": "Vous pourrez le remplacer par carte et par patrouille plus tard. Laissez votre dossier personnel pour choisir à chaque fois."
+    },
+    "ready": {
+      "title": "Tout est prêt",
+      "description": "Voici votre configuration. Vous pouvez tout modifier depuis les Réglages quand vous le souhaitez.",
+      "agentRow": "Agent",
+      "modelRow": "Modèle",
+      "modelUnset": "Non défini",
+      "modelHub": "Hub Myra (auto)",
+      "folderRow": "Dossier de travail",
+      "folderUnset": "Dossier personnel",
+      "cta": "Créez une patrouille pour que votre agent s'exécute tout seul, puis suivez-la en direct dans Opérations."
+    }
+  },
+  "tour": {
+    "title": "Pour commencer",
+    "dismiss": "Masquer la checklist",
+    "locked": "Terminez d'abord l'étape au-dessus",
+    "steps": {
+      "explore": {
+        "title": "Explorer les vues",
+        "hint": "Opérations, Patrouilles et Historique — ouvrez chacune pour voir ce qui s'y trouve."
+      },
+      "patrol": {
+        "title": "Créer votre première patrouille",
+        "hint": "Une patrouille est une opération récurrente ou déclenchée par cron — c'est ainsi qu'un agent part tout seul."
+      },
+      "run": {
+        "title": "Suivre une opération",
+        "hint": "Ouvrez une opération depuis l'Historique pour lire la discussion de l'agent, étape par étape."
+      }
+    },
+    "spotlight": {
+      "progress": "Étape {current} sur {total}",
+      "skip": "Passer",
+      "back": "Retour",
+      "next": "Suivant",
+      "done": "Terminé",
+      "tryThis": "Essayez :",
+      "applyExample": "Remplir le champ pour moi",
+      "applied": "Rempli",
+      "operations": {
+        "title": "Opérations, c'est la vue en direct",
+        "body": "Tout ce qui tourne, groupé par statut — ce qui avance, ce qui bloque, ce qui vous attend."
+      },
+      "patrols": {
+        "title": "Les patrouilles tournent sans vous",
+        "body": "Une patrouille déclenche un agent selon un horaire ou un cron. C'est là que l'automatisation commence vraiment."
+      },
+      "history": {
+        "title": "L'historique garde chaque opération",
+        "body": "Les opérations passées de chaque patrouille, réussies ou échouées, avec les stats et toute la discussion de l'agent."
+      },
+      "newPatrol": {
+        "title": "Créez votre première patrouille",
+        "body": "Cliquez le bouton entouré pour ouvrir l'éditeur de patrouille.",
+        "example": "À court d'idées ? Une bonne première : faire ranger un dossier en pagaille par l'agent chaque vendredi. Les étapes suivantes s'appuient dessus."
+      },
+      "patrolName": {
+        "title": "Nommez-la",
+        "body": "Ce que fait cette patrouille, en quelques mots. C'est ce que vous verrez sur le tableau.",
+        "exampleValue": "Ranger mes téléchargements"
+      },
+      "patrolSubtitle": {
+        "title": "Ajoutez un sous-titre",
+        "body": "Optionnel — une ligne de contexte pour votre vous futur, sous le nom.",
+        "exampleValue": "Éviter que ça s'entasse à nouveau"
+      },
+      "patrolTag": {
+        "title": "Ajoutez un tag",
+        "body": "Optionnel. Les tags regroupent les patrouilles et filtrent le tableau dès que vous en avez plusieurs.",
+        "exampleValue": "ménage"
+      },
+      "patrolFolder": {
+        "title": "Choisissez le dossier à traiter",
+        "body": "L'agent ouvre ce dossier et travaille dedans — pour notre exemple, c'est le dossier en pagaille que vous voulez faire ranger. Obligatoire : sans lui, la patrouille ne s'enregistre pas."
+      },
+      "patrolTrigger": {
+        "title": "Réglez le déclencheur",
+        "body": "Quand elle part toute seule : chaque jour, chaque semaine, une expression cron, ou un webhook entrant.",
+        "exampleValue": "Chaque semaine, vendredi à 17:00"
+      },
+      "patrolInstruction": {
+        "title": "Écrivez la consigne",
+        "body": "Ce que vous diriez à un collègue — c'est la consigne que l'agent exécute à chaque fois. Obligatoire.",
+        "exampleValue": "Range ce dossier : regroupe les fichiers par type, renomme-les de façon cohérente, et mets à la corbeille ce qui est manifestement inutile."
+      },
+      "patrolAgent": {
+        "title": "Choisissez l'agent",
+        "body": "Qui l'exécute — l'agent Myra intégré, ou n'importe quelle CLI que vous avez configurée. Le défaut suffit pour démarrer."
+      },
+      "savePatrol": {
+        "title": "Enregistrez-la",
+        "body": "C'est tout — cliquez le bouton entouré pour l'ajouter au tableau."
+      },
+      "patrolTemplates": {
+        "title": "La prochaine fois, partez d'ici",
+        "body": "Des patrouilles toutes faites pour les tâches courantes. Choisissez-en une et l'éditeur se remplit — pas de page blanche."
+      },
+      "rowMenu": {
+        "title": "N'attendez pas l'horaire",
+        "body": "Vous pouvez déclencher une patrouille à la main quand vous voulez. Ouvrez le menu entouré."
+      },
+      "runNow": {
+        "title": "Lancez-la maintenant",
+        "body": "Cliquez « Lancer maintenant » — l'agent démarre aussitôt, exactement comme il le ferait à son horaire."
+      },
+      "openRun": {
+        "title": "Suivez-la",
+        "body": "Cliquez la ligne entourée pour lire ce que l'agent a fait, étape par étape."
+      }
+    }
   }
 }

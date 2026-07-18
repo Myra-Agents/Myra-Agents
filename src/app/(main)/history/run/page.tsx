@@ -396,6 +396,7 @@ function RunStatusBadge({ status, stopping }: { status: AgentRun["status"]; stop
     awaiting_review: { label: t("result.needsYou"), variant: "outline" },
     completed: { label: t("result.success"), variant: "default" },
     failed: { label: t("result.failed"), variant: "destructive" },
+    canceled: { label: t("result.canceled"), variant: "secondary" },
   };
   // Optimistic override: as soon as Stop is clicked, show "Stopping…" instead of
   // the stale "Running" until the backend confirms the new status.

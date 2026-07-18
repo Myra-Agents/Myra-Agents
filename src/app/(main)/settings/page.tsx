@@ -1,6 +1,8 @@
 "use client";
 
-import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
+
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { buildAgentCommand } from "@myra/shared";
 import {
@@ -10,10 +12,12 @@ import {
 } from "@tauri-apps/plugin-autostart";
 import {
   CheckCircle2Icon,
+  CompassIcon,
   CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
   FlaskConicalIcon,
+  HandIcon,
   Loader2Icon,
   PlusIcon,
   SaveIcon,
@@ -61,6 +65,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // import { useEntitlement } from "@/hooks/use-entitlement"; // user connection disabled
+import { useConfirm } from "@/hooks/use-confirm";
 import { useSettings } from "@/hooks/use-settings";
 import { useTheme } from "@/hooks/use-theme";
 import { setAppLocale } from "@/i18n/provider";
@@ -74,7 +79,9 @@ import {
 import { getHomeFolderSetting, osHomeDir, setHomeFolderSetting } from "@/lib/home-folder.client";
 import { persistPreference } from "@/lib/preferences/preferences-storage";
 import { invoke, isTauri, openExternal } from "@/lib/tauri";
+import { useOnboardingStore } from "@/stores/onboarding-store";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
+import { useTourStore } from "@/stores/tour-store";
 import type { AgentPreset, AppSettings, EmbeddedLlmConfig } from "@/types/settings";
 import { DEFAULT_AGENT_PRESETS } from "@/types/settings";
 
@@ -208,50 +215,75 @@ function EmbeddedAgentCard({
         </span>
       </div>
       <p className="text-muted-foreground text-xs">{t("agents.embedded.description")}</p>
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs" htmlFor="myra-api-key">
-            {t("agents.embedded.apiKeyLabel")}
-          </Label>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-            onClick={() => openExternal("https://openrouter.ai/workspaces/default/keys")}
-          >
-            <ExternalLinkIcon className="size-3" />
-            {t("agents.embedded.getKey")}
-          </button>
-        </div>
-        <Input
-          id="myra-api-key"
-          type="password"
-          autoComplete="off"
-          placeholder={t("agents.embedded.apiKeyPlaceholder")}
-          value={llm?.apiKey ?? ""}
-          onChange={(e) => onChange({ apiKey: e.target.value })}
-        />
+      {/* Provider: cloud (OpenRouter/hub) vs a local Ollama daemon. */}
+      <div className="grid grid-cols-2 gap-1 rounded-md bg-muted p-0.5">
+        {(["cloud", "ollama"] as const).map((p) => {
+          const active = (llm?.provider ?? "cloud") === p;
+          return (
+            <Button
+              key={p}
+              type="button"
+              size="sm"
+              variant={active ? "secondary" : "ghost"}
+              className="h-7"
+              onClick={() => onChange({ provider: p })}
+            >
+              {t(p === "cloud" ? "agents.embedded.providerCloud" : "agents.embedded.providerOllama")}
+            </Button>
+          );
+        })}
       </div>
+      {(llm?.provider ?? "cloud") === "cloud" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs" htmlFor="myra-api-key">
+              {t("agents.embedded.apiKeyLabel")}
+            </Label>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+              onClick={() => openExternal("https://openrouter.ai/workspaces/default/keys")}
+            >
+              <ExternalLinkIcon className="size-3" />
+              {t("agents.embedded.getKey")}
+            </button>
+          </div>
+          <Input
+            id="myra-api-key"
+            type="password"
+            autoComplete="off"
+            placeholder={t("agents.embedded.apiKeyPlaceholder")}
+            value={llm?.apiKey ?? ""}
+            onChange={(e) => onChange({ apiKey: e.target.value })}
+          />
+        </div>
+      )}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label className="text-xs" htmlFor="myra-model">
             {t("agents.embedded.modelLabel")}
           </Label>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-            onClick={() => openExternal("https://openrouter.ai/models")}
-          >
-            <ExternalLinkIcon className="size-3" />
-            {t("agents.embedded.browseModels")}
-          </button>
+          {/* OpenRouter's catalog is meaningless for a local Ollama tag. */}
+          {(llm?.provider ?? "cloud") === "cloud" && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+              onClick={() => openExternal("https://openrouter.ai/models")}
+            >
+              <ExternalLinkIcon className="size-3" />
+              {t("agents.embedded.browseModels")}
+            </button>
+          )}
         </div>
         <Input
           id="myra-model"
-          placeholder="auto"
+          placeholder={(llm?.provider ?? "cloud") === "ollama" ? "qwen2.5-coder" : "auto"}
           value={llm?.model ?? ""}
           onChange={(e) => onChange({ model: e.target.value })}
         />
-        <p className="text-muted-foreground text-xs">{t("agents.embedded.modelHint")}</p>
+        <p className="text-muted-foreground text-xs">
+          {t((llm?.provider ?? "cloud") === "ollama" ? "agents.embedded.ollamaModelHint" : "agents.embedded.modelHint")}
+        </p>
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex justify-end">
@@ -534,14 +566,44 @@ function AgentPresetCard({
   );
 }
 
+// Visible tab values (parked tabs are commented out in the JSX below).
+const SETTINGS_TABS = new Set(["preferences", "agents", "localModels", "data"]);
+
 export default function SettingsPage() {
+  // useSearchParams() needs a Suspense boundary in the static export.
+  return (
+    <Suspense fallback={null}>
+      <SettingsScreen />
+    </Suspense>
+  );
+}
+
+function SettingsScreen() {
   const t = useTranslations("settings");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Tab is URL-driven so it can be deep-linked (e.g. /settings?tab=agents from a
+  // failed-run error). Unknown/absent param falls back to preferences.
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam && SETTINGS_TABS.has(tabParam) ? tabParam : "preferences";
+  const selectTab = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams);
+      params.set("tab", value);
+      router.replace(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams],
+  );
   // const { isPro } = useEntitlement(); // user connection disabled
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
   const setThemeMode = usePreferencesStore((state) => state.setThemeMode);
   const loaderVariant = usePreferencesStore((state) => state.loaderVariant);
   const setLoaderVariant = usePreferencesStore((state) => state.setLoaderVariant);
+  const startTour = useTourStore((s) => s.start);
+  const replayOnboarding = useOnboardingStore((s) => s.replay);
+  const { confirm: confirmAction, confirmDialog } = useConfirm();
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [dirtyPresetFields, setDirtyPresetFields] = useState<Map<number, Set<keyof AgentPreset>>>(new Map());
@@ -732,7 +794,9 @@ export default function SettingsPage() {
   }, [t]);
 
   const handleClearLogs = useCallback(async () => {
-    if (!window.confirm(t("data.clearLogsConfirm"))) {
+    // Not window.confirm: the Tauri webview rejects it (no dialog permission),
+    // so the guard threw and the logs could never be cleared. See useConfirm.
+    if (!(await confirmAction({ description: t("data.clearLogsConfirm") }))) {
       return;
     }
 
@@ -747,7 +811,7 @@ export default function SettingsPage() {
     } finally {
       setDataAction(null);
     }
-  }, [t]);
+  }, [t, confirmAction]);
 
   const addCustomPreset = () => {
     const preset: AgentPreset = {
@@ -817,6 +881,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
+      {confirmDialog}
       <div className="flex items-center gap-3">
         <SettingsIcon className="size-5 text-muted-foreground" />
         <h1 className="font-semibold text-xl tracking-tight">{t("title")}</h1>
@@ -824,7 +889,7 @@ export default function SettingsPage() {
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Tabs defaultValue="preferences" className="w-full">
+      <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
         <TabsList variant="line">
           {/* Hub tab hidden — no remote enabled for now.
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>
@@ -945,6 +1010,30 @@ export default function SettingsPage() {
                   <Switch checked={openAtLogin} onCheckedChange={(checked) => void toggleOpenAtLogin(checked)} />
                 </div>
               )}
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label>{t("preferences.setupWizard")}</Label>
+                  <p className="text-muted-foreground text-xs">{t("preferences.setupWizardHint")}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={replayOnboarding}>
+                  <HandIcon className="size-3.5" />
+                  {t("preferences.setupWizardStart")}
+                </Button>
+              </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label>{t("preferences.guidedTour")}</Label>
+                  <p className="text-muted-foreground text-xs">{t("preferences.guidedTourHint")}</p>
+                </div>
+                {/* No toast on either — the wizard opening, and the checklist
+                    reappearing bottom-right, are the feedback. */}
+                <Button variant="outline" size="sm" onClick={startTour}>
+                  <CompassIcon className="size-3.5" />
+                  {t("preferences.guidedTourStart")}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

@@ -70,6 +70,7 @@ import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
 import { getScheduleIdea } from "@/lib/schedule-ideas";
+import { TOUR_APPLY_EVENT } from "@/lib/tour-steps";
 import { cn } from "@/lib/utils";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import { useNavGuard } from "@/stores/nav-guard-store";
@@ -211,7 +212,10 @@ function ScheduleEditScreen() {
       agentPrompt: "",
       tags: [],
       schedule: { type: "daily", time: "09:00" },
-      enabled: false,
+      // Active like a template-created one: a patrol you just filled in is a
+      // patrol you meant to run, and starting it inactive only bought an extra
+      // "Activate this patrol?" prompt on the way out.
+      enabled: true,
       createdAt: "",
     };
   }, [blankMode, tSchedules]);
@@ -675,6 +679,8 @@ function ScheduleEditScreen() {
               : save
           }
           disabled={saving || (!draftMode && !dirty)}
+          // Spotlight-tour anchor — see lib/tour-steps.ts.
+          data-tour="save-patrol"
           className={cn(
             "rounded-md px-2 py-0.5 font-medium text-[11px] transition-colors",
             draftMode || dirty
@@ -800,6 +806,8 @@ function ScheduleEditScreen() {
           onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
           placeholder={t("namePlaceholder")}
           aria-label={t("nameLabel")}
+          // Spotlight-tour anchor — see lib/tour-steps.ts.
+          data-tour="patrol-name"
           className="-ml-1.5 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 font-medium text-[16px] text-text-primary leading-tight outline-none transition-colors placeholder:text-text-tertiary hover:border-border/60 focus:border-border focus:bg-card-background"
         />
         <textarea
@@ -807,6 +815,7 @@ function ScheduleEditScreen() {
           onChange={(e) => setDraft((d) => (d ? { ...d, cardDescription: e.target.value } : d))}
           placeholder={t("subtitle")}
           aria-label={t("descriptionLabel")}
+          data-tour="patrol-subtitle"
           rows={1}
           className="-ml-1.5 resize-none rounded-md border border-transparent bg-transparent px-1.5 py-0.5 font-light text-[12px] text-text-secondary leading-tight outline-none transition-colors placeholder:text-text-tertiary hover:border-border/60 focus:border-border focus:bg-card-background"
         />
@@ -827,7 +836,14 @@ function ScheduleEditScreen() {
           />
           <span className="text-[12px] text-text-secondary">{draft.enabled ? t("active") : t("inactive")}</span>
         </div>
-        <div className="flex items-center border-border border-r px-2">
+        {/* data-tour: spotlight-tour anchor. `data-tour-satisfied` is what holds
+            that step's "Next" back until a folder is really chosen — the tour
+            can't read the draft. See lib/tour-steps.ts. */}
+        <div
+          className="flex items-center border-border border-r px-2"
+          data-tour="patrol-folder"
+          data-tour-satisfied={hasFolder ? "true" : "false"}
+        >
           <FolderSelect
             scheduleId={task.id}
             // Template / blank drafts start fresh every time — don't seed or
@@ -1047,7 +1063,11 @@ function TagsEditor({
   const BASE_CHIP = "flex h-6 items-center gap-1 rounded-2xl border px-2 text-[12px]";
 
   return (
-    <div className="flex items-center gap-2 pt-4">
+    // data-tour anchors the row, not the "New tag" button: the button is swapped
+    // out for the inline field the moment it's pressed, and a target that
+    // vanishes reads to the tour as "the user navigated away" (see
+    // lib/tour-steps.ts).
+    <div className="flex items-center gap-2 pt-4" data-tour="patrol-tag">
       <span className="pr-1 text-[12px] text-text-tertiary">{t("tags")}</span>
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.map((tag) => {
@@ -1156,6 +1176,8 @@ function TagsEditor({
           <button
             type="button"
             onClick={() => setAdding(true)}
+            // The tour's "fill this in" reaches for this inside the ringed row.
+            data-tour-add-tag=""
             className="flex h-6 items-center rounded-2xl border border-border-cards bg-muted/30 px-2 text-[12px] text-text-secondary transition-colors hover:text-text-primary"
           >
             {t("newTag")}
@@ -1319,10 +1341,29 @@ function SettingsTab({
   onPromptInput: () => void;
   t: ReturnType<typeof useTranslations>;
 }) {
+  // The guided tour's "fill this in for me" arrow can't reach a trigger the way
+  // it reaches a text field — a schedule is state, not a DOM value. So it fires
+  // TOUR_APPLY_EVENT at the ringed section and the shape stays here, where it's
+  // owned. Keep in step with the suggestion the tour prints
+  // (`tour.spotlight.patrolTrigger.exampleValue`).
+  const tourApplyCleanup = useRef<(() => void) | null>(null);
+  const setTourNode = useCallback(
+    (node: HTMLElement | null) => {
+      tourApplyCleanup.current?.();
+      tourApplyCleanup.current = null;
+      if (!node) return;
+      const onApply = () => setDraft((d) => (d ? { ...d, schedule: { type: "weekly", days: [5], time: "17:00" } } : d));
+      node.addEventListener(TOUR_APPLY_EVENT, onApply);
+      tourApplyCleanup.current = () => node.removeEventListener(TOUR_APPLY_EVENT, onApply);
+    },
+    [setDraft],
+  );
+
   return (
     <div className="flex flex-col gap-7">
       {/* Triggers */}
-      <section className="flex flex-col gap-2.5">
+      {/* data-tour: spotlight-tour anchor — see lib/tour-steps.ts. */}
+      <section className="flex flex-col gap-2.5" data-tour="patrol-trigger" ref={setTourNode}>
         <span className="px-2 text-[12px] text-text-secondary">{t("triggers")}</span>
         <TriggersCard
           schedule={draft.schedule}
@@ -1349,10 +1390,12 @@ function SettingsTab({
               setDraft((d) => (d ? { ...d, agentPrompt: e.target.value } : d));
             }}
             spellCheck={false}
+            // Spotlight-tour anchor — see lib/tour-steps.ts.
+            data-tour="patrol-instruction"
             className="min-h-[182px] resize-y border-0 bg-transparent p-0 text-[12px] text-text-primary shadow-none focus-visible:ring-0 dark:bg-transparent"
             placeholder={t("instructionPlaceholder")}
           />
-          <div className="border-border border-t pt-4">
+          <div className="border-border border-t pt-4" data-tour="patrol-agent">
             <AgentPresetSection
               draft={draft}
               setDraft={setDraft}

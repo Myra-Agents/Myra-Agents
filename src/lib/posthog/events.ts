@@ -14,7 +14,11 @@ export type AppEvent =
   | "agent_run_completed"
   | "agent_run_failed"
   | "schedule_created"
-  | "settings_saved";
+  | "settings_saved"
+  | "onboarding_started"
+  | "onboarding_step_completed"
+  | "onboarding_completed"
+  | "onboarding_skipped";
 
 /**
  * Fire a product event. No-op when PostHog never initialized (no key / SSR),

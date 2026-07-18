@@ -28,10 +28,11 @@ export interface PastRun {
   /** The owning card was auto-archived (Done → Trash at midnight). Drives the
    *  archive icon so History shows it's archived rather than just trashed. */
   archived: boolean;
-  /** The run was cancelled (the user stopped the agent). Detected as the card's
-   *  latest run ending `failed` while the card landed in Done — a genuine failure
-   *  bounces the card back to Todo, so only a deliberate stop lands failed+Done.
-   *  Shown as a grey "Canceled" verdict instead of "Failed". */
+  /** The run was cancelled (the user stopped the agent), read straight off the
+   *  run's own `canceled` status. Was inferred from card state — last run
+   *  `failed` while the card landed in Done — until a genuine failure could
+   *  also land the card in Done, at which point that heuristic stopped being
+   *  able to tell the two apart. Shown as a grey "Canceled" verdict. */
   canceled: boolean;
   tokens?: number;
   cost?: number;
@@ -46,11 +47,6 @@ export function pastRunsFromCards(cards: KanbanCard[]): PastRun[] {
   const runs: PastRun[] = [];
   for (const card of cards) {
     const history = card.runHistory ?? [];
-    // A cancel lands the card in Done with its latest run `failed`; a real
-    // failure sends the card back to Todo. Resolve an archived (trashed) card to
-    // the column it came from.
-    const effectiveStatus = card.status === "trashed" ? (card.previousStatus ?? "done") : card.status;
-    const lastRunId = history.at(-1)?.id;
     for (const run of history) {
       runs.push({
         runId: run.id,
@@ -67,7 +63,7 @@ export function pastRunsFromCards(cards: KanbanCard[]): PastRun[] {
         // so they must not read as "Running".
         live: !run.endedAt,
         archived: Boolean(card.archivedAt),
-        canceled: run.status === "failed" && run.id === lastRunId && effectiveStatus === "done",
+        canceled: run.status === "canceled",
         tokens: run.tokens,
         cost: run.cost,
         agentPresetId: card.agentPresetId,
