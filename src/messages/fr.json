@@ -1175,7 +1175,7 @@
         "shimmer": "Shimmer (discret)",
         "assemble": "Assemblage (ludique)"
       },
-      "openAtLogin": "Ouvrir à la connexion",
+      "openAtLogin": "Ouvert au démarrage",
       "openAtLoginHint": "Lance Myra Agents automatiquement à l'ouverture de votre session.",
       "setupWizard": "Assistant de configuration",
       "setupWizardHint": "Repasse la configuration initiale — langue, thème, agent, modèle et dossier de travail.",
