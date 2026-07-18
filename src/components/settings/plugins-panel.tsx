@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { connectionManager } from "@/lib/connections/manager";
+import { track } from "@/lib/posthog/events";
 import { isDevModeError } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { PluginConfigField, PluginInfo } from "@/types/settings";
@@ -175,7 +176,10 @@ export function PluginsPanel({
           </div>
           <Switch
             checked={enabled}
-            onCheckedChange={(checked) => onToggle(plugin.name, checked)}
+            onCheckedChange={(checked) => {
+              onToggle(plugin.name, checked);
+              track("plugin_toggled", { plugin: plugin.name, enabled: checked });
+            }}
             aria-label={t("toggleAria", { name: plugin.manifestName ?? plugin.name })}
             className={cn(!enabled && "opacity-80")}
           />

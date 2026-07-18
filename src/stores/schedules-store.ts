@@ -97,7 +97,10 @@ export const useSchedulesStore = create<SchedulesState>((set, get) => ({
   deleteSchedule: async (id) => {
     const { connId, entityId } = parseGlobalId(id);
     const ok = await connectionManager.invokeOne<boolean>(connId, "delete_schedule", { id: entityId });
-    if (ok) set({ schedules: get().schedules.filter((s) => s.id !== id) });
+    if (ok) {
+      set({ schedules: get().schedules.filter((s) => s.id !== id) });
+      track("schedule_deleted", { schedule_id: id });
+    }
     return ok;
   },
 
@@ -107,6 +110,7 @@ export const useSchedulesStore = create<SchedulesState>((set, get) => ({
       id: entityId,
       enabled,
     });
+    track("schedule_toggled", { schedule_id: id, enabled });
     if (task) {
       const g = globalize(task, connId);
       set({ schedules: get().schedules.map((s) => (s.id === g.id ? g : s)) });
@@ -117,12 +121,16 @@ export const useSchedulesStore = create<SchedulesState>((set, get) => ({
 
   triggerNow: async (id) => {
     const { connId, entityId } = parseGlobalId(id);
-    return connectionManager.invokeOne<string>(connId, "trigger_schedule_now", { id: entityId });
+    const runId = await connectionManager.invokeOne<string>(connId, "trigger_schedule_now", { id: entityId });
+    track("schedule_triggered_manually", { schedule_id: id });
+    return runId;
   },
 
   purgeHistory: async (id) => {
     const { connId, entityId } = parseGlobalId(id);
-    return connectionManager.invokeOne<number>(connId, "purge_schedule_history", { id: entityId });
+    const count = await connectionManager.invokeOne<number>(connId, "purge_schedule_history", { id: entityId });
+    track("schedule_history_purged", { schedule_id: id });
+    return count;
   },
 }));
 

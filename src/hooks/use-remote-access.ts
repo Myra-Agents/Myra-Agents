@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 
 import { connectionManager } from "@/lib/connections/manager";
+import { track } from "@/lib/posthog/events";
 
 /** Mirror of the Rust `RemoteStatus` (`#[serde(rename_all = "camelCase")]`). */
 export interface RemoteStatus {
@@ -52,6 +53,7 @@ export function useRemoteAccess() {
         await invoke("enable_remote_access", { hubUrl, code, label });
         await connectionManager.refreshLocal();
         await refresh();
+        track("remote_access_enabled", { hub_url: hubUrl });
       } finally {
         setBusy(false);
       }
@@ -65,6 +67,7 @@ export function useRemoteAccess() {
       await invoke("disable_remote_access");
       await connectionManager.refreshLocal();
       await refresh();
+      track("remote_access_disabled");
     } finally {
       setBusy(false);
     }

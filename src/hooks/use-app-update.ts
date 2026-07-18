@@ -4,6 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check as checkForUpdate, type Update } from "@tauri-apps/plugin-updater";
 
+import { track } from "@/lib/posthog/events";
 import { isTauri } from "@/lib/tauri";
 
 /**
@@ -74,6 +75,12 @@ export function useAppUpdate() {
             break;
         }
       });
+      // Fire before relaunch, not after: relaunch() tears down this process, so
+      // anything queued post-relaunch would never flush. There's no existing
+      // flush/delay helper in this codebase to await on, so this best-effort
+      // capture relies on posthog-js's own batching (e.g. `navigator.sendBeacon`
+      // on unload) to get the event out before the process exits.
+      track("app_update_installed", { from_version: update.currentVersion, to_version: update.version });
       // Swap complete — restart into the new version.
       await relaunch();
     } catch (e) {

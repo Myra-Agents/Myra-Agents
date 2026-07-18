@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { ColumnPreferences } from "@/hooks/use-column-preferences";
 import { connIdOf } from "@/lib/aggregate/global-id";
 import { normalizeTag, tagClassName } from "@/lib/kanban-tags";
+import { track } from "@/lib/posthog/events";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
 import { COLUMN_STATUSES, isTransitionAllowed } from "@/types/kanban";
 import type { ScheduledTask } from "@/types/schedule";
@@ -387,12 +388,14 @@ export function KanbanBoard({
       }
       const skipped = selectedCards.length - movable.length;
       toast.success(t("bulk.moved", { count: movable.length, skipped }));
+      track("bulk_action_completed", { action: "move", card_count: movable.length });
       setSelectedIds(new Set());
     });
 
   const handleBulkTrash = () =>
     runBulkAction(async () => {
       await onBulkTrash(selectedCards.map((card) => card.id));
+      track("bulk_action_completed", { action: "trash", card_count: selectedCards.length });
       setSelectedIds(new Set());
     });
 
@@ -404,6 +407,7 @@ export function KanbanBoard({
         await onBulkAddTag(card, tag);
       }
       toast.success(t("bulk.tagged", { count: selectedCards.length, tag }));
+      track("bulk_action_completed", { action: "tag", card_count: selectedCards.length });
       setBulkTag("");
     });
 
@@ -419,6 +423,7 @@ export function KanbanBoard({
       }
       const skipped = selectedCards.length - launchable.length;
       toast.success(t("bulk.launched", { count: launchable.length, skipped }));
+      track("bulk_action_completed", { action: "launch", card_count: launchable.length });
       setSelectedIds(new Set());
     });
 
@@ -432,6 +437,7 @@ export function KanbanBoard({
     link.download = `myra-agents-selection-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
+    track("bulk_action_completed", { action: "export", card_count: selectedCards.length });
   };
 
   const handleDragStart = (event: DragStartEvent) => {

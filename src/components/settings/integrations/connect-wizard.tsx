@@ -22,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import type { Connection } from "@/lib/connections/types";
 import { deployInstance, type SecretInput } from "@/lib/integrations/deploy";
+import { track } from "@/lib/posthog/events";
 import { cn } from "@/lib/utils";
 import type { PluginConfigField, PluginInfo, PluginInstance } from "@/types/settings";
 
@@ -156,6 +157,7 @@ export function ConnectWizard({
       } else {
         toast.success(t("deployOk", { label: instance.label }));
       }
+      track("integration_connected", { plugin: plugin.name, roles: plugin.roles });
       onDeployed();
       onClose();
     } catch (e) {

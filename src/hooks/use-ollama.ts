@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { track } from "@/lib/posthog/events";
 import { invoke, listen } from "@/lib/tauri";
 import type { OllamaPullProgress, OllamaStatus } from "@/types/settings";
 
@@ -65,6 +66,7 @@ export function useOllama() {
     try {
       const next = await invoke<OllamaStatus>("ollama_install");
       setStatus(next);
+      track("ollama_installed");
       return next;
     } finally {
       setBusy(false);
@@ -92,6 +94,7 @@ export function useOllama() {
         // completed pull, `"cancelled"` when stopped — so callers can tell them apart.
         const result = await invoke<OllamaPullProgress>("ollama_pull", { model: tag });
         await refresh();
+        if (result.status === "success") track("model_downloaded", { model: tag });
         return result;
       } finally {
         setPulling((prev) => {
@@ -126,6 +129,7 @@ export function useOllama() {
       try {
         await invoke("ollama_remove", { model });
         await refresh();
+        track("model_removed", { model });
       } finally {
         setBusy(false);
       }

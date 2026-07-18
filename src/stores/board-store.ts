@@ -283,6 +283,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
         get,
         get().cards.filter((c) => c.id !== id),
       );
+      track("card_deleted", { card_id: id });
     }
     return success;
   },
@@ -291,6 +292,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     const { connId, entityId } = parseGlobalId(id);
     const card = await connectionManager.invokeOne<KanbanCard | null>(connId, "trash_card", { id: entityId });
     if (card) get().upsertCard(globalize(card, connId));
+    track("card_trashed", { card_id: id });
     return card;
   },
 
@@ -301,6 +303,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       status: status ?? null,
     });
     if (card) get().upsertCard(globalize(card, connId));
+    track("card_restored", { card_id: id });
     return card;
   },
 
@@ -310,6 +313,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       input: { id: entityId, note },
     });
     if (card) get().upsertCard(globalize(card, connId));
+    track("revision_note_added", { card_id: id });
     return card;
   },
 
@@ -319,6 +323,10 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       input: { id: entityId, answer },
     });
     if (card) get().upsertCard(globalize(card, connId));
+    // Note: `answerFeedback` only ever carries a free-text reply to the agent's
+    // question (see review-composer.tsx) — approval is a separate action
+    // (moveCard → "done"), so there is no real "approved" boolean to report here.
+    track("feedback_answered", { card_id: id });
     return card;
   },
 
