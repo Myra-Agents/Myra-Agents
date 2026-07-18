@@ -98,6 +98,10 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("");
   const [seededLlm, setSeededLlm] = useState(false);
+  // Best-effort abandonment tracking: set the instant `finish()` runs (skip or
+  // complete), so the unmount cleanup below can tell "left via the wizard's own
+  // exits" apart from "unmounted some other way" (host swap, forced close, …).
+  const finishedRef = useRef(false);
 
   // Seed the LLM fields once, after settings finish loading, from any
   // already-saved embedded LLM config (don't seed from DEFAULT_SETTINGS).
@@ -135,8 +139,34 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
   const isLast = stepIndex === STEP_ORDER.length - 1;
   const progress = useMemo(() => ((stepIndex + 1) / STEP_ORDER.length) * 100, [stepIndex]);
 
+  // Fires whenever the visible step changes — including the very first render,
+  // since effects run after mount regardless of the dependency list.
+  useEffect(() => {
+    track("onboarding_step_viewed", { step: stepId });
+  }, [stepId]);
+
+  // Kept in sync so the unmount-only cleanup below (declared with `[]` deps, so
+  // its closure is fixed at mount) can still read the step the user was on when
+  // the wizard went away.
+  const stepIdRef = useRef(stepId);
+  useEffect(() => {
+    stepIdRef.current = stepId;
+  }, [stepId]);
+
+  // Best-effort abandonment signal: if the wizard unmounts without `finish()`
+  // ever having run, the user left some other way (closed the host, navigated
+  // away, app quit) rather than through skip/close/guide-me.
+  useEffect(() => {
+    return () => {
+      if (!finishedRef.current) {
+        track("onboarding_abandoned", { step: stepIdRef.current });
+      }
+    };
+  }, []);
+
   const finish = useCallback(
     (skipped: boolean, guided = false) => {
+      finishedRef.current = true;
       // Persist the folder choice regardless of how they leave — a set folder is
       // useful even for a skipper.
       if (homeFolder.trim()) setHomeFolderSetting(homeFolder);
@@ -174,22 +204,38 @@ export function OnboardingWizard({ onClose }: OnboardingWizardProps) {
         startFlow("explore");
       }
       completeOnboarding();
-      track(skipped ? "onboarding_skipped" : "onboarding_completed", { last_step: stepId, guided });
+      track(skipped ? "onboarding_skipped" : "onboarding_completed", {
+        last_step: stepId,
+        guided,
+        // Only meaningful for an actual completion — a skip may never have
+        // touched the connect step at all.
+        ...(skipped ? {} : { provider, model: model.trim() || undefined }),
+      });
       onClose();
     },
     [homeFolder, locale, themeMode, provider, apiKey, model, settings, save, stepId, onClose, startTour, startFlow],
   );
 
   const goNext = useCallback(() => {
-    track("onboarding_step_completed", { step: stepId });
+    track("onboarding_step_completed", {
+      step: stepId,
+      // The connect step is where provider/model are actually chosen — attach
+      // them here so drop-off analysis on that step has the context.
+      ...(stepId === "connect" ? { provider, model: model.trim() || undefined } : {}),
+    });
     if (isLast) {
       finish(false);
       return;
     }
     setStepIndex((i) => Math.min(i + 1, STEP_ORDER.length - 1));
-  }, [stepId, isLast, finish]);
+  }, [stepId, isLast, finish, provider, model]);
 
-  const goBack = useCallback(() => setStepIndex((i) => Math.max(i - 1, 0)), []);
+  const goBack = useCallback(() => {
+    // Mirrors `onboarding_step_completed`'s convention: `step` is the step being
+    // left (i.e. navigated back FROM), not the destination.
+    track("onboarding_step_back", { step: stepId });
+    setStepIndex((i) => Math.max(i - 1, 0));
+  }, [stepId]);
 
   return (
     <Dialog
@@ -738,6 +784,16 @@ function ConnectOllama({
   const models = status?.models ?? [];
   const [manageOpen, setManageOpen] = useState(false);
 
+  const handleInstallClick = useCallback(async () => {
+    track("ollama_install_attempted");
+    try {
+      await install();
+      track("ollama_install_succeeded");
+    } catch (e) {
+      track("ollama_install_failed", { error: e instanceof Error ? e.message : String(e) });
+    }
+  }, [install]);
+
   return (
     <div className="space-y-4">
       {/* Ollama runtime status + one-click install when missing. */}
@@ -772,7 +828,7 @@ function ConnectOllama({
           <div className="mt-4 space-y-2.5">
             <p className="text-sm text-text-secondary">{t("connect.ollama.installHint")}</p>
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" onClick={() => void install()} disabled={busy}>
+              <Button type="button" size="sm" onClick={() => void handleInstallClick()} disabled={busy}>
                 {busy ? <Loader2Icon className="animate-spin" /> : <DownloadIcon />}
                 {busy ? t("connect.ollama.installing") : t("connect.ollama.install")}
               </Button>

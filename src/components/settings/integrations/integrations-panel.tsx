@@ -16,6 +16,7 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { useConnections } from "@/hooks/use-connections";
 import { connectionManager } from "@/lib/connections/manager";
 import { aggregateInstances, deployInstance, removeInstance } from "@/lib/integrations/deploy";
+import { track } from "@/lib/posthog/events";
 import { isDevModeError } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { PluginInfo, PluginInstance } from "@/types/settings";
@@ -123,6 +124,7 @@ export function IntegrationsPanel() {
         secretKeys: secretKeysFor(instance.plugin),
       });
       if (results.some((r) => !r.ok)) toast.error(t("deletePartial"));
+      track("integration_removed", { plugin: instance.plugin });
       void load();
     },
     [connections, secretKeysFor, load, t, confirm],
