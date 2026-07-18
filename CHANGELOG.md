@@ -8,6 +8,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-18
+
+### Added
+
+- **First-run onboarding wizard** — language/theme up front, CLI agent detection (only lists what's actually installed), an OpenRouter connect step with a native folder picker, and an Ollama local-models step.
+- **Embedded Myra agent → local Ollama** — the built-in Myra agent can run against a local Ollama model instead of the cloud harness, with an LLM config UI in Settings, a Tested badge, and Test & Save.
+- **"Get started" guided checklist** — a spotlight walkthrough that runs the tour strictly in order, walks the patrol editor field by field, suggests a worked example, and ends with confetti; reopenable from Settings.
+- **Operations page** — a Stop all button and a trash action on the row menu.
+- **Settings deep-links** — jump straight to a tab; connection errors now link to the Agents tab.
+
+### Fixed
+
+- **History status** — reads a run's real cancel/fail status instead of guessing it.
+- **Windows console flashes** — sidecar launch no longer pops foreground console windows.
+- Replaced a lingering `window.confirm` in Settings with an `AlertDialog`.
+- Harness transcript events deduped by `seq` (embedded-agent runs no longer double up).
+- Assorted tour/checklist fixes: confetti now launches from the bottom-center at full size, the checklist floats clear of the toast stack, a step no longer blacks out the view it just opened, and biome errors from the merged Operations PRs are cleared.
+
 ## [0.7.0] — 2026-07-09
 
 ### Added
