@@ -844,6 +844,7 @@
       "showMore": "Show {count} more characters",
       "tokens": "tokens",
       "turns": "{count} turns",
+      "openAgentSettings": "Open Settings → Agents",
       "review": {
         "awaitingTitle": "This run is awaiting your review",
         "questionTitle": "The agent is waiting for your input",

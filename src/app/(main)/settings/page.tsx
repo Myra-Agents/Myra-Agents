@@ -1,6 +1,8 @@
 "use client";
 
-import { type ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
+
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { buildAgentCommand } from "@myra/shared";
 import {
@@ -564,8 +566,35 @@ function AgentPresetCard({
   );
 }
 
+// Visible tab values (parked tabs are commented out in the JSX below).
+const SETTINGS_TABS = new Set(["preferences", "agents", "localModels", "data"]);
+
 export default function SettingsPage() {
+  // useSearchParams() needs a Suspense boundary in the static export.
+  return (
+    <Suspense fallback={null}>
+      <SettingsScreen />
+    </Suspense>
+  );
+}
+
+function SettingsScreen() {
   const t = useTranslations("settings");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Tab is URL-driven so it can be deep-linked (e.g. /settings?tab=agents from a
+  // failed-run error). Unknown/absent param falls back to preferences.
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabParam && SETTINGS_TABS.has(tabParam) ? tabParam : "preferences";
+  const selectTab = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams);
+      params.set("tab", value);
+      router.replace(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams],
+  );
   // const { isPro } = useEntitlement(); // user connection disabled
   const { settings, loading, error, save } = useSettings();
   const { setTheme } = useTheme();
@@ -860,7 +889,7 @@ export default function SettingsPage() {
 
       {error && <p className="text-destructive text-sm">{error}</p>}
 
-      <Tabs defaultValue="preferences" className="w-full">
+      <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
         <TabsList variant="line">
           {/* Hub tab hidden — no remote enabled for now.
           <TabsTrigger value="hub">{t("tabs.hub")}</TabsTrigger>

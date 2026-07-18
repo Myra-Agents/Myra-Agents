@@ -844,6 +844,7 @@
       "showMore": "Afficher {count} caractères de plus",
       "tokens": "jetons",
       "turns": "{count} tours",
+      "openAgentSettings": "Ouvrir Réglages → Agents",
       "review": {
         "awaitingTitle": "Cette exécution attend votre vérification",
         "questionTitle": "L'agent attend votre réponse",

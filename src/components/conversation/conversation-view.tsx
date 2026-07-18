@@ -6,6 +6,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import Link from "next/link";
+
 import {
   BrainIcon,
   ChevronRightIcon,
@@ -18,6 +20,7 @@ import {
   GlobeIcon,
   ListChecksIcon,
   type LucideIcon,
+  SettingsIcon,
   SparklesIcon,
   TerminalIcon,
   WrenchIcon,
@@ -301,6 +304,15 @@ function ResultFooter({ entry }: { entry: Extract<TranscriptEntry, { kind: "resu
         >
           <Markdown text={entry.summary} />
         </div>
+      )}
+      {entry.isError && (
+        <Link
+          href="/settings?tab=agents"
+          className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 font-medium text-foreground text-xs transition-colors hover:bg-muted"
+        >
+          <SettingsIcon className="size-3.5" />
+          {t("openAgentSettings")}
+        </Link>
       )}
       <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
         {typeof entry.tokens === "number" && (
