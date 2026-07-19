@@ -137,16 +137,26 @@ export function SpotlightTour() {
   // On interactive steps the user's real press on the target is what advances
   // the tour, so listen for it instead of rendering a "Next".
   //
-  // `pointerdown`, not `click`: a Radix menu trigger opens on pointerdown and
-  // preventDefaults it, so the pointerup lands on the menu's dismissable layer
-  // and the trigger never emits a click at all — a click listener on it fires
-  // exactly zero times. Pressing the ringed element is the signal we mean.
+  // `pointerdown`, not `click`, but only for a step that opens a menu
+  // ({@link TourStep.opensMenu}): Radix opens it on pointerdown and
+  // preventDefaults the event, so the pointerup lands on the menu's
+  // dismissable layer and the trigger never emits a click at all — a click
+  // listener on it fires exactly zero times.
+  //
+  // Every other interactive step advances on `click` instead, so the
+  // target's own handler — Radix selecting a menu item, a plain button —
+  // runs *first*. Advancing on `pointerdown` there would race it: this
+  // step's `nextStep()` can push the *next* step's route before the press's
+  // own click is dispatched, unmounting the target mid-click and silently
+  // dropping whatever it was about to do (e.g. "Run now" would advance the
+  // tour without ever launching the run).
   useEffect(() => {
     if (!step?.interactive || !targetEl) return;
+    const eventName = step.opensMenu ? "pointerdown" : "click";
     const onPress = () => nextStep(index);
-    targetEl.addEventListener("pointerdown", onPress);
-    return () => targetEl.removeEventListener("pointerdown", onPress);
-  }, [step?.interactive, targetEl, nextStep, index]);
+    targetEl.addEventListener(eventName, onPress);
+    return () => targetEl.removeEventListener(eventName, onPress);
+  }, [step?.interactive, step?.opensMenu, targetEl, nextStep, index]);
 
   // Escape gets out of the tour — but only when it isn't already dismissing
   // something else. Steps ring dropdowns (the folder picker, the row menu), and

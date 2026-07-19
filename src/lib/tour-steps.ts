@@ -28,6 +28,23 @@ export interface TourStep {
    */
   interactive?: boolean;
   /**
+   * The interactive press is caught on `pointerdown` instead of `click` —
+   * needed only for a control that *opens* a Radix menu: Radix opens it on
+   * pointerdown and preventDefaults the event, so pointerup lands on the
+   * menu's own dismissable layer and a `click` listener on the trigger fires
+   * zero times.
+   *
+   * A plain button or an already-open menu's own item still fires `click`
+   * normally — advancing on `click` there (the default) is what lets the
+   * target's real handler run *first*. Advancing on `pointerdown` for one of
+   * these would race it: this step's `nextStep()` can trigger the *next*
+   * step's route push before the press's own click has been dispatched,
+   * unmounting the target mid-click and silently dropping whatever it was
+   * about to do — e.g. "Run now" would advance the tour without ever
+   * launching the run.
+   */
+  opensMenu?: boolean;
+  /**
    * Like {@link interactive}, but advance only once the target has left the
    * DOM rather than on the press. For a button whose action can fail — Save
    * rejects an incomplete patrol — the press proves nothing: advancing on it
@@ -103,7 +120,7 @@ export const TOUR_FLOWS: Record<TourStepId, readonly TourStep[]> = {
   // Launch one by hand, then read it. Both steps self-skip when there's no
   // patrol to run, which is the state a user who skipped `patrol` is in.
   run: [
-    { id: "rowMenu", route: "/schedules", target: "patrol-row-menu", interactive: true, padding: 2 },
+    { id: "rowMenu", route: "/schedules", target: "patrol-row-menu", interactive: true, opensMenu: true, padding: 2 },
     { id: "runNow", target: "run-now", interactive: true },
     // Operations, not History: a just-launched run is live, and Operations is
     // the live view — History is where it goes once it's done.
