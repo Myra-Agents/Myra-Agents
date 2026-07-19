@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 import { AgentTestBootstrap } from "./_components/agent-test-bootstrap";
 import { AppUpdateBootstrap } from "./_components/app-update-bootstrap";
+import { DeepLinkListener } from "./_components/deep-link-listener";
 import { GlobalShortcuts } from "./_components/global-shortcuts";
 import { HEADER_ACTIONS_ID } from "./_components/header-actions";
 import { HeaderBreadcrumb } from "./_components/header-breadcrumb";
@@ -69,6 +70,8 @@ export default function Layout({ children }: Readonly<{ children: ReactNode }>) 
       {/* Confetti on the last checklist box ticking; nothing otherwise. */}
       <TourCelebration />
       <TrayActionListener />
+      {/* Consumes `myra://patrol/new?template=<id>` deep links from the landing site. */}
+      <DeepLinkListener />
       {/* Global "Operation started" toast for every run start (manual or scheduled). */}
       <RunStartedToasts />
       {/* Silent re-fetch of board + schedules on every route change. */}
