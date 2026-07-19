@@ -8,6 +8,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-07-19
+
+### Fixed
+
+- **Guided tour** — the "Run now" step no longer races its own advance, the highlight ring clears immediately when a step changes, and the "Follow an operation" step now points to Operations instead of History.
+- French translation for `openAtLogin`.
+
+### Added
+
+- PostHog events for the onboarding flow and gaps.
+
 ## [0.8.0] — 2026-07-18
 
 ### Added
