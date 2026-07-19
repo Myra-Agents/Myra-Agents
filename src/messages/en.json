@@ -1023,6 +1023,8 @@
       "firesOn": "Fires on: {events}",
       "noTriggers": "No triggers",
       "noMachines": "No machines",
+      "connecting": "Connecting…",
+      "connected": "Connected",
       "deleteConfirm": "Delete the “{label}” integration from every machine?",
       "deletePartial": "Some machines couldn't be updated — try again.",
       "webhookWarning": {
@@ -1469,6 +1471,28 @@
     },
     "removeTrigger": "Remove trigger",
     "oneScheduledOnly": "Only one scheduled trigger is allowed. Remove the existing one to add another.",
+    "noConnectors": "No trigger-capable plugins connected. Connect one from Integrations.",
+    "eventTrigger": {
+      "anyEvent": "Any event",
+      "matches": "Matches: {summary}",
+      "from": "From",
+      "subjectContains": "Subject / title contains",
+      "bodyContains": "Body contains",
+      "regex": "Regex",
+      "regexField": "Regex field",
+      "prompt": "Prompt override",
+      "promptPlaceholder": "Leave blank to use the patrol's own instruction",
+      "promptHint": "Templated: '{{subject}}' '{{from}}' '{{body}}' '{{id}}'.",
+      "requireReview": "Hold for review before running"
+    },
+    "actionsSection": {
+      "title": "Actions",
+      "description": "Run after this patrol's card finishes.",
+      "addAction": "Add Action",
+      "searchActions": "Search actions...",
+      "noActions": "No action-capable plugins connected.",
+      "remove": "Remove action"
+    },
     "noRepository": "No Repository",
     "recents": "Recents",
     "allRepositories": "All Repositories",

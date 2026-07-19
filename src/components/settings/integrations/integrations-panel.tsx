@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { COLUMN_CONFIG } from "@myra/shared/types/kanban";
-import { BlocksIcon, PencilIcon, PlusIcon, Trash2Icon, TriangleAlertIcon } from "lucide-react";
+import {
+  BlocksIcon,
+  CheckIcon,
+  Loader2Icon,
+  PencilIcon,
+  PlugZapIcon,
+  PlusIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -69,6 +78,62 @@ export function IntegrationsPanel() {
     const off = connectionManager.onTopologyChange(() => void load());
     return off;
   }, [load]);
+
+  // Connect (`run_plugin_setup`) progress per instance id — a plugin's `catalog
+  // .setup` (OAuth consent, etc.) runs server-side and streams back over the
+  // bus; see PROTOCOL.md's "Role 5". `running` clears on `plugin-setup-done`.
+  const [connectState, setConnectState] = useState<
+    Record<string, { lines: string[]; running: boolean; ok?: boolean }>
+  >({});
+
+  useEffect(() => {
+    let unlistenLog: (() => void) | undefined;
+    let unlistenDone: (() => void) | undefined;
+    void connectionManager
+      .listenAll<{ id: string; line: string }>("plugin-setup-log", ({ payload }) => {
+        setConnectState((s) => {
+          const cur = s[payload.id] ?? { lines: [], running: true };
+          return { ...s, [payload.id]: { ...cur, lines: [...cur.lines, payload.line].slice(-20) } };
+        });
+      })
+      .then((un) => {
+        unlistenLog = un;
+      });
+    void connectionManager
+      .listenAll<{ id: string; ok: boolean }>("plugin-setup-done", ({ payload }) => {
+        setConnectState((s) => ({
+          ...s,
+          [payload.id]: { lines: s[payload.id]?.lines ?? [], running: false, ok: payload.ok },
+        }));
+        if (payload.ok) void load();
+      })
+      .then((un) => {
+        unlistenDone = un;
+      });
+    return () => {
+      unlistenLog?.();
+      unlistenDone?.();
+    };
+  }, [load]);
+
+  const startConnect = useCallback(
+    async (instance: PluginInstance) => {
+      const connIds = membership[instance.id] ?? [];
+      const connId = connIds[0];
+      if (!connId) return;
+      setConnectState((s) => ({ ...s, [instance.id]: { lines: [], running: true } }));
+      try {
+        await connectionManager.invokeOne(connId, "run_plugin_setup", { instanceId: instance.id });
+        track("integration_connect_started", { plugin: instance.plugin });
+      } catch (e) {
+        setConnectState((s) => ({
+          ...s,
+          [instance.id]: { lines: [e instanceof Error ? e.message : String(e)], running: false, ok: false },
+        }));
+      }
+    },
+    [membership],
+  );
 
   const pluginFor = useCallback((name: string) => catalog.find((p) => p.name === name), [catalog]);
   const secretKeysFor = useCallback(
@@ -213,6 +278,14 @@ export function IntegrationsPanel() {
                   )}
                 </div>
 
+                {plugin?.catalog?.setup && deployed && (
+                  <ConnectRow
+                    label={plugin.catalog.setup.label}
+                    state={connectState[inst.id]}
+                    onConnect={() => void startConnect(inst)}
+                  />
+                )}
+
                 <div className="flex items-center justify-end gap-1 border-t pt-2">
                   <Button variant="ghost" size="sm" onClick={() => void openEdit(inst)}>
                     <PencilIcon className="size-3.5" />
@@ -248,5 +321,56 @@ export function IntegrationsPanel() {
         />
       )}
     </Card>
+  );
+}
+
+/**
+ * One instance card's "Connect" affordance for a plugin declaring `catalog
+ * .setup` (OAuth consent run server-side via `run_plugin_setup` — see
+ * PROTOCOL.md's "Role 5"). Idle → button; running → spinner + the last few
+ * log lines; done → a checkmark (success) or the button again (retry, on
+ * failure) with the error as its last line.
+ */
+function ConnectRow({
+  label,
+  state,
+  onConnect,
+}: {
+  label: string;
+  state: { lines: string[]; running: boolean; ok?: boolean } | undefined;
+  onConnect: () => void;
+}) {
+  const t = useTranslations("settings.integrations");
+  const lastLine = state?.lines[state.lines.length - 1];
+
+  if (state?.running) {
+    return (
+      <div className="space-y-1 border-t pt-2">
+        <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+          <Loader2Icon className="size-3 animate-spin" />
+          {t("connecting")}
+        </div>
+        {lastLine && <p className="truncate text-muted-foreground text-xs">{lastLine}</p>}
+      </div>
+    );
+  }
+
+  if (state?.ok === true) {
+    return (
+      <div className="flex items-center gap-1.5 border-t pt-2 text-xs">
+        <CheckIcon className="size-3 text-green-500" />
+        {t("connected")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1 border-t pt-2">
+      <Button variant="outline" size="sm" onClick={onConnect} className="w-full">
+        <PlugZapIcon className="size-3.5" />
+        {label}
+      </Button>
+      {state?.ok === false && lastLine && <p className="truncate text-destructive text-xs">{lastLine}</p>}
+    </div>
   );
 }

@@ -27,6 +27,7 @@ export type AppEvent =
   | "settings_saved"
   | "integration_connected"
   | "integration_removed"
+  | "integration_connect_started"
   | "remote_access_enabled"
   | "remote_access_disabled"
   | "ollama_installed"

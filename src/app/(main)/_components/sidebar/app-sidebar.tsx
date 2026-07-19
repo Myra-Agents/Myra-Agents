@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Settings } from "lucide-react";
+import { Plug, Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useShallow } from "zustand/react/shallow";
 
@@ -29,6 +29,7 @@ import { SidebarSupportCard } from "./sidebar-support-card";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const t = useTranslations("nav");
+  const tIntegrations = useTranslations("settings.integrations");
 
   const { sidebarVariant, sidebarCollapsible, isSynced } = usePreferencesStore(
     useShallow((s) => ({
@@ -89,6 +90,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarSupportCard />
         {/* <NavUser /> — masqué pour le moment; restaurer en décommentant (voir nav-user.tsx) */}
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              tooltip={tIntegrations("title")}
+              className="group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:[&>span]:hidden"
+            >
+              <Link prefetch={false} href="/integrations">
+                <Plug />
+                <span>{tIntegrations("title")}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild

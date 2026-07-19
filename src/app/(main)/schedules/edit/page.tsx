@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
-  ActivityIcon,
   CheckCircle2Icon,
   CheckIcon,
   ChevronDownIcon,
@@ -16,14 +15,12 @@ import {
   GitBranchIcon,
   HomeIcon,
   LightbulbIcon,
-  MessageSquareIcon,
   PlayIcon,
   PlusIcon,
   RefreshCwIcon,
   RotateCcwIcon,
   Trash2Icon,
   TriangleAlertIcon,
-  UsersIcon,
   XCircleIcon,
   XIcon,
 } from "lucide-react";
@@ -68,6 +65,7 @@ import { loadTestResult } from "@/lib/agent-test-store";
 import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
+import { connectionManager } from "@/lib/connections/manager";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
 import { getScheduleIdea } from "@/lib/schedule-ideas";
 import { TOUR_APPLY_EVENT } from "@/lib/tour-steps";
@@ -75,9 +73,17 @@ import { cn } from "@/lib/utils";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import { useNavGuard } from "@/stores/nav-guard-store";
 import type { KanbanCard } from "@/types/kanban";
-import type { CreateScheduleInput, ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
+import type {
+  Action as PatrolAction,
+  ConnectorRule,
+  CreateScheduleInput,
+  EventTrigger,
+  ScheduledTask,
+  ScheduleKindType,
+  UpdateScheduleInput,
+} from "@/types/schedule";
 import { defaultScheduleKind, describeSchedule } from "@/types/schedule";
-import type { AgentPreset } from "@/types/settings";
+import type { AgentPreset, PluginCatalogAction, PluginInfo } from "@/types/settings";
 
 export default function ScheduleEditPage() {
   // useSearchParams() needs a Suspense boundary in the static export.
@@ -100,8 +106,15 @@ type Draft = {
   cardDescription: string;
   agentPrompt: string;
   // Null while the user has removed the (single) schedule trigger — Save is then
-  // blocked until a trigger is re-added.
+  // blocked until a trigger is re-added. A patrol's one trigger is either a
+  // time-based `schedule` OR a connector `eventTrigger`, never both — picking
+  // one from Add Trigger clears the other (`schedule` still carries a dummy
+  // value under the hood since the API field stays required; the server
+  // ignores it when `eventTrigger` is set).
   schedule: ScheduledTask["schedule"] | null;
+  eventTrigger: EventTrigger | null;
+  // Post-run side effects dispatched to connectors when this patrol's card finishes.
+  actions: NonNullable<ScheduledTask["actions"]>;
   // Repository/folder the run clones into. Empty string = "No Repository".
   workingDir: string;
   tags: string[];
@@ -119,6 +132,8 @@ function draftOf(task: ScheduledTask): Draft {
     cardDescription: task.cardDescription,
     agentPrompt: task.agentPrompt,
     schedule: task.schedule,
+    eventTrigger: task.eventTrigger ?? null,
+    actions: task.actions ?? [],
     workingDir: task.workingDir ?? "",
     tags: task.tags ?? [],
     agentPresetId: task.agentPresetId,
@@ -448,7 +463,7 @@ function ScheduleEditScreen() {
   const validateRequired = useCallback(
     (d: Draft) => {
       const missing: string[] = [];
-      if (!d.schedule) missing.push(t("fields.trigger"));
+      if (!d.schedule && !d.eventTrigger) missing.push(t("fields.trigger"));
       if (!d.agentPrompt.trim()) {
         missing.push(t("fields.instruction"));
         flagMissingPrompt();
@@ -481,6 +496,8 @@ function ScheduleEditScreen() {
         agentPrompt: draft.agentPrompt,
         tags: draft.tags,
         schedule: draft.schedule,
+        eventTrigger: draft.eventTrigger ?? undefined,
+        actions: draft.actions.length ? draft.actions : undefined,
         enabled: draft.enabled,
         agentPresetId: draft.agentPresetId,
         agentFlags: draft.agentFlags.length ? draft.agentFlags : undefined,
@@ -519,6 +536,8 @@ function ScheduleEditScreen() {
           agentPrompt: draft.agentPrompt,
           tags: draft.tags,
           schedule: draft.schedule,
+          eventTrigger: draft.eventTrigger ?? undefined,
+          actions: draft.actions.length ? draft.actions : undefined,
           enabled,
           agentPresetId: draft.agentPresetId,
           agentFlags: draft.agentFlags.length ? draft.agentFlags : undefined,
@@ -1367,8 +1386,23 @@ function SettingsTab({
         <span className="px-2 text-[12px] text-text-secondary">{t("triggers")}</span>
         <TriggersCard
           schedule={draft.schedule}
-          onChange={(schedule) => setDraft((d) => (d ? { ...d, schedule } : d))}
-          onRemove={() => setDraft((d) => (d ? { ...d, schedule: null } : d))}
+          eventTrigger={draft.eventTrigger}
+          onChangeSchedule={(schedule) => setDraft((d) => (d ? { ...d, schedule, eventTrigger: null } : d))}
+          onChangeEventTrigger={(eventTrigger) =>
+            setDraft((d) => (d ? { ...d, eventTrigger, schedule: d.schedule ?? defaultScheduleKind("cron") } : d))
+          }
+          onRemove={() => setDraft((d) => (d ? { ...d, schedule: null, eventTrigger: null } : d))}
+          t={t}
+        />
+      </section>
+
+      {/* Actions — post-run side effects dispatched to a connector once this
+          patrol's card finishes. */}
+      <section className="flex flex-col gap-2.5">
+        <span className="px-2 text-[12px] text-text-secondary">{t("actionsSection.title")}</span>
+        <ActionsCard
+          actions={draft.actions}
+          onChange={(actions) => setDraft((d) => (d ? { ...d, actions } : d))}
           t={t}
         />
       </section>
@@ -2132,24 +2166,42 @@ function triggerLabel(kind: ScheduledTask["schedule"]): string {
 
 function TriggersCard({
   schedule,
-  onChange,
+  eventTrigger,
+  onChangeSchedule,
+  onChangeEventTrigger,
   onRemove,
   t,
 }: {
   schedule: ScheduledTask["schedule"] | null;
-  onChange: (s: ScheduledTask["schedule"]) => void;
+  eventTrigger: EventTrigger | null;
+  onChangeSchedule: (s: ScheduledTask["schedule"]) => void;
+  onChangeEventTrigger: (e: EventTrigger) => void;
   onRemove: () => void;
   t: ReturnType<typeof useTranslations>;
 }) {
-  const triggers = schedule ? [schedule] : [];
+  const plugins = usePluginCatalog();
+  const hasTrigger = schedule !== null || eventTrigger !== null;
   return (
     <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
-      {triggers.map((trig, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: single positional schedule trigger.
-        <TriggerRow key={i} value={trig} onChange={onChange} onRemove={onRemove} t={t} />
-      ))}
-      {/* Only one scheduled trigger is supported → tell the menu to disable it. */}
-      <AddTriggerMenu onPick={onChange} hasScheduled={schedule !== null} t={t} />
+      {eventTrigger ? (
+        <EventTriggerRow
+          value={eventTrigger}
+          plugin={plugins.find((p) => p.name === eventTrigger.connector)}
+          onChange={onChangeEventTrigger}
+          onRemove={onRemove}
+          t={t}
+        />
+      ) : (
+        schedule && <TriggerRow value={schedule} onChange={onChangeSchedule} onRemove={onRemove} t={t} />
+      )}
+      {/* Only one trigger (schedule or event) is supported → tell the menu to disable the rest. */}
+      <AddTriggerMenu
+        onPickSchedule={onChangeSchedule}
+        onPickEvent={onChangeEventTrigger}
+        hasTrigger={hasTrigger}
+        plugins={plugins}
+        t={t}
+      />
     </div>
   );
 }
@@ -2194,14 +2246,142 @@ function TriggerRow({
   );
 }
 
-/** "+ Add Trigger" row → dropdown with a search box and trigger categories. */
-function AddTriggerMenu({
-  onPick,
-  hasScheduled,
+/**
+ * Installed plugins declaring `catalog` verbs — shared by the trigger and
+ * action pickers (and the trigger row's connector name lookup). Fetched once
+ * per mount; the editor is a short-lived page so no live-refresh subscription.
+ */
+function usePluginCatalog(): PluginInfo[] {
+  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const id = connectionManager.primaryId();
+    connectionManager
+      .invokeOne<PluginInfo[]>(id, "list_plugins")
+      .then((list) => {
+        if (!cancelled) setPlugins(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPlugins([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return plugins;
+}
+
+/** One event-trigger row — click to edit its rule; trash icon on hover removes it. */
+function EventTriggerRow({
+  value,
+  plugin,
+  onChange,
+  onRemove,
   t,
 }: {
-  onPick: (s: ScheduledTask["schedule"]) => void;
-  hasScheduled: boolean;
+  value: EventTrigger;
+  plugin: PluginInfo | undefined;
+  onChange: (e: EventTrigger) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const rule = value.rules[0] ?? {};
+  const parts = [rule.from, rule.subjectContains, rule.bodyContains, rule.regex].filter(Boolean);
+  const summary =
+    parts.length > 0 ? t("eventTrigger.matches", { summary: parts.join(" · ") }) : t("eventTrigger.anyEvent");
+  const name = plugin?.catalog?.name ?? value.connector;
+  const setRule = (patch: Partial<ConnectorRule>) => onChange({ ...value, rules: [{ ...rule, ...patch }] });
+
+  return (
+    <div className="group relative flex items-center">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 py-3.5 pr-12 pl-4 text-left transition-colors hover:bg-muted/20"
+          >
+            <GitBranchIcon className="size-[18px] shrink-0 text-icon-secondary" />
+            <div className="flex flex-col">
+              <span className="text-[14px] text-text-primary">{name}</span>
+              <span className="text-[12px] text-text-tertiary">{summary}</span>
+            </div>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-80 flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.from")}</span>
+            <Input
+              value={rule.from ?? ""}
+              onChange={(e) => setRule({ from: e.target.value || undefined })}
+              className="h-8 text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.subjectContains")}</span>
+            <Input
+              value={rule.subjectContains ?? ""}
+              onChange={(e) => setRule({ subjectContains: e.target.value || undefined })}
+              className="h-8 text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.bodyContains")}</span>
+            <Input
+              value={rule.bodyContains ?? ""}
+              onChange={(e) => setRule({ bodyContains: e.target.value || undefined })}
+              className="h-8 text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.regex")}</span>
+            <Input
+              value={rule.regex ?? ""}
+              onChange={(e) => setRule({ regex: e.target.value || undefined })}
+              className="h-8 font-mono text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.prompt")}</span>
+            <Textarea
+              value={rule.prompt ?? ""}
+              onChange={(e) => setRule({ prompt: e.target.value || undefined })}
+              placeholder={t("eventTrigger.promptPlaceholder")}
+              className="min-h-16 text-[13px]"
+            />
+            <span className="text-[11px] text-text-tertiary">{t("eventTrigger.promptHint")}</span>
+          </div>
+          <label className="flex items-center justify-between gap-2 text-[13px]">
+            {t("eventTrigger.requireReview")}
+            <Switch checked={rule.requireReview ?? false} onCheckedChange={(c) => setRule({ requireReview: c })} />
+          </label>
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={t("removeTrigger")}
+        onClick={onRemove}
+        className="absolute right-3 flex size-7 items-center justify-center rounded-md text-icon-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2Icon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+/** "+ Add Trigger" row → dropdown with a search box, the scheduled options,
+ * and every installed connector plugin whose `catalog.verbs` includes
+ * `"trigger"`. Only one trigger (of either kind) is supported at a time. */
+function AddTriggerMenu({
+  onPickSchedule,
+  onPickEvent,
+  hasTrigger,
+  plugins,
+  t,
+}: {
+  onPickSchedule: (s: ScheduledTask["schedule"]) => void;
+  onPickEvent: (e: EventTrigger) => void;
+  hasTrigger: boolean;
+  plugins: PluginInfo[];
   t: ReturnType<typeof useTranslations>;
 }) {
   const [query, setQuery] = useState("");
@@ -2213,19 +2393,13 @@ function AddTriggerMenu({
     { key: "custom", make: () => defaultScheduleKind("cron") },
   ];
 
-  // Event-driven connectors aren't in the schedule model yet — surfaced for parity
-  // with the design, flagged as coming soon.
-  const connectors: { key: "github" | "slack" | "teams" | "sentry" | "linear"; icon: React.ReactNode }[] = [
-    { key: "github", icon: <GitBranchIcon className="size-4 text-icon-secondary" /> },
-    { key: "slack", icon: <MessageSquareIcon className="size-4 text-icon-secondary" /> },
-    { key: "teams", icon: <UsersIcon className="size-4 text-icon-secondary" /> },
-    { key: "sentry", icon: <TriangleAlertIcon className="size-4 text-icon-secondary" /> },
-    { key: "linear", icon: <ActivityIcon className="size-4 text-icon-secondary" /> },
-  ];
+  const triggerPlugins = useMemo(() => plugins.filter((p) => p.catalog?.verbs?.includes("trigger")), [plugins]);
 
   const q = query.trim().toLowerCase();
   const showScheduled = !q || t("categories.scheduled").toLowerCase().includes(q);
-  const visibleConnectors = connectors.filter((c) => !q || t(`categories.${c.key}`).toLowerCase().includes(q));
+  const visibleConnectors = triggerPlugins.filter(
+    (p) => !q || (p.catalog?.name ?? p.name).toLowerCase().includes(q),
+  );
 
   return (
     <DropdownMenu>
@@ -2251,8 +2425,8 @@ function AddTriggerMenu({
         </div>
         <div className="p-1">
           {showScheduled &&
-            (hasScheduled ? (
-              // A scheduled trigger already exists — only one is supported, so the
+            (hasTrigger ? (
+              // A trigger already exists — only one is supported, so the
               // category is disabled with a tooltip explaining why.
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2275,28 +2449,211 @@ function AddTriggerMenu({
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   {scheduled.map((s) => (
-                    <DropdownMenuItem key={s.key} className="text-[13px]" onSelect={() => onPick(s.make())}>
+                    <DropdownMenuItem key={s.key} className="text-[13px]" onSelect={() => onPickSchedule(s.make())}>
                       {t(`scheduledOptions.${s.key}`)}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             ))}
-          {visibleConnectors.map((c) => (
-            <DropdownMenuSub key={c.key}>
-              <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-                {c.icon}
-                {t(`categories.${c.key}`)}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem disabled className="text-[13px]">
-                  {t("comingSoon")}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ))}
-          {!showScheduled && visibleConnectors.length === 0 && (
+          {visibleConnectors.map((p) => {
+            const name = p.catalog?.name ?? p.name;
+            if (hasTrigger) {
+              return (
+                <Tooltip key={p.name}>
+                  <TooltipTrigger asChild>
+                    <div
+                      aria-disabled
+                      className="flex cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-text-tertiary opacity-60"
+                    >
+                      <GitBranchIcon className="size-4 text-icon-tertiary" />
+                      {name}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{t("oneScheduledOnly")}</TooltipContent>
+                </Tooltip>
+              );
+            }
+            return (
+              <DropdownMenuItem
+                key={p.name}
+                className="gap-2 text-[13px]"
+                onSelect={() => onPickEvent({ connector: p.name, rules: [{}] })}
+              >
+                <GitBranchIcon className="size-4 text-icon-secondary" />
+                {name}
+              </DropdownMenuItem>
+            );
+          })}
+          {triggerPlugins.length === 0 && (
+            <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noConnectors")}</p>
+          )}
+          {!showScheduled && triggerPlugins.length > 0 && visibleConnectors.length === 0 && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noTriggers")}</p>
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Actions card — post-run side effects dispatched to a connector when this
+ * patrol's card finishes. Same row/popover/add-menu shape as Triggers, but a
+ * plain list (not capped at one) since a patrol can run several actions. */
+function ActionsCard({
+  actions,
+  onChange,
+  t,
+}: {
+  actions: PatrolAction[];
+  onChange: (a: PatrolAction[]) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const plugins = usePluginCatalog();
+  const actionPlugins = useMemo(() => plugins.filter((p) => (p.catalog?.actions?.length ?? 0) > 0), [plugins]);
+
+  const updateAt = (i: number, next: PatrolAction) => onChange(actions.map((a, idx) => (idx === i ? next : a)));
+  const removeAt = (i: number) => onChange(actions.filter((_, idx) => idx !== i));
+
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
+      {actions.map((action, i) => {
+        const plugin = plugins.find((p) => p.name === action.connector);
+        const def = plugin?.catalog?.actions?.find((a) => a.id === action.type);
+        return (
+          <ActionRow
+            // biome-ignore lint/suspicious/noArrayIndexKey: positional action list, no stable id.
+            key={i}
+            action={action}
+            label={def?.label ?? `${plugin?.catalog?.name ?? action.connector}: ${action.type}`}
+            fields={def?.config ?? []}
+            onChange={(next) => updateAt(i, next)}
+            onRemove={() => removeAt(i)}
+            t={t}
+          />
+        );
+      })}
+      <AddActionMenu plugins={actionPlugins} onPick={(a) => onChange([...actions, a])} t={t} />
+    </div>
+  );
+}
+
+function ActionRow({
+  action,
+  label,
+  fields,
+  onChange,
+  onRemove,
+  t,
+}: {
+  action: PatrolAction;
+  label: string;
+  fields: PluginCatalogAction["config"];
+  onChange: (a: PatrolAction) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const setConfig = (key: string, value: string) =>
+    onChange({ ...action, config: { ...action.config, [key]: value } });
+  return (
+    <div className="group relative flex items-center">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 py-3.5 pr-12 pl-4 text-left transition-colors hover:bg-muted/20"
+          >
+            <PlayIcon className="size-[18px] shrink-0 text-icon-secondary" />
+            <span className="text-[14px] text-text-primary">{label}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-80 flex-col gap-3">
+          {fields.length === 0 && <p className="text-[13px] text-text-tertiary">—</p>}
+          {fields.map((f) => (
+            <div key={f.key} className="flex flex-col gap-1">
+              <span className="text-[12px] text-text-secondary">
+                {f.label}
+                {f.required && <span className="text-destructive"> *</span>}
+              </span>
+              <Input
+                value={String(action.config[f.key] ?? "")}
+                placeholder={f.placeholder}
+                onChange={(e) => setConfig(f.key, e.target.value)}
+                className="h-8 text-[13px]"
+              />
+              {f.description && <span className="text-[11px] text-text-tertiary">{f.description}</span>}
+            </div>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={t("actionsSection.remove")}
+        onClick={onRemove}
+        className="absolute right-3 flex size-7 items-center justify-center rounded-md text-icon-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2Icon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+function AddActionMenu({
+  plugins,
+  onPick,
+  t,
+}: {
+  plugins: PluginInfo[];
+  onPick: (a: PatrolAction) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+
+  const entries = useMemo(
+    () => plugins.flatMap((p) => (p.catalog?.actions ?? []).map((def) => ({ plugin: p, def }))),
+    [plugins],
+  );
+  const visible = entries.filter(
+    ({ plugin, def }) => !q || `${plugin.catalog?.name ?? plugin.name} ${def.label}`.toLowerCase().includes(q),
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-text-secondary transition-colors hover:bg-muted/20 hover:text-text-primary"
+        >
+          <PlusIcon className="size-[18px] shrink-0" />
+          <span className="text-[14px]">{t("actionsSection.addAction")}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("actionsSection.searchActions")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="p-1">
+          {visible.map(({ plugin, def }) => (
+            <DropdownMenuItem
+              key={`${plugin.name}:${def.id}`}
+              className="flex-col items-start gap-0.5 text-[13px]"
+              onSelect={() => onPick({ connector: plugin.name, type: def.id, config: {} })}
+            >
+              <span>
+                {plugin.catalog?.name ?? plugin.name} — {def.label}
+              </span>
+              {def.summary && <span className="text-[11px] text-text-tertiary">{def.summary}</span>}
+            </DropdownMenuItem>
+          ))}
+          {visible.length === 0 && (
+            <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("actionsSection.noActions")}</p>
           )}
         </div>
       </DropdownMenuContent>

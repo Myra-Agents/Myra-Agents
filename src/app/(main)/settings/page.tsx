@@ -37,8 +37,8 @@ import { AppUpdatePanel } from "@/components/settings/app-update-panel";
 import { LocalModelsPanel } from "@/components/settings/local-models-panel";
 // User connection disabled — hub status, remote access and cloud sync are off.
 // import { HubStatusCard } from "@/components/settings/hub-status-card";
-// Integrations, Plugins and Sync are parked for now — restore the imports with their tabs below.
-// import { IntegrationsPanel } from "@/components/settings/integrations/integrations-panel";
+// Plugins and Sync are parked for now — restore the imports with their tabs below.
+// Integrations moved to its own /integrations route (sidebar item) — see that page.
 // import { LocalServerPanel } from "@/components/settings/local-server-panel";
 // import { PluginsPanel } from "@/components/settings/plugins-panel";
 // import { RemoteAccessPanel } from "@/components/settings/remote-access-panel";
@@ -897,8 +897,7 @@ function SettingsScreen() {
           <TabsTrigger value="preferences">{t("tabs.preferences")}</TabsTrigger>
           <TabsTrigger value="agents">{t("tabs.agents")}</TabsTrigger>
           <TabsTrigger value="localModels">{t("tabs.localModels")}</TabsTrigger>
-          {/* Integrations, Sync and Plugins are parked for now.
-          <TabsTrigger value="integrations">{t("tabs.integrations")}</TabsTrigger>
+          {/* Sync and Plugins are parked for now.
           <TabsTrigger value="sync">{t("tabs.sync")}</TabsTrigger>
           <TabsTrigger value="plugins">{t("tabs.plugins")}</TabsTrigger>
           */}
@@ -1127,11 +1126,7 @@ function SettingsScreen() {
           <LocalModelsPanel />
         </TabsContent>
 
-        {/* Integrations, Sync and Plugins are parked for now.
-        <TabsContent value="integrations" className="space-y-6">
-          <IntegrationsPanel />
-        </TabsContent>
-
+        {/* Sync and Plugins are parked for now.
         <TabsContent value="sync" className="space-y-6">
           <SyncPanel />
         </TabsContent>

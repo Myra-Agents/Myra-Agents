@@ -1023,6 +1023,8 @@
       "firesOn": "Se déclenche sur : {events}",
       "noTriggers": "Aucun déclencheur",
       "noMachines": "Aucune machine",
+      "connecting": "Connexion…",
+      "connected": "Connecté",
       "deleteConfirm": "Supprimer l'intégration « {label} » de toutes les machines ?",
       "deletePartial": "Certaines machines n'ont pas pu être mises à jour — réessayez.",
       "webhookWarning": {
@@ -1469,6 +1471,28 @@
     },
     "removeTrigger": "Supprimer le déclencheur",
     "oneScheduledOnly": "Un seul déclencheur planifié est autorisé. Supprime l’existant pour en ajouter un autre.",
+    "noConnectors": "Aucun plugin déclencheur connecté. Connectes-en un depuis Intégrations.",
+    "eventTrigger": {
+      "anyEvent": "Tout événement",
+      "matches": "Correspond à : {summary}",
+      "from": "De",
+      "subjectContains": "Sujet / titre contient",
+      "bodyContains": "Corps contient",
+      "regex": "Regex",
+      "regexField": "Champ regex",
+      "prompt": "Prompt personnalisé",
+      "promptPlaceholder": "Laisse vide pour utiliser l'instruction du patrol",
+      "promptHint": "Templaté : '{{subject}}' '{{from}}' '{{body}}' '{{id}}'.",
+      "requireReview": "Retenir pour revue avant exécution"
+    },
+    "actionsSection": {
+      "title": "Actions",
+      "description": "Exécutées une fois la carte de ce patrol terminée.",
+      "addAction": "Ajouter une action",
+      "searchActions": "Rechercher des actions...",
+      "noActions": "Aucun plugin action connecté.",
+      "remove": "Supprimer l'action"
+    },
     "noRepository": "Aucun dépôt",
     "recents": "Récents",
     "allRepositories": "Tous les dépôts",
