@@ -1622,7 +1622,7 @@
       },
       "run": {
         "title": "Suivre une opération",
-        "hint": "Ouvrez une opération depuis l'Historique pour lire la discussion de l'agent, étape par étape."
+        "hint": "Ouvrez-la depuis Opérations pour lire la discussion de l'agent, étape par étape."
       }
     },
     "spotlight": {

@@ -20,6 +20,9 @@ export const TOUR_ROUTES = {
   schedules: "/schedules",
   history: "/history",
   runDetail: "/history/run",
+  // Same "agent discussion" detail, reached from an Operations row instead of
+  // a History one — see the `openRun` tour step in lib/tour-steps.ts.
+  logs: "/logs",
 } as const;
 
 export type TourRoute = (typeof TOUR_ROUTES)[keyof typeof TOUR_ROUTES];

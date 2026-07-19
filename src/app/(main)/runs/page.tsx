@@ -69,7 +69,9 @@ import { useSettings } from "@/hooks/use-settings";
 import { connIdOf } from "@/lib/aggregate/global-id";
 import { tagClassName } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
+import { TOUR_FLOWS } from "@/lib/tour-steps";
 import { cn } from "@/lib/utils";
+import { useTourStore } from "@/stores/tour-store";
 import type { KanbanCard, KanbanStatus } from "@/types/kanban";
 import { isTransitionAllowed } from "@/types/kanban";
 import type { AgentPreset } from "@/types/settings";
@@ -195,6 +197,15 @@ export default function RunsPage() {
     const saved = getLocalStorageValue(RUNS_VIEW_KEY);
     if (saved === "list" || saved === "kanban") setView(saved);
   }, []);
+  // The guided tour's `openRun` step (lib/tour-steps.ts) rings the first row of
+  // the List table — force List for it even when the saved choice is Kanban,
+  // rather than leave the step pointing at a target that doesn't exist there.
+  // Not persisted: leaving the tour restores whatever the user actually chose.
+  const tourFlow = useTourStore((s) => s.flow);
+  const tourStepIndex = useTourStore((s) => s.index);
+  useEffect(() => {
+    if (tourFlow === "run" && TOUR_FLOWS.run[tourStepIndex]?.target === "operations-row") setView("list");
+  }, [tourFlow, tourStepIndex]);
   const selectView = useCallback((next: RunsView) => {
     setView(next);
     setLocalStorageValue(RUNS_VIEW_KEY, next);
@@ -768,11 +779,13 @@ export default function RunsPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      rows.map((card) => {
+                      rows.map((card, rowIndex) => {
                         const bucket = bucketOf(card);
                         return (
                           <TableRow
                             key={card.id}
+                            // Spotlight-tour anchor on the first row only — see lib/tour-steps.ts.
+                            data-tour={rowIndex === 0 ? "operations-row" : undefined}
                             className="cursor-pointer border-border-cards hover:bg-secondary/40"
                             onClick={() => router.push(`/logs?card=${encodeURIComponent(card.id)}`)}
                           >
