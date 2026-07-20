@@ -1010,6 +1010,30 @@
         "save": "Enregistrer",
         "clear": "Effacer",
         "configured": "Configuré"
+      },
+      "tabs": {
+        "installed": "Installés",
+        "browse": "Explorer"
+      },
+      "browse": {
+        "searchPlaceholder": "Rechercher un plugin",
+        "by": "par {author} · v{version}",
+        "install": "Installer",
+        "installing": "Installation…",
+        "installed": "Installé · configurer",
+        "empty": "Aucun plugin ne correspond.",
+        "filter": {
+          "all": "Tous",
+          "trigger": "Déclencheurs",
+          "action": "Actions",
+          "notify": "Notifications"
+        },
+        "verb": {
+          "trigger": "Déclencheur",
+          "action": "Action",
+          "notify": "Notification",
+          "receive": "Réception"
+        }
       }
     },
     "integrations": {
