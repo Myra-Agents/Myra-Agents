@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
-  ActivityIcon,
   CheckCircle2Icon,
   CheckIcon,
   ChevronDownIcon,
@@ -16,14 +15,15 @@ import {
   GitBranchIcon,
   HomeIcon,
   LightbulbIcon,
-  MessageSquareIcon,
   PlayIcon,
   PlusIcon,
+  PuzzleIcon,
   RefreshCwIcon,
   RotateCcwIcon,
+  SparklesIcon,
   Trash2Icon,
   TriangleAlertIcon,
-  UsersIcon,
+  TypeIcon,
   XCircleIcon,
   XIcon,
 } from "lucide-react";
@@ -66,6 +66,13 @@ import { useSchedules } from "@/hooks/use-schedules";
 import { useSettings } from "@/hooks/use-settings";
 import { loadTestResult } from "@/lib/agent-test-store";
 import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
+import {
+  type ConnectorActionProvider,
+  type ConnectorActionType,
+  type ConnectorTrigger,
+  listConnectorActions,
+  listConnectorTriggers,
+} from "@/lib/connector-triggers";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
@@ -75,7 +82,13 @@ import { cn } from "@/lib/utils";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import { useNavGuard } from "@/stores/nav-guard-store";
 import type { KanbanCard } from "@/types/kanban";
-import type { CreateScheduleInput, ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
+import type {
+  CreateScheduleInput,
+  ScheduledTask,
+  ScheduleKindType,
+  TaskAction,
+  UpdateScheduleInput,
+} from "@/types/schedule";
 import { defaultScheduleKind, describeSchedule } from "@/types/schedule";
 import type { AgentPreset } from "@/types/settings";
 
@@ -110,6 +123,8 @@ type Draft = {
   useWorktree?: boolean;
   launchVia?: "direct" | "ollama";
   ollamaModel?: string;
+  // Post-run actions to run when a materialized card finishes.
+  actions: TaskAction[];
 };
 
 function draftOf(task: ScheduledTask): Draft {
@@ -126,6 +141,7 @@ function draftOf(task: ScheduledTask): Draft {
     useWorktree: task.useWorktree,
     launchVia: task.launchVia,
     ollamaModel: task.ollamaModel,
+    actions: task.actions ?? [],
   };
 }
 
@@ -488,6 +504,7 @@ function ScheduleEditScreen() {
         workingDir: draft.workingDir.trim() || undefined,
         launchVia: draft.launchVia,
         ollamaModel: draft.ollamaModel,
+        actions: draft.actions.length ? draft.actions : undefined,
       };
       await updateSchedule(input);
       // Commit the app-local per-folder branch overrides alongside the save.
@@ -526,6 +543,7 @@ function ScheduleEditScreen() {
           workingDir: draft.workingDir.trim() || undefined,
           launchVia: draft.launchVia,
           ollamaModel: draft.ollamaModel,
+          actions: draft.actions.length ? draft.actions : undefined,
         };
         const created = await createSchedule(input);
         // Persist app-local per-folder branch overrides under the new schedule id.
@@ -1373,6 +1391,20 @@ function SettingsTab({
         />
       </section>
 
+      {/* Actions — run when the patrol finishes */}
+      <section className="flex flex-col gap-2.5">
+        <span className="px-2 text-[12px] text-text-secondary">{t("actions")}</span>
+        <ActionsCard
+          actions={draft.actions}
+          onAdd={(a) => setDraft((d) => (d ? { ...d, actions: [...d.actions, a] } : d))}
+          onUpdate={(i, config) =>
+            setDraft((d) => (d ? { ...d, actions: d.actions.map((a, idx) => (idx === i ? { ...a, config } : a)) } : d))
+          }
+          onRemove={(i) => setDraft((d) => (d ? { ...d, actions: d.actions.filter((_, idx) => idx !== i) } : d))}
+          t={t}
+        />
+      </section>
+
       {/* Agent Instruction */}
       <section className="flex flex-col gap-2.5">
         <span className="px-2 text-[12px] text-text-secondary">{t("agentInstruction")}</span>
@@ -2213,19 +2245,19 @@ function AddTriggerMenu({
     { key: "custom", make: () => defaultScheduleKind("cron") },
   ];
 
-  // Event-driven connectors aren't in the schedule model yet — surfaced for parity
-  // with the design, flagged as coming soon.
-  const connectors: { key: "github" | "slack" | "teams" | "sentry" | "linear"; icon: React.ReactNode }[] = [
-    { key: "github", icon: <GitBranchIcon className="size-4 text-icon-secondary" /> },
-    { key: "slack", icon: <MessageSquareIcon className="size-4 text-icon-secondary" /> },
-    { key: "teams", icon: <UsersIcon className="size-4 text-icon-secondary" /> },
-    { key: "sentry", icon: <TriangleAlertIcon className="size-4 text-icon-secondary" /> },
-    { key: "linear", icon: <ActivityIcon className="size-4 text-icon-secondary" /> },
-  ];
+  // Trigger-capable connectors, detected from the installed plugins (event role /
+  // catalog.verbs="trigger"). Replaces the old hardcoded "coming soon" list — the
+  // menu now reflects what's actually installed. Picking one is design-flagged
+  // (see connector-trigger binding); for now it deep-links to Plugins to set up.
+  const router = useRouter();
+  const [connectorTriggers, setConnectorTriggers] = useState<ConnectorTrigger[]>([]);
+  useEffect(() => {
+    void listConnectorTriggers().then(setConnectorTriggers);
+  }, []);
 
   const q = query.trim().toLowerCase();
   const showScheduled = !q || t("categories.scheduled").toLowerCase().includes(q);
-  const visibleConnectors = connectors.filter((c) => !q || t(`categories.${c.key}`).toLowerCase().includes(q));
+  const visibleConnectors = connectorTriggers.filter((c) => !q || c.name.toLowerCase().includes(q));
 
   return (
     <DropdownMenu>
@@ -2282,22 +2314,216 @@ function AddTriggerMenu({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             ))}
-          {visibleConnectors.map((c) => (
-            <DropdownMenuSub key={c.key}>
-              <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-                {c.icon}
-                {t(`categories.${c.key}`)}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem disabled className="text-[13px]">
-                  {t("comingSoon")}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ))}
+          {visibleConnectors.map((c) => {
+            const Icon = c.icon;
+            return (
+              <DropdownMenuSub key={c.id}>
+                <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                  <Icon className="size-4 text-icon-secondary" />
+                  {c.name}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {c.summary && <div className="px-2 py-1.5 text-[12px] text-text-tertiary">{c.summary}</div>}
+                  <DropdownMenuItem className="text-[13px]" onSelect={() => router.push("/settings")}>
+                    {t("configureConnector")}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            );
+          })}
           {!showScheduled && visibleConnectors.length === 0 && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noTriggers")}</p>
           )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** "Actions" card — post-run actions run when a materialized card finishes. Lists
+ *  the configured actions (each editable in a popover) + an Add-Action menu of
+ *  installed action-capable connectors. */
+function ActionsCard({
+  actions,
+  onAdd,
+  onUpdate,
+  onRemove,
+  t,
+}: {
+  actions: TaskAction[];
+  onAdd: (a: TaskAction) => void;
+  onUpdate: (index: number, config: Record<string, unknown>) => void;
+  onRemove: (index: number) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [providers, setProviders] = useState<ConnectorActionProvider[]>([]);
+  useEffect(() => {
+    void listConnectorActions().then(setProviders);
+  }, []);
+
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
+      {actions.map((a, i) => {
+        const provider = providers.find((p) => p.id === a.connector);
+        const actionType = provider?.actions.find((x) => x.id === a.type);
+        return (
+          <ActionRow
+            // biome-ignore lint/suspicious/noArrayIndexKey: positional action list.
+            key={i}
+            action={a}
+            provider={provider}
+            actionType={actionType}
+            onChange={(config) => onUpdate(i, config)}
+            onRemove={() => onRemove(i)}
+            t={t}
+          />
+        );
+      })}
+      <AddActionMenu providers={providers} onAdd={onAdd} t={t} />
+    </div>
+  );
+}
+
+/** One configured action — click to edit its (templated) config; trash to remove. */
+function ActionRow({
+  action,
+  provider,
+  actionType,
+  onChange,
+  onRemove,
+  t,
+}: {
+  action: TaskAction;
+  provider?: ConnectorActionProvider;
+  actionType?: ConnectorActionType;
+  onChange: (config: Record<string, unknown>) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const Icon = provider?.icon ?? PuzzleIcon;
+  const fields = actionType?.config ?? [];
+  const label = `${provider?.name ?? action.connector} · ${actionType?.label ?? action.type}`;
+  return (
+    <div className="group relative flex items-center">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 py-3.5 pr-12 pl-4 text-left transition-colors hover:bg-muted/20"
+          >
+            <Icon className="size-[18px] shrink-0 text-icon-secondary" />
+            <span className="text-[14px] text-text-primary">{label}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-80 flex-col gap-2.5">
+          {fields.length === 0 && <p className="text-[13px] text-text-tertiary">{t("noActionConfig")}</p>}
+          {fields.map((f) => {
+            const raw = action.config[f.key];
+            const isPrompt = typeof raw === "object" && raw !== null && "prompt" in raw;
+            const text = isPrompt ? String((raw as { prompt?: string }).prompt ?? "") : String(raw ?? "");
+            const setText = (v: string) => onChange({ ...action.config, [f.key]: isPrompt ? { prompt: v } : v });
+            const toggle = () => onChange({ ...action.config, [f.key]: isPrompt ? text : { prompt: text } });
+            return (
+              <div key={f.key} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-text-secondary">{f.label}</span>
+                  {/* Fixed text (templated) ↔ prompt resolved by an agent at run time. */}
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    title={t(isPrompt ? "fieldPromptHint" : "fieldTextHint")}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-text-tertiary transition-colors hover:bg-muted/40 hover:text-text-primary"
+                  >
+                    {isPrompt ? <SparklesIcon className="size-3" /> : <TypeIcon className="size-3" />}
+                    {t(isPrompt ? "fieldPrompt" : "fieldText")}
+                  </button>
+                </div>
+                <Input
+                  value={text}
+                  placeholder={isPrompt ? t("fieldPromptPlaceholder") : f.placeholder}
+                  onChange={(e) => setText(e.target.value)}
+                  className={cn("h-8 text-[13px]", isPrompt && "border-[color:var(--task-status-needs-you)]")}
+                />
+              </div>
+            );
+          })}
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={t("removeAction")}
+        onClick={onRemove}
+        className="absolute right-3 flex size-7 items-center justify-center rounded-md text-icon-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2Icon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+/** "+ Add Action" row → connectors → their action types. Picking one appends it
+ *  to the patrol's actions (config edited in its row). */
+function AddActionMenu({
+  providers,
+  onAdd,
+  t,
+}: {
+  providers: ConnectorActionProvider[];
+  onAdd: (a: TaskAction) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const visible = providers.filter(
+    (p) => !q || p.name.toLowerCase().includes(q) || p.actions.some((a) => a.label.toLowerCase().includes(q)),
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-text-secondary transition-colors hover:bg-muted/20 hover:text-text-primary"
+        >
+          <PlusIcon className="size-[18px] shrink-0" />
+          <span className="text-[14px]">{t("addAction")}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("searchActions")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="p-1">
+          {visible.map((p) => {
+            const Icon = p.icon;
+            return (
+              <DropdownMenuSub key={p.id}>
+                <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                  <Icon className="size-4 text-icon-secondary" />
+                  {p.name}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {p.actions.map((a) => (
+                    <DropdownMenuItem
+                      key={a.id}
+                      className="flex-col items-start gap-0.5 text-[13px]"
+                      onSelect={() => onAdd({ connector: p.id, type: a.id, config: {} })}
+                    >
+                      <span>{a.label}</span>
+                      {a.summary && <span className="text-[11px] text-text-tertiary">{a.summary}</span>}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            );
+          })}
+          {visible.length === 0 && <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noActions")}</p>}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1443,13 +1443,20 @@
     "searchTriggers": "Rechercher des déclencheurs...",
     "comingSoon": "Bientôt disponible",
     "noTriggers": "Aucun déclencheur correspondant",
+    "configureConnector": "Configurer dans Plugins",
+    "actions": "Actions",
+    "addAction": "Ajouter une action",
+    "searchActions": "Rechercher des actions...",
+    "noActions": "Aucune action correspondante",
+    "noActionConfig": "Aucun réglage pour cette action.",
+    "removeAction": "Supprimer l'action",
+    "fieldText": "Texte",
+    "fieldPrompt": "Prompt",
+    "fieldTextHint": "Texte fixe (variables {{result}} {{title}} supportées). Cliquer pour un prompt.",
+    "fieldPromptHint": "Un agent le résout en valeur à l'exécution. Cliquer pour un texte fixe.",
+    "fieldPromptPlaceholder": "ex : l'email le plus impliqué dans ce projet",
     "categories": {
-      "scheduled": "Planifié",
-      "github": "GitHub / GitLab",
-      "slack": "Slack",
-      "teams": "Microsoft Teams",
-      "sentry": "Sentry",
-      "linear": "Linear"
+      "scheduled": "Planifié"
     },
     "scheduledOptions": {
       "hourly": "Toutes les heures",
