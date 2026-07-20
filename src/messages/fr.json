@@ -526,6 +526,37 @@
       "ollamaTitle": "Run agents locally (optional)",
       "ollamaDescription": "Ollama lets you run open-source models on your machine instead of cloud APIs. Install it separately to use local models with OpenCode.",
       "ollamaLearnMore": "Ollama documentation"
+    },
+    "calendar": {
+      "title": "Calendrier",
+      "subtitle": "Vue calendrier de vos patrouilles — visualisez ce qui tourne quand, repérez les pics de charge et planifiez sans collision.",
+      "today": "Aujourd'hui",
+      "prev": "Précédent",
+      "next": "Suivant",
+      "hidePaused": "Masquer les pausées",
+      "more": "+{n} de plus",
+      "densityWarning": "{n} patrouilles sur ce créneau — surcharge possible",
+      "views": {
+        "month": "Mois",
+        "week": "Semaine",
+        "day": "Jour"
+      },
+      "status": {
+        "completed": "Dernier run ok",
+        "failed": "Dernier run échoué",
+        "running": "En cours",
+        "never": "Jamais exécuté",
+        "paused": "En pause"
+      },
+      "tip": {
+        "agent": "Agent",
+        "lastRun": "Statut",
+        "successRate": "Taux de succès",
+        "avgDuration": "Durée moy.",
+        "avgTokens": "Tokens moy.",
+        "avgCost": "Coût moy.",
+        "noRuns": "Aucun run"
+      }
     }
   },
   "planner": {

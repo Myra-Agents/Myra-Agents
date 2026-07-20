@@ -1,5 +1,5 @@
 // House, ScrollText icons parked — Home/Logs nav entries commented out below.
-import { Activity, History, type LucideIcon, Route } from "lucide-react";
+import { Activity, CalendarDays, History, type LucideIcon, Route } from "lucide-react";
 
 export interface NavSubItem {
   title: string;
@@ -80,6 +80,15 @@ export const sidebarItems: NavGroup[] = [
         url: "/schedules",
         icon: Route,
         description: "Set up recurring and cron-triggered runs so agents fire on their own.",
+      },
+      {
+        // Calendar view of scheduled patrols (issue #181) — month / week / day grid
+        // of upcoming fire times, coloured by last-run status.
+        title: "Calendar",
+        url: "/calendar",
+        icon: CalendarDays,
+        description: "Month / week / day view of when your patrols fire — spot busy slots and collisions.",
+        isNew: true,
       },
       // Day Planner is parked for now — re-enable with the ClipboardList icon import.
       // {

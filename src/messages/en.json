@@ -526,6 +526,37 @@
       "ollamaTitle": "Run agents locally (optional)",
       "ollamaDescription": "Ollama lets you run open-source models on your machine instead of cloud APIs. Install it separately to use local models with OpenCode.",
       "ollamaLearnMore": "Ollama documentation"
+    },
+    "calendar": {
+      "title": "Calendar",
+      "subtitle": "Calendar view of your patrols — see when everything fires, spot busy slots, and plan around collisions.",
+      "today": "Today",
+      "prev": "Previous",
+      "next": "Next",
+      "hidePaused": "Hide paused",
+      "more": "+{n} more",
+      "densityWarning": "{n} patrols in this slot — possible overload",
+      "views": {
+        "month": "Month",
+        "week": "Week",
+        "day": "Day"
+      },
+      "status": {
+        "completed": "Last run ok",
+        "failed": "Last run failed",
+        "running": "Running",
+        "never": "Never run",
+        "paused": "Paused"
+      },
+      "tip": {
+        "agent": "Agent",
+        "lastRun": "Status",
+        "successRate": "Success rate",
+        "avgDuration": "Avg duration",
+        "avgTokens": "Avg tokens",
+        "avgCost": "Avg cost",
+        "noRuns": "No runs yet"
+      }
     }
   },
   "planner": {
