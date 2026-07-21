@@ -160,6 +160,33 @@ export function IntegrationsPanel() {
     [membership],
   );
 
+  const startDisconnect = useCallback(
+    async (instance: PluginInstance) => {
+      const connId = (membership[instance.id] ?? [])[0];
+      if (!connId) return;
+      setConnectState((s) => ({ ...s, [instance.id]: { lines: [], running: true } }));
+      // Optimistically drop the shown account — the identity re-fetch will fail
+      // (token gone) and leave it cleared.
+      setIdentities((s) => {
+        const { [instance.id]: _, ...rest } = s;
+        return rest;
+      });
+      try {
+        await connectionManager.invokeOne(connId, "run_plugin_setup", {
+          instanceId: instance.id,
+          action: "disconnect",
+        });
+        track("integration_disconnect_started", { plugin: instance.plugin });
+      } catch (e) {
+        setConnectState((s) => ({
+          ...s,
+          [instance.id]: { lines: [e instanceof Error ? e.message : String(e)], running: false, ok: false },
+        }));
+      }
+    },
+    [membership],
+  );
+
   const pluginFor = useCallback((name: string) => catalog.find((p) => p.name === name), [catalog]);
   const secretKeysFor = useCallback(
     (name: string) => (pluginFor(name)?.config ?? []).filter((f) => f.type === "secret").map((f) => f.key),
@@ -332,9 +359,21 @@ export function IntegrationsPanel() {
                 })()}
 
                 {identities[inst.id] && (
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                    <UserIcon className="size-3.5 shrink-0" />
-                    <span className="truncate">{t("connectedAs", { account: identities[inst.id] })}</span>
+                  <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <UserIcon className="size-3.5 shrink-0" />
+                      <span className="truncate">{t("connectedAs", { account: identities[inst.id] })}</span>
+                    </span>
+                    {plugin?.catalog?.disconnect && (
+                      <button
+                        type="button"
+                        onClick={() => void startDisconnect(inst)}
+                        disabled={connectState[inst.id]?.running}
+                        className="shrink-0 text-destructive hover:underline disabled:opacity-50"
+                      >
+                        {plugin.catalog.disconnect.label || t("disconnect")}
+                      </button>
+                    )}
                   </div>
                 )}
 
