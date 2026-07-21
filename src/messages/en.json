@@ -1003,8 +1003,8 @@
       },
       "inboundUrl": "Inbound URL — paste this into the sender (e.g. GitHub webhook).",
       "webhookWarning": {
-        "title": "Webhooks run in the local server",
-        "body": "They only fire while Myra is running and stop when you quit the app or shut down. For 24/7 delivery, install the background service or use a remote instance."
+        "title": "Webhooks run on your machine",
+        "body": "They fire only while Myra's server is running and stop when you quit the app. Install the background service to keep receiving 24/7, and expose it through a tunnel so external services can reach it."
       },
       "secret": {
         "save": "Save",
@@ -1028,8 +1028,8 @@
       "deleteConfirm": "Delete the “{label}” integration from every machine?",
       "deletePartial": "Some machines couldn't be updated — try again.",
       "webhookWarning": {
-        "title": "Webhooks run in the local server",
-        "body": "They only fire while Myra is running and stop when you quit the app or shut down. For 24/7 delivery, install the background service or use a remote instance."
+        "title": "Webhooks run on your machine",
+        "body": "They fire only while Myra's server is running and stop when you quit the app. Install the background service to keep receiving 24/7, and expose it through a tunnel so external services can reach it."
       },
       "wizard": {
         "titleNew": "New integration",
@@ -1051,6 +1051,10 @@
         "inboundUrl": "Inbound URL (per machine) — paste into the sender",
         "secretNote": "Secrets are pushed to each selected machine's keychain now. Keychains can't be copied between machines, so a machine added later will prompt for the secret again.",
         "secretSet": "Set",
+        "authMethod": "Authentication",
+        "signIn": "Sign in",
+        "signedIn": "Signed in",
+        "signInNoMachine": "Connect a machine first.",
         "cancel": "Cancel",
         "back": "Back",
         "next": "Next",

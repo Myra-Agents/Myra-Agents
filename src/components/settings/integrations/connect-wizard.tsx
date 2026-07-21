@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { CheckIcon, KeyRoundIcon, Loader2Icon } from "lucide-react";
+import { CheckIcon, KeyRoundIcon, Loader2Icon, PlugZapIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -19,7 +19,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { connectionManager } from "@/lib/connections/manager";
 import type { Connection } from "@/lib/connections/types";
 import { deployInstance, type SecretInput } from "@/lib/integrations/deploy";
 import { track } from "@/lib/posthog/events";
@@ -108,6 +110,81 @@ export function ConnectWizard({
 
   // Effective events/template: instance override falls back to the manifest's.
   const effectiveEvents = events.length > 0 ? events : (out?.events ?? []);
+
+  // Auth methods (catalog.auth) render as tabs; the selected one's fields sit in
+  // its tab, everything else above the tabs. Falls back to a flat field list for
+  // connectors that declare no auth methods.
+  const authMethods = plugin?.catalog?.auth ?? [];
+  const [authMethodId, setAuthMethodId] = useState<string>("");
+  const activeAuth = authMethodId || authMethods[0]?.id || "";
+  const claimedFieldKeys = new Set(authMethods.flatMap((m) => m.fields ?? []));
+  const nonHiddenFields = (plugin?.config ?? []).filter((f) => !f.hidden);
+  const commonFields = nonHiddenFields.filter((f) => !claimedFieldKeys.has(f.key));
+
+  // Sign in (`run_plugin_setup`) progress for this instance, streamed over the bus.
+  const [signInState, setSignInState] = useState<{ running: boolean; ok?: boolean; line?: string }>({
+    running: false,
+  });
+  useEffect(() => {
+    let offLog: (() => void) | undefined;
+    let offDone: (() => void) | undefined;
+    void connectionManager
+      .listenAll<{ id: string; line: string }>("plugin-setup-log", ({ payload }) => {
+        if (payload.id === instanceId) setSignInState((s) => ({ ...s, line: payload.line }));
+      })
+      .then((un) => {
+        offLog = un;
+      });
+    void connectionManager
+      .listenAll<{ id: string; ok: boolean }>("plugin-setup-done", ({ payload }) => {
+        if (payload.id === instanceId) setSignInState({ running: false, ok: payload.ok });
+      })
+      .then((un) => {
+        offDone = un;
+      });
+    return () => {
+      offLog?.();
+      offDone?.();
+    };
+  }, [instanceId]);
+
+  const signIn = useCallback(async () => {
+    if (!plugin) return;
+    const primary = connectionManager.primaryId();
+    if (!primary) {
+      setSignInState({ running: false, ok: false, line: t("signInNoMachine") });
+      return;
+    }
+    setSignInState({ running: true });
+    try {
+      const instance: PluginInstance = {
+        id: instanceId,
+        plugin: plugin.name,
+        label: label.trim() || plugin.name,
+        enabled: true,
+        config,
+        events: events.length > 0 ? events : undefined,
+        template: template.trim().length > 0 ? template : undefined,
+      };
+      const secretInputs: SecretInput[] = Object.entries(secrets)
+        .filter(([, v]) => v.length > 0)
+        .map(([key, value]) => ({ key, value }));
+      // Write config + secrets to the primary machine only, then run the OAuth
+      // consent there — the refresh token lands in that machine's keychain. The
+      // final Deploy step fans the instance out to the rest.
+      await deployInstance({
+        instance,
+        secrets: secretInputs,
+        selectedConnIds: [primary],
+        allConnIds: [primary],
+        secretKeys: allSecretKeys,
+      });
+      await connectionManager.invokeOne(primary, "run_plugin_setup", { instanceId });
+      // completion arrives via the plugin-setup-done listener above
+    } catch (e) {
+      setSignInState({ running: false, ok: false, line: e instanceof Error ? e.message : String(e) });
+    }
+  }, [plugin, instanceId, label, config, events, template, secrets, allSecretKeys, t]);
 
   const reset = useCallback(() => {
     onClose();
@@ -210,7 +287,7 @@ export function ConnectWizard({
               <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("labelPlaceholder")} />
             </div>
 
-            {(plugin.config ?? []).map((field) => (
+            {commonFields.map((field) => (
               <WizardField
                 key={field.key}
                 field={field}
@@ -221,6 +298,70 @@ export function ConnectWizard({
                 onSecret={(v) => setSecrets((s) => ({ ...s, [field.key]: v }))}
               />
             ))}
+
+            {authMethods.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t("authMethod")}</Label>
+                <Tabs value={activeAuth} onValueChange={setAuthMethodId}>
+                  <TabsList className="w-full">
+                    {authMethods.map((m) => (
+                      <TabsTrigger key={m.id} value={m.id} className="flex-1 text-xs">
+                        {m.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {authMethods.map((m) => (
+                    <TabsContent key={m.id} value={m.id} className="space-y-3 pt-3">
+                      {m.summary && <p className="text-muted-foreground text-xs">{m.summary}</p>}
+                      {nonHiddenFields
+                        .filter((f) => (m.fields ?? []).includes(f.key))
+                        .map((field) => (
+                          <WizardField
+                            key={field.key}
+                            field={field}
+                            value={config[field.key]}
+                            secretDraft={secrets[field.key] ?? ""}
+                            secretAlreadySet={editing?.secretKeys.includes(field.key) ?? false}
+                            onValue={(v) => setConfig((c) => ({ ...c, [field.key]: v }))}
+                            onSecret={(v) => setSecrets((s) => ({ ...s, [field.key]: v }))}
+                          />
+                        ))}
+                      {m.kind === "oauth" && (
+                        <div className="space-y-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            disabled={signInState.running}
+                            onClick={() => void signIn()}
+                          >
+                            {signInState.running ? (
+                              <Loader2Icon className="size-3.5 animate-spin" />
+                            ) : (
+                              <PlugZapIcon className="size-3.5" />
+                            )}
+                            {plugin.catalog?.setup?.label ?? t("signIn")}
+                          </Button>
+                          {signInState.ok === true && (
+                            <p className="flex items-center gap-1 text-green-600 text-xs">
+                              <CheckIcon className="size-3" />
+                              {t("signedIn")}
+                            </p>
+                          )}
+                          {signInState.running && signInState.line && (
+                            <p className="truncate text-muted-foreground text-xs">{signInState.line}</p>
+                          )}
+                          {signInState.ok === false && signInState.line && (
+                            <p className="truncate text-destructive text-xs">{signInState.line}</p>
+                          )}
+                        </div>
+                      )}
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </div>
+            )}
 
             {out && (
               <>

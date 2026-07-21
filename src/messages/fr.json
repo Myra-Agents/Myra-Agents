@@ -1003,8 +1003,8 @@
       },
       "inboundUrl": "URL entrante — à coller chez l'émetteur (ex. webhook GitHub).",
       "webhookWarning": {
-        "title": "Les webhooks tournent dans le serveur local",
-        "body": "Ils ne se déclenchent que pendant l'exécution de Myra et s'arrêtent à la fermeture de l'app ou à l'extinction. Pour une diffusion 24/7, installez le service en arrière-plan ou utilisez une instance distante."
+        "title": "Les webhooks tournent sur ta machine",
+        "body": "Ils ne se déclenchent que tant que le serveur Myra tourne et s'arrêtent quand tu quittes l'app. Installe le service en arrière-plan pour continuer à recevoir 24/7, et expose-le via un tunnel pour que les services externes puissent l'atteindre."
       },
       "secret": {
         "save": "Enregistrer",
@@ -1028,8 +1028,8 @@
       "deleteConfirm": "Supprimer l'intégration « {label} » de toutes les machines ?",
       "deletePartial": "Certaines machines n'ont pas pu être mises à jour — réessayez.",
       "webhookWarning": {
-        "title": "Les webhooks tournent dans le serveur local",
-        "body": "Ils ne se déclenchent que pendant l'exécution de Myra et s'arrêtent à la fermeture de l'app ou à l'extinction. Pour une diffusion 24/7, installez le service en arrière-plan ou utilisez une instance distante."
+        "title": "Les webhooks tournent sur ta machine",
+        "body": "Ils ne se déclenchent que tant que le serveur Myra tourne et s'arrêtent quand tu quittes l'app. Installe le service en arrière-plan pour continuer à recevoir 24/7, et expose-le via un tunnel pour que les services externes puissent l'atteindre."
       },
       "wizard": {
         "titleNew": "Nouvelle intégration",
@@ -1051,6 +1051,10 @@
         "inboundUrl": "URL entrante (par machine) — à coller chez l'émetteur",
         "secretNote": "Les secrets sont poussés dès maintenant dans le trousseau de chaque machine sélectionnée. Les trousseaux ne peuvent pas être copiés entre machines : une machine ajoutée plus tard redemandera le secret.",
         "secretSet": "Défini",
+        "authMethod": "Authentification",
+        "signIn": "Se connecter",
+        "signedIn": "Connecté",
+        "signInNoMachine": "Connecte d'abord une machine.",
         "cancel": "Annuler",
         "back": "Retour",
         "next": "Suivant",
