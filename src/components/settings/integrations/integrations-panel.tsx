@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { COLUMN_CONFIG } from "@myra/shared/types/kanban";
 import {
@@ -110,6 +110,10 @@ export function IntegrationsPanel() {
   const [connectState, setConnectState] = useState<
     Record<string, { lines: string[]; running: boolean; ok?: boolean }>
   >({});
+  // Instances whose in-flight `run_plugin_setup` is a disconnect, not a connect —
+  // both emit `plugin-setup-done {ok:true}`, but a disconnect must reset to the
+  // Sign-in state, not show "Connected".
+  const disconnectingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let unlistenLog: (() => void) | undefined;
@@ -126,6 +130,21 @@ export function IntegrationsPanel() {
       });
     void connectionManager
       .listenAll<{ id: string; ok: boolean }>("plugin-setup-done", ({ payload }) => {
+        if (disconnectingRef.current.has(payload.id)) {
+          // Disconnect finished — drop the progress state (so the Sign-in row
+          // returns) and the shown account; never render "Connected".
+          disconnectingRef.current.delete(payload.id);
+          setConnectState((s) => {
+            const { [payload.id]: _, ...rest } = s;
+            return rest;
+          });
+          setIdentities((s) => {
+            const { [payload.id]: _, ...rest } = s;
+            return rest;
+          });
+          void load();
+          return;
+        }
         setConnectState((s) => ({
           ...s,
           [payload.id]: { lines: s[payload.id]?.lines ?? [], running: false, ok: payload.ok },
@@ -164,6 +183,7 @@ export function IntegrationsPanel() {
     async (instance: PluginInstance) => {
       const connId = (membership[instance.id] ?? [])[0];
       if (!connId) return;
+      disconnectingRef.current.add(instance.id);
       setConnectState((s) => ({ ...s, [instance.id]: { lines: [], running: true } }));
       // Optimistically drop the shown account — the identity re-fetch will fail
       // (token gone) and leave it cleared.
@@ -178,6 +198,7 @@ export function IntegrationsPanel() {
         });
         track("integration_disconnect_started", { plugin: instance.plugin });
       } catch (e) {
+        disconnectingRef.current.delete(instance.id);
         setConnectState((s) => ({
           ...s,
           [instance.id]: { lines: [e instanceof Error ? e.message : String(e)], running: false, ok: false },
