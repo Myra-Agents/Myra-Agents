@@ -79,6 +79,7 @@ import type {
   CreateScheduleInput,
   EventTrigger,
   ScheduledTask,
+  ScheduleKind,
   ScheduleKindType,
   UpdateScheduleInput,
 } from "@/types/schedule";
@@ -109,7 +110,7 @@ type Draft = {
   // `eventTriggers`), never both — picking one kind from Add Trigger clears the
   // other. `schedule` is null when event-driven; Save fills a dummy for the
   // still-required API field (the server ignores it when eventTriggers is set).
-  schedule: ScheduledTask["schedule"] | null;
+  schedule: ScheduleKind | null;
   eventTriggers: EventTrigger[];
   // Post-run side effects dispatched to connectors when this patrol's card finishes.
   actions: NonNullable<ScheduledTask["actions"]>;
@@ -129,7 +130,8 @@ function draftOf(task: ScheduledTask): Draft {
     name: task.name,
     cardDescription: task.cardDescription,
     agentPrompt: task.agentPrompt,
-    schedule: (task.eventTriggers?.length ?? 0) > 0 ? null : task.schedule,
+    // Schedule and event triggers are independent — keep whatever the task has.
+    schedule: task.schedule ?? null,
     eventTriggers: task.eventTriggers ?? [],
     actions: task.actions ?? [],
     workingDir: task.workingDir ?? "",
@@ -493,7 +495,7 @@ function ScheduleEditScreen() {
         cardDescription: draft.cardDescription,
         agentPrompt: draft.agentPrompt,
         tags: draft.tags,
-        schedule: draft.schedule ?? defaultScheduleKind("cron"),
+        schedule: draft.schedule ?? undefined,
         eventTriggers: draft.eventTriggers.length ? draft.eventTriggers : undefined,
         actions: draft.actions.length ? draft.actions : undefined,
         enabled: draft.enabled,
@@ -533,7 +535,7 @@ function ScheduleEditScreen() {
           cardDescription: draft.cardDescription,
           agentPrompt: draft.agentPrompt,
           tags: draft.tags,
-          schedule: draft.schedule ?? defaultScheduleKind("cron"),
+          schedule: draft.schedule ?? undefined,
           eventTriggers: draft.eventTriggers.length ? draft.eventTriggers : undefined,
           actions: draft.actions.length ? draft.actions : undefined,
           enabled,
@@ -1385,10 +1387,10 @@ function SettingsTab({
         <TriggersCard
           schedule={draft.schedule}
           eventTriggers={draft.eventTriggers}
-          onChangeSchedule={(schedule) => setDraft((d) => (d ? { ...d, schedule, eventTriggers: [] } : d))}
+          onChangeSchedule={(schedule) => setDraft((d) => (d ? { ...d, schedule } : d))}
           onRemoveSchedule={() => setDraft((d) => (d ? { ...d, schedule: null } : d))}
           onAddEventTrigger={(et) =>
-            setDraft((d) => (d ? { ...d, eventTriggers: [...d.eventTriggers, et], schedule: null } : d))
+            setDraft((d) => (d ? { ...d, eventTriggers: [...d.eventTriggers, et] } : d))
           }
           onChangeEventTrigger={(i, et) =>
             setDraft((d) =>
@@ -2162,7 +2164,7 @@ function MultiBranchSelect({
 // clicking a row edits it, "Add Trigger" picks/replaces the schedule kind.
 
 /** Friendlier wording than describeSchedule for the common cadences. */
-function triggerLabel(kind: ScheduledTask["schedule"]): string {
+function triggerLabel(kind: ScheduleKind): string {
   if (kind.type === "interval" && kind.minutes % 60 === 0) {
     const h = kind.minutes / 60;
     return h === 1 ? "Every hour" : `Every ${h} hours`;
@@ -2180,9 +2182,9 @@ function TriggersCard({
   onRemoveEventTrigger,
   t,
 }: {
-  schedule: ScheduledTask["schedule"] | null;
+  schedule: ScheduleKind | null;
   eventTriggers: EventTrigger[];
-  onChangeSchedule: (s: ScheduledTask["schedule"]) => void;
+  onChangeSchedule: (s: ScheduleKind) => void;
   onRemoveSchedule: () => void;
   onAddEventTrigger: (e: EventTrigger) => void;
   onChangeEventTrigger: (index: number, e: EventTrigger) => void;
@@ -2193,36 +2195,37 @@ function TriggersCard({
   // Index of the event-trigger row whose config popover is auto-opened (the one
   // just added from the menu). Cleared when the user closes it.
   const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const hasTrigger = schedule !== null || eventTriggers.length > 0;
   const addEvent = (et: EventTrigger) => {
     setOpenIdx(eventTriggers.length); // the index the new one will land at
     onAddEventTrigger(et);
   };
   return (
     <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
-      {eventTriggers.length > 0
-        ? eventTriggers.map((et, i) => (
-            <EventTriggerRow
-              // biome-ignore lint/suspicious/noArrayIndexKey: positional trigger list.
-              key={i}
-              value={et}
-              plugin={plugins.find((p) => p.name === et.connector)}
-              open={openIdx === i}
-              onOpenChange={(o) => setOpenIdx(o ? i : null)}
-              onChange={(next) => onChangeEventTrigger(i, next)}
-              onRemove={() => {
-                setOpenIdx(null);
-                onRemoveEventTrigger(i);
-              }}
-              t={t}
-            />
-          ))
-        : schedule && <TriggerRow value={schedule} onChange={onChangeSchedule} onRemove={onRemoveSchedule} t={t} />}
+      {/* Schedule and connector event triggers are independent — a patrol can
+          run on a schedule AND fire on events. The schedule row (if any) and
+          every event-trigger row are shown side by side. */}
+      {schedule && <TriggerRow value={schedule} onChange={onChangeSchedule} onRemove={onRemoveSchedule} t={t} />}
+      {eventTriggers.map((et, i) => (
+        <EventTriggerRow
+          // biome-ignore lint/suspicious/noArrayIndexKey: positional trigger list.
+          key={i}
+          value={et}
+          plugin={plugins.find((p) => p.name === et.connector)}
+          open={openIdx === i}
+          onOpenChange={(o) => setOpenIdx(o ? i : null)}
+          onChange={(next) => onChangeEventTrigger(i, next)}
+          onRemove={() => {
+            setOpenIdx(null);
+            onRemoveEventTrigger(i);
+          }}
+          t={t}
+        />
+      ))}
       {/* One schedule max; connector event triggers can stack. */}
       <AddTriggerMenu
         onPickSchedule={onChangeSchedule}
         onPickEvent={addEvent}
-        hasTrigger={hasTrigger}
+        hasSchedule={schedule !== null}
         plugins={plugins}
         t={t}
       />
@@ -2237,8 +2240,8 @@ function TriggerRow({
   onRemove,
   t,
 }: {
-  value: ScheduledTask["schedule"];
-  onChange: (s: ScheduledTask["schedule"]) => void;
+  value: ScheduleKind;
+  onChange: (s: ScheduleKind) => void;
   onRemove: () => void;
   t: ReturnType<typeof useTranslations>;
 }) {
@@ -2608,19 +2611,19 @@ function humanizeEvent(opt: string): string {
 function AddTriggerMenu({
   onPickSchedule,
   onPickEvent,
-  hasTrigger,
+  hasSchedule,
   plugins,
   t,
 }: {
-  onPickSchedule: (s: ScheduledTask["schedule"]) => void;
+  onPickSchedule: (s: ScheduleKind) => void;
   onPickEvent: (e: EventTrigger) => void;
-  hasTrigger: boolean;
+  hasSchedule: boolean;
   plugins: PluginInfo[];
   t: ReturnType<typeof useTranslations>;
 }) {
   const [query, setQuery] = useState("");
 
-  const scheduled: { key: "hourly" | "daily" | "weekly" | "custom"; make: () => ScheduledTask["schedule"] }[] = [
+  const scheduled: { key: "hourly" | "daily" | "weekly" | "custom"; make: () => ScheduleKind }[] = [
     { key: "hourly", make: () => ({ type: "interval", start: "09:00", minutes: 60 }) },
     { key: "daily", make: () => defaultScheduleKind("daily") },
     { key: "weekly", make: () => defaultScheduleKind("weekly") },
@@ -2659,8 +2662,8 @@ function AddTriggerMenu({
         </div>
         <div className="p-1">
           {showScheduled &&
-            (hasTrigger ? (
-              // A trigger already exists — only one is supported, so the
+            (hasSchedule ? (
+              // A schedule already exists — only one is supported, so the
               // category is disabled with a tooltip explaining why.
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2722,10 +2725,6 @@ function AddTriggerMenu({
                       {humanizeEvent(opt)}
                     </DropdownMenuItem>
                   ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-[13px]" onSelect={() => pick()}>
-                    {t("allEvents")}
-                  </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             );
@@ -2937,8 +2936,8 @@ function ScheduleKindFields({
   onChange,
   t,
 }: {
-  value: ScheduledTask["schedule"];
-  onChange: (s: ScheduledTask["schedule"]) => void;
+  value: ScheduleKind;
+  onChange: (s: ScheduleKind) => void;
   t: ReturnType<typeof useTranslations>;
 }) {
   const kinds: ScheduleKindType[] = ["once", "daily", "weekly", "interval", "cron"];

@@ -262,7 +262,7 @@ export function KanbanCardComponent({
               </Badge>
             )}
 
-            {schedule && (
+            {schedule?.schedule && (
               <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                 ⏱ {schedule.schedule.type}
               </Badge>
