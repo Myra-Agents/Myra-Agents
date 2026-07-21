@@ -13,6 +13,7 @@ import {
   PlusIcon,
   Trash2Icon,
   TriangleAlertIcon,
+  UserIcon,
   ZapIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -80,6 +81,28 @@ export function IntegrationsPanel() {
     const off = connectionManager.onTopologyChange(() => void load());
     return off;
   }, [load]);
+
+  // The connected account label per instance ("@user · Name"), fetched from a
+  // connector that exposes an `identity` options field (e.g. GitLab's GET /user).
+  // Connectors without one just show a plain "Connected".
+  const [identities, setIdentities] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const primary = connectionManager.primaryId();
+    for (const inst of Object.values(instances)) {
+      const plugin = catalog.find((p) => p.name === inst.plugin);
+      if (!plugin?.optionsExec) continue;
+      connectionManager
+        .invokeOne<{ options?: { value: string; label: string }[] }>(primary, "connector_options", {
+          connector: inst.plugin,
+          field: "identity",
+        })
+        .then((res) => {
+          const label = res?.options?.[0]?.label;
+          if (label) setIdentities((s) => (s[inst.id] === label ? s : { ...s, [inst.id]: label }));
+        })
+        .catch(() => {});
+    }
+  }, [instances, catalog]);
 
   // Connect (`run_plugin_setup`) progress per instance id — a plugin's `catalog
   // .setup` (OAuth consent, etc.) runs server-side and streams back over the
@@ -307,6 +330,13 @@ export function IntegrationsPanel() {
                     </p>
                   );
                 })()}
+
+                {identities[inst.id] && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                    <UserIcon className="size-3.5 shrink-0" />
+                    <span className="truncate">{t("connectedAs", { account: identities[inst.id] })}</span>
+                  </div>
+                )}
 
                 {/* Machine badges only matter across multiple machines; with a
                     single local server it's redundant. Always surface the

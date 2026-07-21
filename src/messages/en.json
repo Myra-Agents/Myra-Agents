@@ -1025,6 +1025,7 @@
       "noMachines": "No machines",
       "connecting": "Connecting…",
       "connected": "Connected",
+      "connectedAs": "Connected as {account}",
       "capabilities": { "triggers": "Triggers", "actions": "Actions" },
       "deleteConfirm": "Delete the “{label}” integration from every machine?",
       "deletePartial": "Some machines couldn't be updated — try again.",

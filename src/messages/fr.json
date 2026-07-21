@@ -1025,6 +1025,7 @@
       "noMachines": "Aucune machine",
       "connecting": "Connexion…",
       "connected": "Connecté",
+      "connectedAs": "Connecté en tant que {account}",
       "capabilities": { "triggers": "Déclencheurs", "actions": "Actions" },
       "deleteConfirm": "Supprimer l'intégration « {label} » de toutes les machines ?",
       "deletePartial": "Certaines machines n'ont pas pu être mises à jour — réessayez.",
