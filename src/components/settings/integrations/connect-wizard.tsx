@@ -336,8 +336,6 @@ export function ConnectWizard({
               <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("labelPlaceholder")} />
             </div>
 
-            {commonFields.map(renderField)}
-
             {authMethods.length > 0 &&
               (() => {
                 const primary = authMethods[0];
@@ -386,6 +384,8 @@ export function ConnectWizard({
                   </div>
                 );
               })()}
+
+            {commonFields.length > 0 && <div className="space-y-4 border-t pt-4">{commonFields.map(renderField)}</div>}
 
             {out && (
               <>
