@@ -396,7 +396,10 @@ export function IntegrationsPanel() {
                   </div>
                 )}
 
-                {plugin?.catalog?.setup && deployed && (
+                {/* Sign in only when not already connected — a live account
+                    (identity) means there's nothing to sign into; use Disconnect
+                    instead. */}
+                {plugin?.catalog?.setup && deployed && !identities[inst.id] && (
                   <ConnectRow
                     label={plugin.catalog.setup.label}
                     state={connectState[inst.id]}
