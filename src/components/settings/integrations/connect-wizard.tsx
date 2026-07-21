@@ -454,7 +454,10 @@ export function ConnectWizard({
               })}
             </div>
 
-            {inbound && selectedConns.size > 0 && (
+            {/* Poll-first connectors mark their inbound webhook `optional` — the
+                route still works on a routable host, but there's nothing to paste
+                into a sender by default, so don't surface it. */}
+            {inbound && !inbound.optional && selectedConns.size > 0 && (
               <div className="space-y-1.5 rounded-lg border p-3">
                 <Label className="text-xs">{t("inboundUrl")}</Label>
                 {connections
