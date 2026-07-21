@@ -2463,12 +2463,19 @@ function EventTriggerRow({
   const name = plugin?.catalog?.name ?? value.connector;
   const setRule = (patch: Partial<ConnectorRule>) => onChange({ ...value, rules: [{ ...rule, ...patch }] });
 
-  // Connector-specific trigger settings (e.g. GitLab project/events), declared
-  // by the plugin's catalog.trigger.config and stored on eventTrigger.config.
-  const triggerConfig = plugin?.catalog?.trigger?.config ?? [];
+  // Connector-specific trigger settings (e.g. GitLab project), declared by the
+  // plugin's catalog.trigger.config and stored on eventTrigger.config. `hidden`
+  // fields (the event kind — fixed by the Add-Trigger menu) aren't shown as
+  // editable inputs.
+  const triggerConfig = (plugin?.catalog?.trigger?.config ?? []).filter((f) => !f.hidden);
   const cfg = value.config ?? {};
   const setCfg = (key: string, v: unknown) => onChange({ ...value, config: { ...cfg, [key]: v } });
   const project = typeof cfg.project === "string" ? cfg.project : "";
+  // One event kind per trigger — surface it in the row so stacked triggers are
+  // distinguishable (GitLab · Merge request vs GitLab · Issue).
+  const eventKind =
+    Array.isArray(cfg.events) && typeof cfg.events[0] === "string" ? humanizeEvent(cfg.events[0]) : "";
+  const title = eventKind ? `${name} · ${eventKind}` : name;
   const summary = project ? `${project} · ${rulesSummary}` : rulesSummary;
 
   return (
@@ -2481,7 +2488,7 @@ function EventTriggerRow({
           >
             <GitBranchIcon className="size-[18px] shrink-0 text-icon-secondary" />
             <div className="flex flex-col">
-              <span className="text-[14px] text-text-primary">{name}</span>
+              <span className="text-[14px] text-text-primary">{title}</span>
               <span className="text-[12px] text-text-tertiary">{summary}</span>
             </div>
           </button>
