@@ -105,14 +105,12 @@ type Draft = {
   name: string;
   cardDescription: string;
   agentPrompt: string;
-  // Null while the user has removed the (single) schedule trigger — Save is then
-  // blocked until a trigger is re-added. A patrol's one trigger is either a
-  // time-based `schedule` OR a connector `eventTrigger`, never both — picking
-  // one from Add Trigger clears the other (`schedule` still carries a dummy
-  // value under the hood since the API field stays required; the server
-  // ignores it when `eventTrigger` is set).
+  // A patrol is either time-based (one `schedule`) OR event-driven (one or more
+  // `eventTriggers`), never both — picking one kind from Add Trigger clears the
+  // other. `schedule` is null when event-driven; Save fills a dummy for the
+  // still-required API field (the server ignores it when eventTriggers is set).
   schedule: ScheduledTask["schedule"] | null;
-  eventTrigger: EventTrigger | null;
+  eventTriggers: EventTrigger[];
   // Post-run side effects dispatched to connectors when this patrol's card finishes.
   actions: NonNullable<ScheduledTask["actions"]>;
   // Repository/folder the run clones into. Empty string = "No Repository".
@@ -131,8 +129,8 @@ function draftOf(task: ScheduledTask): Draft {
     name: task.name,
     cardDescription: task.cardDescription,
     agentPrompt: task.agentPrompt,
-    schedule: task.schedule,
-    eventTrigger: task.eventTrigger ?? null,
+    schedule: (task.eventTriggers?.length ?? 0) > 0 ? null : task.schedule,
+    eventTriggers: task.eventTriggers ?? [],
     actions: task.actions ?? [],
     workingDir: task.workingDir ?? "",
     tags: task.tags ?? [],
@@ -463,7 +461,7 @@ function ScheduleEditScreen() {
   const validateRequired = useCallback(
     (d: Draft) => {
       const missing: string[] = [];
-      if (!d.schedule && !d.eventTrigger) missing.push(t("fields.trigger"));
+      if (!d.schedule && d.eventTriggers.length === 0) missing.push(t("fields.trigger"));
       if (!d.agentPrompt.trim()) {
         missing.push(t("fields.instruction"));
         flagMissingPrompt();
@@ -484,7 +482,7 @@ function ScheduleEditScreen() {
 
   const save = useCallback(async () => {
     if (!task || !draft || !dirty) return;
-    if (!validateRequired(draft) || !draft.schedule) return;
+    if (!validateRequired(draft)) return;
     setSaving(true);
     try {
       const input: UpdateScheduleInput = {
@@ -495,8 +493,8 @@ function ScheduleEditScreen() {
         cardDescription: draft.cardDescription,
         agentPrompt: draft.agentPrompt,
         tags: draft.tags,
-        schedule: draft.schedule,
-        eventTrigger: draft.eventTrigger ?? undefined,
+        schedule: draft.schedule ?? defaultScheduleKind("cron"),
+        eventTriggers: draft.eventTriggers.length ? draft.eventTriggers : undefined,
         actions: draft.actions.length ? draft.actions : undefined,
         enabled: draft.enabled,
         agentPresetId: draft.agentPresetId,
@@ -525,7 +523,7 @@ function ScheduleEditScreen() {
   const add = useCallback(
     async (enabled: boolean) => {
       if (!task || !draft) return;
-      if (!validateRequired(draft) || !draft.schedule) return;
+      if (!validateRequired(draft)) return;
       setSaving(true);
       try {
         const input: CreateScheduleInput = {
@@ -535,8 +533,8 @@ function ScheduleEditScreen() {
           cardDescription: draft.cardDescription,
           agentPrompt: draft.agentPrompt,
           tags: draft.tags,
-          schedule: draft.schedule,
-          eventTrigger: draft.eventTrigger ?? undefined,
+          schedule: draft.schedule ?? defaultScheduleKind("cron"),
+          eventTriggers: draft.eventTriggers.length ? draft.eventTriggers : undefined,
           actions: draft.actions.length ? draft.actions : undefined,
           enabled,
           agentPresetId: draft.agentPresetId,
@@ -1386,12 +1384,20 @@ function SettingsTab({
         <span className="px-2 text-[12px] text-text-secondary">{t("triggers")}</span>
         <TriggersCard
           schedule={draft.schedule}
-          eventTrigger={draft.eventTrigger}
-          onChangeSchedule={(schedule) => setDraft((d) => (d ? { ...d, schedule, eventTrigger: null } : d))}
-          onChangeEventTrigger={(eventTrigger) =>
-            setDraft((d) => (d ? { ...d, eventTrigger, schedule: d.schedule ?? defaultScheduleKind("cron") } : d))
+          eventTriggers={draft.eventTriggers}
+          onChangeSchedule={(schedule) => setDraft((d) => (d ? { ...d, schedule, eventTriggers: [] } : d))}
+          onRemoveSchedule={() => setDraft((d) => (d ? { ...d, schedule: null } : d))}
+          onAddEventTrigger={(et) =>
+            setDraft((d) => (d ? { ...d, eventTriggers: [...d.eventTriggers, et], schedule: null } : d))
           }
-          onRemove={() => setDraft((d) => (d ? { ...d, schedule: null, eventTrigger: null } : d))}
+          onChangeEventTrigger={(i, et) =>
+            setDraft((d) =>
+              d ? { ...d, eventTriggers: d.eventTriggers.map((x, idx) => (idx === i ? et : x)) } : d,
+            )
+          }
+          onRemoveEventTrigger={(i) =>
+            setDraft((d) => (d ? { ...d, eventTriggers: d.eventTriggers.filter((_, idx) => idx !== i) } : d))
+          }
           t={t}
         />
       </section>
@@ -2166,38 +2172,56 @@ function triggerLabel(kind: ScheduledTask["schedule"]): string {
 
 function TriggersCard({
   schedule,
-  eventTrigger,
+  eventTriggers,
   onChangeSchedule,
+  onRemoveSchedule,
+  onAddEventTrigger,
   onChangeEventTrigger,
-  onRemove,
+  onRemoveEventTrigger,
   t,
 }: {
   schedule: ScheduledTask["schedule"] | null;
-  eventTrigger: EventTrigger | null;
+  eventTriggers: EventTrigger[];
   onChangeSchedule: (s: ScheduledTask["schedule"]) => void;
-  onChangeEventTrigger: (e: EventTrigger) => void;
-  onRemove: () => void;
+  onRemoveSchedule: () => void;
+  onAddEventTrigger: (e: EventTrigger) => void;
+  onChangeEventTrigger: (index: number, e: EventTrigger) => void;
+  onRemoveEventTrigger: (index: number) => void;
   t: ReturnType<typeof useTranslations>;
 }) {
   const plugins = usePluginCatalog();
-  const hasTrigger = schedule !== null || eventTrigger !== null;
+  // Index of the event-trigger row whose config popover is auto-opened (the one
+  // just added from the menu). Cleared when the user closes it.
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const hasTrigger = schedule !== null || eventTriggers.length > 0;
+  const addEvent = (et: EventTrigger) => {
+    setOpenIdx(eventTriggers.length); // the index the new one will land at
+    onAddEventTrigger(et);
+  };
   return (
     <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
-      {eventTrigger ? (
-        <EventTriggerRow
-          value={eventTrigger}
-          plugin={plugins.find((p) => p.name === eventTrigger.connector)}
-          onChange={onChangeEventTrigger}
-          onRemove={onRemove}
-          t={t}
-        />
-      ) : (
-        schedule && <TriggerRow value={schedule} onChange={onChangeSchedule} onRemove={onRemove} t={t} />
-      )}
-      {/* Only one trigger (schedule or event) is supported → tell the menu to disable the rest. */}
+      {eventTriggers.length > 0
+        ? eventTriggers.map((et, i) => (
+            <EventTriggerRow
+              // biome-ignore lint/suspicious/noArrayIndexKey: positional trigger list.
+              key={i}
+              value={et}
+              plugin={plugins.find((p) => p.name === et.connector)}
+              open={openIdx === i}
+              onOpenChange={(o) => setOpenIdx(o ? i : null)}
+              onChange={(next) => onChangeEventTrigger(i, next)}
+              onRemove={() => {
+                setOpenIdx(null);
+                onRemoveEventTrigger(i);
+              }}
+              t={t}
+            />
+          ))
+        : schedule && <TriggerRow value={schedule} onChange={onChangeSchedule} onRemove={onRemoveSchedule} t={t} />}
+      {/* One schedule max; connector event triggers can stack. */}
       <AddTriggerMenu
         onPickSchedule={onChangeSchedule}
-        onPickEvent={onChangeEventTrigger}
+        onPickEvent={addEvent}
         hasTrigger={hasTrigger}
         plugins={plugins}
         t={t}
@@ -2275,12 +2299,16 @@ function usePluginCatalog(): PluginInfo[] {
 function EventTriggerRow({
   value,
   plugin,
+  open,
+  onOpenChange,
   onChange,
   onRemove,
   t,
 }: {
   value: EventTrigger;
   plugin: PluginInfo | undefined;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onChange: (e: EventTrigger) => void;
   onRemove: () => void;
   t: ReturnType<typeof useTranslations>;
@@ -2302,7 +2330,7 @@ function EventTriggerRow({
 
   return (
     <div className="group relative flex items-center">
-      <Popover>
+      <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -2419,9 +2447,15 @@ function EventTriggerRow({
   );
 }
 
+/** "merge_request" → "Merge request" for the per-event trigger menu. */
+function humanizeEvent(opt: string): string {
+  const s = opt.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /** "+ Add Trigger" row → dropdown with a search box, the scheduled options,
  * and every installed connector plugin whose `catalog.verbs` includes
- * `"trigger"`. Only one trigger (of either kind) is supported at a time. */
+ * `"trigger"`. One schedule max; connector event triggers can stack. */
 function AddTriggerMenu({
   onPickSchedule,
   onPickEvent,
@@ -2509,31 +2543,42 @@ function AddTriggerMenu({
             ))}
           {visibleConnectors.map((p) => {
             const name = p.catalog?.name ?? p.name;
-            if (hasTrigger) {
+            const eventOpts = p.catalog?.trigger?.config?.find((f) => f.type === "multiselect")?.options ?? [];
+            const pick = (events?: string[]) =>
+              onPickEvent({
+                connector: p.name,
+                rules: [{}],
+                ...(events && events.length ? { config: { events } } : {}),
+              });
+            // No declared event kinds → one entry for the whole connector.
+            if (eventOpts.length === 0) {
               return (
-                <Tooltip key={p.name}>
-                  <TooltipTrigger asChild>
-                    <div
-                      aria-disabled
-                      className="flex cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-text-tertiary opacity-60"
-                    >
-                      <GitBranchIcon className="size-4 text-icon-tertiary" />
-                      {name}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{t("oneScheduledOnly")}</TooltipContent>
-                </Tooltip>
+                <DropdownMenuItem key={p.name} className="gap-2 text-[13px]" onSelect={() => pick()}>
+                  <GitBranchIcon className="size-4 text-icon-secondary" />
+                  {name}
+                </DropdownMenuItem>
               );
             }
+            // One entry per event kind (GitLab → merge request / issue / push),
+            // each adds a separate trigger; connector triggers can stack.
             return (
-              <DropdownMenuItem
-                key={p.name}
-                className="gap-2 text-[13px]"
-                onSelect={() => onPickEvent({ connector: p.name, rules: [{}] })}
-              >
-                <GitBranchIcon className="size-4 text-icon-secondary" />
-                {name}
-              </DropdownMenuItem>
+              <DropdownMenuSub key={p.name}>
+                <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                  <GitBranchIcon className="size-4 text-icon-secondary" />
+                  {name}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {eventOpts.map((opt) => (
+                    <DropdownMenuItem key={opt} className="text-[13px]" onSelect={() => pick([opt])}>
+                      {humanizeEvent(opt)}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-[13px]" onSelect={() => pick()}>
+                    {t("allEvents")}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             );
           })}
           {triggerPlugins.length === 0 && (
@@ -2562,9 +2607,14 @@ function ActionsCard({
 }) {
   const plugins = usePluginCatalog();
   const actionPlugins = useMemo(() => plugins.filter((p) => (p.catalog?.actions?.length ?? 0) > 0), [plugins]);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   const updateAt = (i: number, next: PatrolAction) => onChange(actions.map((a, idx) => (idx === i ? next : a)));
   const removeAt = (i: number) => onChange(actions.filter((_, idx) => idx !== i));
+  const addAction = (a: PatrolAction) => {
+    setOpenIdx(actions.length);
+    onChange([...actions, a]);
+  };
 
   return (
     <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
@@ -2578,13 +2628,18 @@ function ActionsCard({
             action={action}
             label={def?.label ?? `${plugin?.catalog?.name ?? action.connector}: ${action.type}`}
             fields={def?.config ?? []}
+            open={openIdx === i}
+            onOpenChange={(o) => setOpenIdx(o ? i : null)}
             onChange={(next) => updateAt(i, next)}
-            onRemove={() => removeAt(i)}
+            onRemove={() => {
+              setOpenIdx(null);
+              removeAt(i);
+            }}
             t={t}
           />
         );
       })}
-      <AddActionMenu plugins={actionPlugins} onPick={(a) => onChange([...actions, a])} t={t} />
+      <AddActionMenu plugins={actionPlugins} onPick={addAction} t={t} />
     </div>
   );
 }
@@ -2593,6 +2648,8 @@ function ActionRow({
   action,
   label,
   fields,
+  open,
+  onOpenChange,
   onChange,
   onRemove,
   t,
@@ -2600,6 +2657,8 @@ function ActionRow({
   action: PatrolAction;
   label: string;
   fields: PluginCatalogAction["config"];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onChange: (a: PatrolAction) => void;
   onRemove: () => void;
   t: ReturnType<typeof useTranslations>;
@@ -2608,7 +2667,7 @@ function ActionRow({
     onChange({ ...action, config: { ...action.config, [key]: value } });
   return (
     <div className="group relative flex items-center">
-      <Popover>
+      <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger asChild>
           <button
             type="button"
