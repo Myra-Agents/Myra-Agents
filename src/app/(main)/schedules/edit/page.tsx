@@ -2296,6 +2296,146 @@ function usePluginCatalog(): PluginInfo[] {
 }
 
 /** One event-trigger row — click to edit its rule; trash icon on hover removes it. */
+/**
+ * A searchable dropdown for a `dynamic` select config field (manifest
+ * `dynamic: true` + `optionsExec`). Fetches the option list lazily on first open
+ * via the `connector_options` rpc (proxied to the connector's optionsExec, e.g.
+ * GitLab's project list). Always allows a free-typed value — so a project the
+ * API didn't return (or an unconnected connector) is still enterable.
+ */
+function DynamicSelect({
+  connector,
+  field,
+  value,
+  placeholder,
+  onChange,
+  t,
+}: {
+  connector: string;
+  field: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string | undefined) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<{ value: string; label: string }[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const id = connectionManager.primaryId();
+      const res = await connectionManager.invokeOne<{ options: { value: string; label: string }[] }>(
+        id,
+        "connector_options",
+        { connector, field },
+      );
+      setOptions(res?.options ?? []);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [connector, field]);
+
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next && options === null && !loading) void load();
+  };
+
+  const q = query.trim().toLowerCase();
+  const all = options ?? [];
+  const filtered = q
+    ? all.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
+    : all;
+  const selectedLabel = all.find((o) => o.value === value)?.label ?? value;
+  const typed = query.trim();
+  const canUseTyped = typed.length > 0 && !all.some((o) => o.value === typed);
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex h-8 items-center justify-between gap-2 rounded-md border border-border px-2.5 text-left text-[13px] transition-colors hover:bg-muted/20"
+        >
+          <span className={cn("truncate", !value && "text-text-tertiary")}>
+            {value ? selectedLabel : (placeholder ?? t("dynamicSelect.placeholder"))}
+          </span>
+          <ChevronDownIcon className="size-3.5 shrink-0 text-icon-tertiary" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("dynamicSelect.search")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="max-h-56 overflow-y-auto p-1">
+          {loading && (
+            <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-text-tertiary">
+              <RefreshCwIcon className="size-3.5 animate-spin" />
+              {t("dynamicSelect.loading")}
+            </div>
+          )}
+          {error && !loading && (
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-destructive hover:bg-muted/40"
+            >
+              <RefreshCwIcon className="size-3.5" />
+              {t("dynamicSelect.error")}
+            </button>
+          )}
+          {!loading &&
+            !error &&
+            filtered.map((o) => (
+              <button
+                type="button"
+                key={o.value}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                  setQuery("");
+                }}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] hover:bg-muted/40"
+              >
+                <CheckIcon className={cn("size-3.5 shrink-0", value === o.value ? "opacity-100" : "opacity-0")} />
+                <span className="truncate">{o.label}</span>
+              </button>
+            ))}
+          {!loading && !error && filtered.length === 0 && !canUseTyped && (
+            <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("dynamicSelect.empty")}</p>
+          )}
+          {canUseTyped && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange(typed);
+                setOpen(false);
+                setQuery("");
+              }}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-text-secondary hover:bg-muted/40"
+            >
+              <PlusIcon className="size-3.5 shrink-0" />
+              {t("dynamicSelect.use", { value: typed })}
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function EventTriggerRow({
   value,
   plugin,
@@ -2375,6 +2515,15 @@ function EventTriggerRow({
                     );
                   })}
                 </div>
+              ) : field.type === "select" && field.dynamic ? (
+                <DynamicSelect
+                  connector={value.connector}
+                  field={field.key}
+                  value={typeof cfg[field.key] === "string" ? (cfg[field.key] as string) : ""}
+                  placeholder={field.placeholder}
+                  onChange={(v) => setCfg(field.key, v)}
+                  t={t}
+                />
               ) : (
                 <Input
                   value={typeof cfg[field.key] === "string" ? (cfg[field.key] as string) : ""}
@@ -2685,12 +2834,23 @@ function ActionRow({
                 {f.label}
                 {f.required && <span className="text-destructive"> *</span>}
               </span>
-              <Input
-                value={String(action.config[f.key] ?? "")}
-                placeholder={f.placeholder}
-                onChange={(e) => setConfig(f.key, e.target.value)}
-                className="h-8 text-[13px]"
-              />
+              {f.type === "select" && f.dynamic ? (
+                <DynamicSelect
+                  connector={action.connector}
+                  field={f.key}
+                  value={String(action.config[f.key] ?? "")}
+                  placeholder={f.placeholder}
+                  onChange={(v) => setConfig(f.key, v ?? "")}
+                  t={t}
+                />
+              ) : (
+                <Input
+                  value={String(action.config[f.key] ?? "")}
+                  placeholder={f.placeholder}
+                  onChange={(e) => setConfig(f.key, e.target.value)}
+                  className="h-8 text-[13px]"
+                />
+              )}
               {f.description && <span className="text-[11px] text-text-tertiary">{f.description}</span>}
             </div>
           ))}

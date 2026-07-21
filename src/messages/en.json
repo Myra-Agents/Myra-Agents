@@ -1449,6 +1449,14 @@
     },
     "addTrigger": "Add Trigger",
     "allEvents": "All events",
+    "dynamicSelect": {
+      "placeholder": "Select…",
+      "search": "Search…",
+      "loading": "Loading…",
+      "error": "Couldn't load — retry",
+      "empty": "No matches",
+      "use": "Use \"{value}\""
+    },
     "searchTriggers": "Search Triggers...",
     "comingSoon": "Coming soon",
     "noTriggers": "No matching triggers",

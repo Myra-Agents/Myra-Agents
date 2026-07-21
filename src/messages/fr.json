@@ -1449,6 +1449,14 @@
     },
     "addTrigger": "Ajouter un déclencheur",
     "allEvents": "Tous les événements",
+    "dynamicSelect": {
+      "placeholder": "Sélectionner…",
+      "search": "Rechercher…",
+      "loading": "Chargement…",
+      "error": "Échec du chargement — réessayer",
+      "empty": "Aucun résultat",
+      "use": "Utiliser « {value} »"
+    },
     "searchTriggers": "Rechercher des déclencheurs...",
     "comingSoon": "Bientôt disponible",
     "noTriggers": "Aucun déclencheur correspondant",
