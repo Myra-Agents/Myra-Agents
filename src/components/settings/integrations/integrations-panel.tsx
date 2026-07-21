@@ -5,9 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COLUMN_CONFIG } from "@myra/shared/types/kanban";
 import {
   BlocksIcon,
-  CheckIcon,
-  Loader2Icon,
-  PencilIcon,
   PlayIcon,
   PlugZapIcon,
   PlusIcon,
@@ -160,25 +157,6 @@ export function IntegrationsPanel() {
     };
   }, [load]);
 
-  const startConnect = useCallback(
-    async (instance: PluginInstance) => {
-      const connIds = membership[instance.id] ?? [];
-      const connId = connIds[0];
-      if (!connId) return;
-      setConnectState((s) => ({ ...s, [instance.id]: { lines: [], running: true } }));
-      try {
-        await connectionManager.invokeOne(connId, "run_plugin_setup", { instanceId: instance.id });
-        track("integration_connect_started", { plugin: instance.plugin });
-      } catch (e) {
-        setConnectState((s) => ({
-          ...s,
-          [instance.id]: { lines: [e instanceof Error ? e.message : String(e)], running: false, ok: false },
-        }));
-      }
-    },
-    [membership],
-  );
-
   const startDisconnect = useCallback(
     async (instance: PluginInstance) => {
       const connId = (membership[instance.id] ?? [])[0];
@@ -255,6 +233,16 @@ export function IntegrationsPanel() {
   const remove = useCallback(
     async (instance: PluginInstance) => {
       if (!(await confirm({ description: t("deleteConfirm", { label: instance.label }) }))) return;
+      // Log out first so the OAuth credential doesn't linger in the connector's
+      // keychain after the instance is gone.
+      const connId = (membership[instance.id] ?? [])[0];
+      const plugin = catalog.find((p) => p.name === instance.plugin);
+      if (connId && plugin?.catalog?.disconnect) {
+        disconnectingRef.current.add(instance.id);
+        await connectionManager
+          .invokeOne(connId, "run_plugin_setup", { instanceId: instance.id, action: "disconnect" })
+          .catch(() => {});
+      }
       const allConnIds = connections.map((c) => c.id);
       const results = await removeInstance({
         instanceId: instance.id,
@@ -265,7 +253,7 @@ export function IntegrationsPanel() {
       track("integration_removed", { plugin: instance.plugin });
       void load();
     },
-    [connections, secretKeysFor, load, t, confirm],
+    [connections, secretKeysFor, load, t, confirm, membership, catalog],
   );
 
   const list = Object.values(instances);
@@ -419,20 +407,18 @@ export function IntegrationsPanel() {
 
                 {/* Sign in only when not already connected — a live account
                     (identity) means there's nothing to sign into; use Disconnect
-                    instead. */}
+                    instead. Opens the wizard at its Configure step, where the
+                    Sign-in itself runs. */}
                 {plugin?.catalog?.setup && deployed && !identities[inst.id] && (
-                  <ConnectRow
-                    label={plugin.catalog.setup.label}
-                    state={connectState[inst.id]}
-                    onConnect={() => void startConnect(inst)}
-                  />
+                  <div className="border-t pt-2">
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => void openEdit(inst)}>
+                      <PlugZapIcon className="size-3.5" />
+                      {plugin.catalog.setup.label}
+                    </Button>
+                  </div>
                 )}
 
                 <div className="flex items-center justify-end gap-1 border-t pt-2">
-                  <Button variant="ghost" size="sm" onClick={() => void openEdit(inst)}>
-                    <PencilIcon className="size-3.5" />
-                    {t("edit")}
-                  </Button>
                   <Button variant="ghost" size="icon-xs" onClick={() => void remove(inst)} aria-label={t("delete")}>
                     <Trash2Icon className="size-3.5 text-destructive" />
                   </Button>
@@ -466,53 +452,3 @@ export function IntegrationsPanel() {
   );
 }
 
-/**
- * One instance card's "Connect" affordance for a plugin declaring `catalog
- * .setup` (OAuth consent run server-side via `run_plugin_setup` — see
- * PROTOCOL.md's "Role 5"). Idle → button; running → spinner + the last few
- * log lines; done → a checkmark (success) or the button again (retry, on
- * failure) with the error as its last line.
- */
-function ConnectRow({
-  label,
-  state,
-  onConnect,
-}: {
-  label: string;
-  state: { lines: string[]; running: boolean; ok?: boolean } | undefined;
-  onConnect: () => void;
-}) {
-  const t = useTranslations("settings.integrations");
-  const lastLine = state?.lines[state.lines.length - 1];
-
-  if (state?.running) {
-    return (
-      <div className="space-y-1 border-t pt-2">
-        <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-          <Loader2Icon className="size-3 animate-spin" />
-          {t("connecting")}
-        </div>
-        {lastLine && <p className="truncate text-muted-foreground text-xs">{lastLine}</p>}
-      </div>
-    );
-  }
-
-  if (state?.ok === true) {
-    return (
-      <div className="flex items-center gap-1.5 border-t pt-2 text-xs">
-        <CheckIcon className="size-3 text-green-500" />
-        {t("connected")}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1 border-t pt-2">
-      <Button variant="outline" size="sm" onClick={onConnect} className="w-full">
-        <PlugZapIcon className="size-3.5" />
-        {label}
-      </Button>
-      {state?.ok === false && lastLine && <p className="truncate text-destructive text-xs">{lastLine}</p>}
-    </div>
-  );
-}
