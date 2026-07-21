@@ -8,10 +8,12 @@ import {
   CheckIcon,
   Loader2Icon,
   PencilIcon,
+  PlayIcon,
   PlugZapIcon,
   PlusIcon,
   Trash2Icon,
   TriangleAlertIcon,
+  ZapIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -260,9 +262,51 @@ export function IntegrationsPanel() {
                   />
                 </div>
 
-                <p className="text-muted-foreground text-xs">
-                  {events.length > 0 ? t("firesOn", { events: events.map(eventLabel).join(", ") }) : t("noTriggers")}
-                </p>
+                {(() => {
+                  const cat = plugin?.catalog;
+                  const canTrigger = cat?.verbs?.includes("trigger");
+                  const triggerKinds = cat?.trigger?.config?.find((f) => f.type === "multiselect")?.options ?? [];
+                  const catalogActions = cat?.actions ?? [];
+                  if (canTrigger || catalogActions.length > 0) {
+                    return (
+                      <div className="flex flex-col gap-1.5">
+                        {canTrigger && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="mr-0.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+                              {t("capabilities.triggers")}
+                            </span>
+                            {(triggerKinds.length > 0 ? triggerKinds : [cat?.trigger?.summary ?? ""]).map((k) => (
+                              <Badge key={k} variant="outline" className="gap-1 font-normal">
+                                <ZapIcon className="size-3 text-muted-foreground" />
+                                {k}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {catalogActions.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="mr-0.5 text-[11px] text-muted-foreground uppercase tracking-wide">
+                              {t("capabilities.actions")}
+                            </span>
+                            {catalogActions.map((a) => (
+                              <Badge key={a.id} variant="outline" className="gap-1 font-normal">
+                                <PlayIcon className="size-3 text-muted-foreground" />
+                                {a.label}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-muted-foreground text-xs">
+                      {events.length > 0
+                        ? t("firesOn", { events: events.map(eventLabel).join(", ") })
+                        : t("noTriggers")}
+                    </p>
+                  );
+                })()}
 
                 {/* Machine badges only matter across multiple machines; with a
                     single local server it's redundant. Always surface the
