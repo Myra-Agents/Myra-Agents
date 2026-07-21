@@ -2641,9 +2641,22 @@ function AddTriggerMenu({
 
   const q = query.trim().toLowerCase();
   const showScheduled = !q || t("categories.scheduled").toLowerCase().includes(q);
-  const visibleConnectors = triggerPlugins.filter(
-    (p) => !q || (p.catalog?.name ?? p.name).toLowerCase().includes(q),
-  );
+
+  // Flat list of pickable connector triggers — one per event kind (so search
+  // matches "Merge request", not just "GitLab"), or one bare entry for a
+  // connector that declares no event kinds. `opt` = the chosen event kind.
+  const eventOptsOf = (p: PluginInfo) =>
+    p.catalog?.trigger?.config?.find((f) => f.type === "multiselect")?.options ?? [];
+  const connectorEntries = triggerPlugins.flatMap((p) => {
+    const name = p.catalog?.name ?? p.name;
+    const opts = eventOptsOf(p);
+    return opts.length
+      ? opts.map((opt) => ({ plugin: p, opt: opt as string | undefined, label: `${name} · ${humanizeEvent(opt)}` }))
+      : [{ plugin: p, opt: undefined as string | undefined, label: name }];
+  });
+  const matchingEntries = connectorEntries.filter((e) => !q || e.label.toLowerCase().includes(q));
+  const pickEntry = (e: { plugin: PluginInfo; opt?: string }) =>
+    onPickEvent({ connector: e.plugin.name, rules: [{}], ...(e.opt ? { config: { events: [e.opt] } } : {}) });
 
   return (
     <DropdownMenu>
@@ -2700,46 +2713,62 @@ function AddTriggerMenu({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             ))}
-          {visibleConnectors.map((p) => {
-            const name = p.catalog?.name ?? p.name;
-            const eventOpts = p.catalog?.trigger?.config?.find((f) => f.type === "multiselect")?.options ?? [];
-            const pick = (events?: string[]) =>
-              onPickEvent({
-                connector: p.name,
-                rules: [{}],
-                ...(events && events.length ? { config: { events } } : {}),
-              });
-            // No declared event kinds → one entry for the whole connector.
-            if (eventOpts.length === 0) {
-              return (
-                <DropdownMenuItem key={p.name} className="gap-2 text-[13px]" onSelect={() => pick()}>
+          {/* While searching, flatten every connector's event kinds into direct
+              picks so a query like "mer" surfaces "GitLab · Merge request". With
+              no query, keep the compact connector → event-kind submenu. */}
+          {q
+            ? matchingEntries.map((e) => (
+                <DropdownMenuItem
+                  key={e.label}
+                  className="gap-2 text-[13px]"
+                  onSelect={() => pickEntry(e)}
+                >
                   <GitBranchIcon className="size-4 text-icon-secondary" />
-                  {name}
+                  {e.label}
                 </DropdownMenuItem>
-              );
-            }
-            // One entry per event kind (GitLab → merge request / issue / push),
-            // each adds a separate trigger; connector triggers can stack.
-            return (
-              <DropdownMenuSub key={p.name}>
-                <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-                  <GitBranchIcon className="size-4 text-icon-secondary" />
-                  {name}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  {eventOpts.map((opt) => (
-                    <DropdownMenuItem key={opt} className="text-[13px]" onSelect={() => pick([opt])}>
-                      {humanizeEvent(opt)}
+              ))
+            : triggerPlugins.map((p) => {
+                const name = p.catalog?.name ?? p.name;
+                const eventOpts = eventOptsOf(p);
+                // No declared event kinds → one entry for the whole connector.
+                if (eventOpts.length === 0) {
+                  return (
+                    <DropdownMenuItem
+                      key={p.name}
+                      className="gap-2 text-[13px]"
+                      onSelect={() => pickEntry({ plugin: p })}
+                    >
+                      <GitBranchIcon className="size-4 text-icon-secondary" />
+                      {name}
                     </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            );
-          })}
+                  );
+                }
+                // One entry per event kind (GitLab → merge request / issue /
+                // push); each adds a separate trigger, connectors can stack.
+                return (
+                  <DropdownMenuSub key={p.name}>
+                    <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                      <GitBranchIcon className="size-4 text-icon-secondary" />
+                      {name}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {eventOpts.map((opt) => (
+                        <DropdownMenuItem
+                          key={opt}
+                          className="text-[13px]"
+                          onSelect={() => pickEntry({ plugin: p, opt })}
+                        >
+                          {humanizeEvent(opt)}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                );
+              })}
           {triggerPlugins.length === 0 && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noConnectors")}</p>
           )}
-          {!showScheduled && triggerPlugins.length > 0 && visibleConnectors.length === 0 && (
+          {q && !showScheduled && triggerPlugins.length > 0 && matchingEntries.length === 0 && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noTriggers")}</p>
           )}
         </div>
