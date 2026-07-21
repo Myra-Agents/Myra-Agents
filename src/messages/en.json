@@ -1055,6 +1055,7 @@
         "signIn": "Sign in",
         "signedIn": "Signed in",
         "signInNoMachine": "Connect a machine first.",
+        "connectVia": "Connect via {methods}",
         "cancel": "Cancel",
         "back": "Back",
         "next": "Next",

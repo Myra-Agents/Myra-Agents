@@ -111,12 +111,12 @@ export function ConnectWizard({
   // Effective events/template: instance override falls back to the manifest's.
   const effectiveEvents = events.length > 0 ? events : (out?.events ?? []);
 
-  // Auth methods (catalog.auth) render as tabs; the selected one's fields sit in
-  // its tab, everything else above the tabs. Falls back to a flat field list for
-  // connectors that declare no auth methods.
+  // Auth methods (catalog.auth): the FIRST is the primary path (big Sign in up
+  // front); the rest hide under a "connect another way" link. Falls back to a
+  // flat field list for connectors that declare no auth methods.
   const authMethods = plugin?.catalog?.auth ?? [];
-  const [authMethodId, setAuthMethodId] = useState<string>("");
-  const activeAuth = authMethodId || authMethods[0]?.id || "";
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advancedTab, setAdvancedTab] = useState<string>("");
   const claimedFieldKeys = new Set(authMethods.flatMap((m) => m.fields ?? []));
   const nonHiddenFields = (plugin?.config ?? []).filter((f) => !f.hidden);
   const commonFields = nonHiddenFields.filter((f) => !claimedFieldKeys.has(f.key));
@@ -247,6 +247,55 @@ export function ConnectWizard({
   const canConfigure = pluginName.length > 0;
   const canDeploy = canConfigure && label.trim().length > 0 && selectedConns.size > 0;
 
+  // One config field row (shared by common fields + the auth methods' fields).
+  const renderField = (field: PluginConfigField) => (
+    <WizardField
+      key={field.key}
+      field={field}
+      value={config[field.key]}
+      secretDraft={secrets[field.key] ?? ""}
+      secretAlreadySet={editing?.secretKeys.includes(field.key) ?? false}
+      onValue={(v) => setConfig((c) => ({ ...c, [field.key]: v }))}
+      onSecret={(v) => setSecrets((s) => ({ ...s, [field.key]: v }))}
+    />
+  );
+
+  // The Sign in button + its live status. `big` = the prominent primary CTA.
+  const renderSignIn = (big: boolean) => (
+    <div className="space-y-1.5">
+      <Button
+        type="button"
+        variant={big ? "default" : "outline"}
+        size={big ? "lg" : "sm"}
+        className="w-full"
+        disabled={signInState.running}
+        onClick={() => void signIn()}
+      >
+        {signInState.running ? (
+          <Loader2Icon className={cn("animate-spin", big ? "size-4" : "size-3.5")} />
+        ) : (
+          <PlugZapIcon className={big ? "size-4" : "size-3.5"} />
+        )}
+        {plugin?.catalog?.setup?.label ?? t("signIn")}
+      </Button>
+      {signInState.ok === true && (
+        <p className="flex items-center gap-1 text-green-600 text-xs">
+          <CheckIcon className="size-3" />
+          {t("signedIn")}
+        </p>
+      )}
+      {signInState.running && signInState.line && (
+        <p className="truncate text-muted-foreground text-xs">{signInState.line}</p>
+      )}
+      {signInState.ok === false && signInState.line && (
+        <p className="truncate text-destructive text-xs">{signInState.line}</p>
+      )}
+    </div>
+  );
+
+  const fieldsOfMethod = (m: (typeof authMethods)[number]) =>
+    nonHiddenFields.filter((f) => (m.fields ?? []).includes(f.key));
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && reset()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
@@ -287,81 +336,56 @@ export function ConnectWizard({
               <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("labelPlaceholder")} />
             </div>
 
-            {commonFields.map((field) => (
-              <WizardField
-                key={field.key}
-                field={field}
-                value={config[field.key]}
-                secretDraft={secrets[field.key] ?? ""}
-                secretAlreadySet={editing?.secretKeys.includes(field.key) ?? false}
-                onValue={(v) => setConfig((c) => ({ ...c, [field.key]: v }))}
-                onSecret={(v) => setSecrets((s) => ({ ...s, [field.key]: v }))}
-              />
-            ))}
+            {commonFields.map(renderField)}
 
-            {authMethods.length > 0 && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">{t("authMethod")}</Label>
-                <Tabs value={activeAuth} onValueChange={setAuthMethodId}>
-                  <TabsList className="w-full">
-                    {authMethods.map((m) => (
-                      <TabsTrigger key={m.id} value={m.id} className="flex-1 text-xs">
-                        {m.label}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  {authMethods.map((m) => (
-                    <TabsContent key={m.id} value={m.id} className="space-y-3 pt-3">
-                      {m.summary && <p className="text-muted-foreground text-xs">{m.summary}</p>}
-                      {nonHiddenFields
-                        .filter((f) => (m.fields ?? []).includes(f.key))
-                        .map((field) => (
-                          <WizardField
-                            key={field.key}
-                            field={field}
-                            value={config[field.key]}
-                            secretDraft={secrets[field.key] ?? ""}
-                            secretAlreadySet={editing?.secretKeys.includes(field.key) ?? false}
-                            onValue={(v) => setConfig((c) => ({ ...c, [field.key]: v }))}
-                            onSecret={(v) => setSecrets((s) => ({ ...s, [field.key]: v }))}
-                          />
-                        ))}
-                      {m.kind === "oauth" && (
-                        <div className="space-y-1.5">
-                          <Button
+            {authMethods.length > 0 &&
+              (() => {
+                const primary = authMethods[0];
+                const advanced = authMethods.slice(1);
+                const advActive = advancedTab || advanced[0]?.id || "";
+                return (
+                  <div className="space-y-3">
+                    {/* Primary path — big and up front */}
+                    <div className="space-y-2">
+                      {primary.summary && <p className="text-muted-foreground text-xs">{primary.summary}</p>}
+                      {fieldsOfMethod(primary).map(renderField)}
+                      {primary.kind === "oauth" && renderSignIn(true)}
+                    </div>
+
+                    {/* The rest, tucked under a discreet link */}
+                    {advanced.length > 0 && (
+                      <div className="border-t pt-2">
+                        {!showAdvanced ? (
+                          <button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            disabled={signInState.running}
-                            onClick={() => void signIn()}
+                            onClick={() => setShowAdvanced(true)}
+                            className="text-muted-foreground text-xs underline underline-offset-2 transition-colors hover:text-foreground"
                           >
-                            {signInState.running ? (
-                              <Loader2Icon className="size-3.5 animate-spin" />
-                            ) : (
-                              <PlugZapIcon className="size-3.5" />
-                            )}
-                            {plugin.catalog?.setup?.label ?? t("signIn")}
-                          </Button>
-                          {signInState.ok === true && (
-                            <p className="flex items-center gap-1 text-green-600 text-xs">
-                              <CheckIcon className="size-3" />
-                              {t("signedIn")}
-                            </p>
-                          )}
-                          {signInState.running && signInState.line && (
-                            <p className="truncate text-muted-foreground text-xs">{signInState.line}</p>
-                          )}
-                          {signInState.ok === false && signInState.line && (
-                            <p className="truncate text-destructive text-xs">{signInState.line}</p>
-                          )}
-                        </div>
-                      )}
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </div>
-            )}
+                            {t("connectVia", { methods: advanced.map((m) => m.label).join(" / ") })}
+                          </button>
+                        ) : (
+                          <Tabs value={advActive} onValueChange={setAdvancedTab}>
+                            <TabsList className="w-full">
+                              {advanced.map((m) => (
+                                <TabsTrigger key={m.id} value={m.id} className="flex-1 text-xs">
+                                  {m.label}
+                                </TabsTrigger>
+                              ))}
+                            </TabsList>
+                            {advanced.map((m) => (
+                              <TabsContent key={m.id} value={m.id} className="space-y-3 pt-3">
+                                {m.summary && <p className="text-muted-foreground text-xs">{m.summary}</p>}
+                                {fieldsOfMethod(m).map(renderField)}
+                                {m.kind === "oauth" && renderSignIn(false)}
+                              </TabsContent>
+                            ))}
+                          </Tabs>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
             {out && (
               <>
