@@ -1458,6 +1458,7 @@
     },
     "searchTriggers": "Rechercher des déclencheurs...",
     "comingSoon": "Bientôt disponible",
+    "connectAccountFirst": "Connecte un compte dans Intégrations pour utiliser ce déclencheur",
     "noTriggers": "Aucun déclencheur correspondant",
     "categories": {
       "scheduled": "Planifié",

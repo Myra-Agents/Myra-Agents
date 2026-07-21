@@ -2193,6 +2193,18 @@ function TriggersCard({
   t: ReturnType<typeof useTranslations>;
 }) {
   const plugins = usePluginCatalog();
+  // Connectors with at least one connected account (an enabled instance) — a
+  // connector trigger is disabled until one exists.
+  const { settings } = useSettings();
+  const connectedConnectors = useMemo(
+    () =>
+      new Set(
+        Object.values(settings.pluginInstances ?? {})
+          .filter((i) => i.enabled)
+          .map((i) => i.plugin),
+      ),
+    [settings],
+  );
   // Index of the event-trigger row whose config popover is auto-opened (the one
   // just added from the menu). Cleared when the user closes it.
   const [openIdx, setOpenIdx] = useState<number | null>(null);
@@ -2228,6 +2240,7 @@ function TriggersCard({
         onPickEvent={addEvent}
         hasSchedule={schedule !== null}
         plugins={plugins}
+        connectedConnectors={connectedConnectors}
         t={t}
       />
     </div>
@@ -2672,12 +2685,14 @@ function AddTriggerMenu({
   onPickEvent,
   hasSchedule,
   plugins,
+  connectedConnectors,
   t,
 }: {
   onPickSchedule: (s: ScheduleKind) => void;
   onPickEvent: (e: EventTrigger) => void;
   hasSchedule: boolean;
   plugins: PluginInfo[];
+  connectedConnectors: Set<string>;
   t: ReturnType<typeof useTranslations>;
 }) {
   const [query, setQuery] = useState("");
@@ -2709,9 +2724,12 @@ function AddTriggerMenu({
   const matchingEntries = connectorEntries.filter((e) => !q || e.label.toLowerCase().includes(q));
   const pickEntry = (e: { plugin: PluginInfo; opt?: string }) =>
     onPickEvent({ connector: e.plugin.name, rules: [{}], ...(e.opt ? { config: { events: [e.opt] } } : {}) });
+  // A connector trigger needs a connected account; until then it's disabled.
+  const isConnected = (p: PluginInfo) => connectedConnectors.has(p.name);
 
   return (
-    <DropdownMenu>
+    // Reset the search box each time the menu closes, so it reopens clean.
+    <DropdownMenu onOpenChange={(o) => !o && setQuery("")}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -2769,19 +2787,49 @@ function AddTriggerMenu({
               picks so a query like "mer" surfaces "GitLab · Merge request". With
               no query, keep the compact connector → event-kind submenu. */}
           {q
-            ? matchingEntries.map((e) => (
-                <DropdownMenuItem
-                  key={e.label}
-                  className="gap-2 text-[13px]"
-                  onSelect={() => pickEntry(e)}
-                >
-                  <GitBranchIcon className="size-4 text-icon-secondary" />
-                  {e.label}
-                </DropdownMenuItem>
-              ))
+            ? matchingEntries.map((e) =>
+                isConnected(e.plugin) ? (
+                  <DropdownMenuItem key={e.label} className="gap-2 text-[13px]" onSelect={() => pickEntry(e)}>
+                    <GitBranchIcon className="size-4 text-icon-secondary" />
+                    {e.label}
+                  </DropdownMenuItem>
+                ) : (
+                  <Tooltip key={e.label}>
+                    <TooltipTrigger asChild>
+                      <div
+                        aria-disabled
+                        className="flex cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-text-tertiary opacity-60"
+                      >
+                        <GitBranchIcon className="size-4 text-icon-tertiary" />
+                        {e.label}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{t("connectAccountFirst")}</TooltipContent>
+                  </Tooltip>
+                ),
+              )
             : triggerPlugins.map((p) => {
                 const name = p.catalog?.name ?? p.name;
                 const eventOpts = eventOptsOf(p);
+                // No connected account → the whole connector is disabled with a
+                // tooltip pointing at Integrations.
+                if (!isConnected(p)) {
+                  return (
+                    <Tooltip key={p.name}>
+                      <TooltipTrigger asChild>
+                        <div
+                          aria-disabled
+                          className="flex cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-text-tertiary opacity-60"
+                        >
+                          <GitBranchIcon className="size-4 text-icon-tertiary" />
+                          {name}
+                          <ChevronRightIcon className="ml-auto size-4 text-icon-tertiary" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{t("connectAccountFirst")}</TooltipContent>
+                    </Tooltip>
+                  );
+                }
                 // No declared event kinds → one entry for the whole connector.
                 if (eventOpts.length === 0) {
                   return (

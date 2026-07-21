@@ -1458,6 +1458,7 @@
     },
     "searchTriggers": "Search Triggers...",
     "comingSoon": "Coming soon",
+    "connectAccountFirst": "Connect an account in Integrations to use this trigger",
     "noTriggers": "No matching triggers",
     "categories": {
       "scheduled": "Scheduled",
