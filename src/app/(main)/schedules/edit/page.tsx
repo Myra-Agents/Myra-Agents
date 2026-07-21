@@ -2287,10 +2287,18 @@ function EventTriggerRow({
 }) {
   const rule = value.rules[0] ?? {};
   const parts = [rule.from, rule.subjectContains, rule.bodyContains, rule.regex].filter(Boolean);
-  const summary =
+  const rulesSummary =
     parts.length > 0 ? t("eventTrigger.matches", { summary: parts.join(" · ") }) : t("eventTrigger.anyEvent");
   const name = plugin?.catalog?.name ?? value.connector;
   const setRule = (patch: Partial<ConnectorRule>) => onChange({ ...value, rules: [{ ...rule, ...patch }] });
+
+  // Connector-specific trigger settings (e.g. GitLab project/events), declared
+  // by the plugin's catalog.trigger.config and stored on eventTrigger.config.
+  const triggerConfig = plugin?.catalog?.trigger?.config ?? [];
+  const cfg = value.config ?? {};
+  const setCfg = (key: string, v: unknown) => onChange({ ...value, config: { ...cfg, [key]: v } });
+  const project = typeof cfg.project === "string" ? cfg.project : "";
+  const summary = project ? `${project} · ${rulesSummary}` : rulesSummary;
 
   return (
     <div className="group relative flex items-center">
@@ -2307,7 +2315,50 @@ function EventTriggerRow({
             </div>
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="flex w-80 flex-col gap-3">
+        <PopoverContent align="start" className="flex max-h-[70vh] w-80 flex-col gap-3 overflow-y-auto">
+          {triggerConfig.map((field) => (
+            <div key={field.key} className="flex flex-col gap-1">
+              <span className="text-[12px] text-text-secondary">
+                {field.label}
+                {field.required && <span className="text-destructive"> *</span>}
+              </span>
+              {field.type === "multiselect" ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {(field.options ?? []).map((opt) => {
+                    const current = Array.isArray(cfg[field.key]) ? (cfg[field.key] as string[]) : [];
+                    const on = current.includes(opt);
+                    return (
+                      <button
+                        type="button"
+                        key={opt}
+                        aria-pressed={on}
+                        onClick={() =>
+                          setCfg(field.key, on ? current.filter((x) => x !== opt) : [...current, opt])
+                        }
+                        className={cn(
+                          "rounded-full border px-2 py-0.5 text-[12px] transition-colors",
+                          on
+                            ? "border-primary/50 bg-primary/10 text-text-primary"
+                            : "border-border text-text-tertiary hover:text-text-primary",
+                        )}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Input
+                  value={typeof cfg[field.key] === "string" ? (cfg[field.key] as string) : ""}
+                  placeholder={field.placeholder}
+                  onChange={(e) => setCfg(field.key, e.target.value || undefined)}
+                  className="h-8 text-[13px]"
+                />
+              )}
+              {field.description && <span className="text-[11px] text-text-tertiary">{field.description}</span>}
+            </div>
+          ))}
+          {triggerConfig.length > 0 && <div className="border-border border-t" />}
           <div className="flex flex-col gap-1">
             <span className="text-[12px] text-text-secondary">{t("eventTrigger.from")}</span>
             <Input
