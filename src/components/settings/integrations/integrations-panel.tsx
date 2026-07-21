@@ -264,19 +264,24 @@ export function IntegrationsPanel() {
                   {events.length > 0 ? t("firesOn", { events: events.map(eventLabel).join(", ") }) : t("noTriggers")}
                 </p>
 
-                <div className="flex flex-wrap gap-1">
-                  {machines.length === 0 ? (
-                    <Badge variant="outline" className="text-amber-600">
-                      {t("noMachines")}
-                    </Badge>
-                  ) : (
-                    machines.map((connId) => (
-                      <Badge key={connId} variant="secondary">
-                        {connById.get(connId)?.label ?? connId}
+                {/* Machine badges only matter across multiple machines; with a
+                    single local server it's redundant. Always surface the
+                    "not deployed anywhere" warning, though. */}
+                {(connections.length > 1 || machines.length === 0) && (
+                  <div className="flex flex-wrap gap-1">
+                    {machines.length === 0 ? (
+                      <Badge variant="outline" className="text-amber-600">
+                        {t("noMachines")}
                       </Badge>
-                    ))
-                  )}
-                </div>
+                    ) : (
+                      machines.map((connId) => (
+                        <Badge key={connId} variant="secondary">
+                          {connById.get(connId)?.label ?? connId}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                )}
 
                 {plugin?.catalog?.setup && deployed && (
                   <ConnectRow
