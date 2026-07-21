@@ -1490,6 +1490,7 @@
       "anyEvent": "Any event",
       "matches": "Matches: {summary}",
       "from": "From",
+      "fromAny": "Anyone",
       "subjectContains": "Subject / title contains",
       "bodyContains": "Body contains",
       "regex": "Regex",

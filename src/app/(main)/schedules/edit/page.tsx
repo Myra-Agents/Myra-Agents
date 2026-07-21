@@ -52,6 +52,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { MyraLoader } from "@/components/ui/myra-loader";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -2300,17 +2301,19 @@ function usePluginCatalog(): PluginInfo[] {
 
 /** One event-trigger row — click to edit its rule; trash icon on hover removes it. */
 /**
- * A searchable dropdown for a `dynamic` select config field (manifest
- * `dynamic: true` + `optionsExec`). Fetches the option list lazily on first open
- * via the `connector_options` rpc (proxied to the connector's optionsExec, e.g.
- * GitLab's project list). Always allows a free-typed value — so a project the
- * API didn't return (or an unconnected connector) is still enterable.
+ * A searchable, lazy-loading dropdown for a `dynamic` select fed by the
+ * connector's `optionsExec` (via the `connector_options` rpc). Search runs
+ * server-side; results paginate (a page loads on first open, the next appends
+ * when you scroll to the bottom). `context` carries sibling field values the
+ * option list depends on (e.g. an author list scoped to the selected project) —
+ * when it changes, the list resets. Always allows a free-typed value.
  */
 function DynamicSelect({
   connector,
   field,
   value,
   placeholder,
+  context,
   onChange,
   t,
 }: {
@@ -2318,49 +2321,75 @@ function DynamicSelect({
   field: string;
   value: string;
   placeholder?: string;
+  context?: Record<string, unknown>;
   onChange: (v: string | undefined) => void;
   t: ReturnType<typeof useTranslations>;
 }) {
   const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState<{ value: string; label: string }[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false); // first page (replaces the list)
+  const [loadingMore, setLoadingMore] = useState(false); // appending a page
   const [error, setError] = useState(false);
   const [query, setQuery] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    try {
-      const id = connectionManager.primaryId();
-      const res = await connectionManager.invokeOne<{ options: { value: string; label: string }[] }>(
-        id,
-        "connector_options",
-        { connector, field },
-      );
-      setOptions(res?.options ?? []);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [connector, field]);
+  const ctxKey = JSON.stringify(context ?? {});
 
-  const onOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (next && options === null && !loading) void load();
+  const fetchPage = useCallback(
+    async (pageNum: number, search: string, replace: boolean) => {
+      if (replace) setLoading(true);
+      else setLoadingMore(true);
+      setError(false);
+      try {
+        const id = connectionManager.primaryId();
+        const res = await connectionManager.invokeOne<{
+          options: { value: string; label: string }[];
+          hasMore?: boolean;
+        }>(id, "connector_options", {
+          connector,
+          field,
+          search: search || undefined,
+          page: pageNum,
+          context: context ?? {},
+        });
+        const opts = res?.options ?? [];
+        setOptions((prev) => (replace ? opts : [...prev, ...opts]));
+        setHasMore(!!res?.hasMore);
+        setPage(pageNum);
+      } catch {
+        setError(true);
+      } finally {
+        if (replace) setLoading(false);
+        else setLoadingMore(false);
+      }
+      // biome-ignore lint/correctness/useExhaustiveDependencies: ctxKey stands in for context.
+    },
+    [connector, field, ctxKey],
+  );
+
+  // Fetch page 1 whenever the dropdown is open and the query (debounced) or the
+  // context changes. Reopening always refetches fresh.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ctxKey drives the refetch.
+  useEffect(() => {
+    if (!open) return;
+    const h = setTimeout(() => void fetchPage(1, query.trim(), true), query ? 300 : 0);
+    return () => clearTimeout(h);
+  }, [open, query, ctxKey, fetchPage]);
+
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (hasMore && !loading && !loadingMore && el.scrollHeight - el.scrollTop - el.clientHeight < 48) {
+      void fetchPage(page + 1, query.trim(), false);
+    }
   };
 
-  const q = query.trim().toLowerCase();
-  const all = options ?? [];
-  const filtered = q
-    ? all.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q))
-    : all;
-  const selectedLabel = all.find((o) => o.value === value)?.label ?? value;
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
   const typed = query.trim();
-  const canUseTyped = typed.length > 0 && !all.some((o) => o.value === typed);
+  const canUseTyped = typed.length > 0 && !options.some((o) => o.value === typed);
 
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -2382,17 +2411,17 @@ function DynamicSelect({
             className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
         </div>
-        <div className="max-h-56 overflow-y-auto p-1">
+        <div className="max-h-56 overflow-y-auto p-1" onScroll={onScroll}>
           {loading && (
-            <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-text-tertiary">
-              <RefreshCwIcon className="size-3.5 animate-spin" />
+            <div className="flex items-center justify-center gap-2 px-2 py-3 text-[13px] text-text-tertiary">
+              <MyraLoader size={16} className="text-primary" />
               {t("dynamicSelect.loading")}
             </div>
           )}
           {error && !loading && (
             <button
               type="button"
-              onClick={() => void load()}
+              onClick={() => void fetchPage(1, query.trim(), true)}
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-destructive hover:bg-muted/40"
             >
               <RefreshCwIcon className="size-3.5" />
@@ -2401,7 +2430,7 @@ function DynamicSelect({
           )}
           {!loading &&
             !error &&
-            filtered.map((o) => (
+            options.map((o) => (
               <button
                 type="button"
                 key={o.value}
@@ -2416,7 +2445,12 @@ function DynamicSelect({
                 <span className="truncate">{o.label}</span>
               </button>
             ))}
-          {!loading && !error && filtered.length === 0 && !canUseTyped && (
+          {loadingMore && (
+            <div className="flex items-center justify-center py-2">
+              <MyraLoader size={14} className="text-primary" />
+            </div>
+          )}
+          {!loading && !error && options.length === 0 && !canUseTyped && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("dynamicSelect.empty")}</p>
           )}
           {canUseTyped && (
@@ -2471,6 +2505,12 @@ function EventTriggerRow({
   const cfg = value.config ?? {};
   const setCfg = (key: string, v: unknown) => onChange({ ...value, config: { ...cfg, [key]: v } });
   const project = typeof cfg.project === "string" ? cfg.project : "";
+  // A connector can back a generic rule field with a dynamic dropdown (e.g.
+  // GitLab's `from` → an author picker scoped to the selected project). The
+  // dropdown's context is the declared `dependsOn` config values.
+  const fromOpt = plugin?.catalog?.trigger?.ruleOptions?.from;
+  const ruleContext = (deps?: string[]) =>
+    Object.fromEntries((deps ?? []).map((k) => [k, cfg[k]]));
   // One event kind per trigger — surface it in the row so stacked triggers are
   // distinguishable (GitLab · Merge request vs GitLab · Issue).
   const eventKind =
@@ -2548,11 +2588,23 @@ function EventTriggerRow({
           {triggerConfig.length > 0 && <div className="border-border border-t" />}
           <div className="flex flex-col gap-1">
             <span className="text-[12px] text-text-secondary">{t("eventTrigger.from")}</span>
-            <Input
-              value={rule.from ?? ""}
-              onChange={(e) => setRule({ from: e.target.value || undefined })}
-              className="h-8 text-[13px]"
-            />
+            {fromOpt ? (
+              <DynamicSelect
+                connector={value.connector}
+                field={fromOpt.optionsField}
+                value={rule.from ?? ""}
+                placeholder={t("eventTrigger.fromAny")}
+                context={ruleContext(fromOpt.dependsOn)}
+                onChange={(v) => setRule({ from: v || undefined })}
+                t={t}
+              />
+            ) : (
+              <Input
+                value={rule.from ?? ""}
+                onChange={(e) => setRule({ from: e.target.value || undefined })}
+                className="h-8 text-[13px]"
+              />
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[12px] text-text-secondary">{t("eventTrigger.subjectContains")}</span>
