@@ -1003,8 +1003,8 @@
       },
       "inboundUrl": "URL entrante — à coller chez l'émetteur (ex. webhook GitHub).",
       "webhookWarning": {
-        "title": "Les webhooks tournent dans le serveur local",
-        "body": "Ils ne se déclenchent que pendant l'exécution de Myra et s'arrêtent à la fermeture de l'app ou à l'extinction. Pour une diffusion 24/7, installez le service en arrière-plan ou utilisez une instance distante."
+        "title": "Les webhooks tournent sur ta machine",
+        "body": "Ils ne se déclenchent que tant que le serveur Myra tourne et s'arrêtent quand tu quittes l'app. Installe le service en arrière-plan pour continuer à recevoir 24/7, et expose-le via un tunnel pour que les services externes puissent l'atteindre."
       },
       "secret": {
         "save": "Enregistrer",
@@ -1023,11 +1023,17 @@
       "firesOn": "Se déclenche sur : {events}",
       "noTriggers": "Aucun déclencheur",
       "noMachines": "Aucune machine",
+      "connecting": "Connexion…",
+      "connected": "Connecté",
+      "connectedAs": "Connecté en tant que {account}",
+      "disconnect": "Déconnecter",
+      "sameAccount": "Une autre intégration est connectée à ce même compte.",
+      "capabilities": { "triggers": "Déclencheurs", "actions": "Actions" },
       "deleteConfirm": "Supprimer l'intégration « {label} » de toutes les machines ?",
       "deletePartial": "Certaines machines n'ont pas pu être mises à jour — réessayez.",
       "webhookWarning": {
-        "title": "Les webhooks tournent dans le serveur local",
-        "body": "Ils ne se déclenchent que pendant l'exécution de Myra et s'arrêtent à la fermeture de l'app ou à l'extinction. Pour une diffusion 24/7, installez le service en arrière-plan ou utilisez une instance distante."
+        "title": "Les webhooks tournent sur ta machine",
+        "body": "Ils ne se déclenchent que tant que le serveur Myra tourne et s'arrêtent quand tu quittes l'app. Installe le service en arrière-plan pour continuer à recevoir 24/7, et expose-le via un tunnel pour que les services externes puissent l'atteindre."
       },
       "wizard": {
         "titleNew": "Nouvelle intégration",
@@ -1040,6 +1046,7 @@
         "noPlugins": "Aucun plugin webhook installé. Déposez-en un dans ~/.myra-agents/plugins.",
         "label": "Libellé",
         "labelPlaceholder": "ex. #eng-alerts",
+        "labelTaken": "Une autre intégration utilise déjà ce nom.",
         "events": "Déclencheurs",
         "eventsHint": "Statuts de tâche qui déclenchent le webhook sortant de cette intégration.",
         "template": "Modèle de message",
@@ -1049,6 +1056,11 @@
         "inboundUrl": "URL entrante (par machine) — à coller chez l'émetteur",
         "secretNote": "Les secrets sont poussés dès maintenant dans le trousseau de chaque machine sélectionnée. Les trousseaux ne peuvent pas être copiés entre machines : une machine ajoutée plus tard redemandera le secret.",
         "secretSet": "Défini",
+        "authMethod": "Authentification",
+        "signIn": "Se connecter",
+        "signedIn": "Connecté",
+        "signInNoMachine": "Connecte d'abord une machine.",
+        "connectVia": "Se connecter via {methods}",
         "cancel": "Annuler",
         "back": "Retour",
         "next": "Suivant",
@@ -1440,8 +1452,17 @@
       "folder": "un dossier"
     },
     "addTrigger": "Ajouter un déclencheur",
+    "dynamicSelect": {
+      "placeholder": "Sélectionner…",
+      "search": "Rechercher…",
+      "loading": "Chargement…",
+      "error": "Échec du chargement — réessayer",
+      "empty": "Aucun résultat",
+      "use": "Utiliser « {value} »"
+    },
     "searchTriggers": "Rechercher des déclencheurs...",
     "comingSoon": "Bientôt disponible",
+    "connectAccountFirst": "Connecte un compte dans Intégrations pour utiliser ce déclencheur",
     "noTriggers": "Aucun déclencheur correspondant",
     "categories": {
       "scheduled": "Planifié",
@@ -1469,6 +1490,29 @@
     },
     "removeTrigger": "Supprimer le déclencheur",
     "oneScheduledOnly": "Un seul déclencheur planifié est autorisé. Supprime l’existant pour en ajouter un autre.",
+    "noConnectors": "Aucun plugin déclencheur connecté. Connectes-en un depuis Intégrations.",
+    "eventTrigger": {
+      "anyEvent": "Tout événement",
+      "matches": "Correspond à : {summary}",
+      "from": "De",
+      "fromAny": "N'importe qui",
+      "subjectContains": "Sujet / titre contient",
+      "bodyContains": "Corps contient",
+      "regex": "Regex",
+      "regexField": "Champ regex",
+      "prompt": "Prompt personnalisé",
+      "promptPlaceholder": "Laisse vide pour utiliser l'instruction du patrol",
+      "promptHint": "Templaté : '{{subject}}' '{{from}}' '{{body}}' '{{id}}'.",
+      "requireReview": "Retenir pour revue avant exécution"
+    },
+    "actionsSection": {
+      "title": "Actions",
+      "description": "Exécutées une fois la carte de ce patrol terminée.",
+      "addAction": "Ajouter une action",
+      "searchActions": "Rechercher des actions...",
+      "noActions": "Aucun plugin action connecté.",
+      "remove": "Supprimer l'action"
+    },
     "noRepository": "Aucun dépôt",
     "recents": "Récents",
     "allRepositories": "Tous les dépôts",

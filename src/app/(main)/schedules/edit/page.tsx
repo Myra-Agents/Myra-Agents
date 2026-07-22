@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { isTauri, invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
-  ActivityIcon,
   CheckCircle2Icon,
   CheckIcon,
   ChevronDownIcon,
@@ -16,14 +15,12 @@ import {
   GitBranchIcon,
   HomeIcon,
   LightbulbIcon,
-  MessageSquareIcon,
   PlayIcon,
   PlusIcon,
   RefreshCwIcon,
   RotateCcwIcon,
   Trash2Icon,
   TriangleAlertIcon,
-  UsersIcon,
   XCircleIcon,
   XIcon,
 } from "lucide-react";
@@ -55,6 +52,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { MyraLoader } from "@/components/ui/myra-loader";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -68,6 +66,7 @@ import { loadTestResult } from "@/lib/agent-test-store";
 import { connIdOf, entityIdOf, parseGlobalId } from "@/lib/aggregate/global-id";
 import { resolveHomeFolder } from "@/lib/home-folder.client";
 import { normalizeTag, TAG_SWATCH_CLASSES, tagClassName, tagHashIndex } from "@/lib/kanban-tags";
+import { connectionManager } from "@/lib/connections/manager";
 import { getLocalStorageValue, setLocalStorageValue } from "@/lib/local-storage.client";
 import { getScheduleIdea } from "@/lib/schedule-ideas";
 import { TOUR_APPLY_EVENT } from "@/lib/tour-steps";
@@ -75,9 +74,18 @@ import { cn } from "@/lib/utils";
 import { useBreadcrumbOverride } from "@/stores/breadcrumb-store";
 import { useNavGuard } from "@/stores/nav-guard-store";
 import type { KanbanCard } from "@/types/kanban";
-import type { CreateScheduleInput, ScheduledTask, ScheduleKindType, UpdateScheduleInput } from "@/types/schedule";
+import type {
+  Action as PatrolAction,
+  ConnectorRule,
+  CreateScheduleInput,
+  EventTrigger,
+  ScheduledTask,
+  ScheduleKind,
+  ScheduleKindType,
+  UpdateScheduleInput,
+} from "@/types/schedule";
 import { defaultScheduleKind, describeSchedule } from "@/types/schedule";
-import type { AgentPreset } from "@/types/settings";
+import type { AgentPreset, PluginCatalogAction, PluginInfo } from "@/types/settings";
 
 export default function ScheduleEditPage() {
   // useSearchParams() needs a Suspense boundary in the static export.
@@ -99,9 +107,14 @@ type Draft = {
   name: string;
   cardDescription: string;
   agentPrompt: string;
-  // Null while the user has removed the (single) schedule trigger — Save is then
-  // blocked until a trigger is re-added.
-  schedule: ScheduledTask["schedule"] | null;
+  // A patrol is either time-based (one `schedule`) OR event-driven (one or more
+  // `eventTriggers`), never both — picking one kind from Add Trigger clears the
+  // other. `schedule` is null when event-driven; Save fills a dummy for the
+  // still-required API field (the server ignores it when eventTriggers is set).
+  schedule: ScheduleKind | null;
+  eventTriggers: EventTrigger[];
+  // Post-run side effects dispatched to connectors when this patrol's card finishes.
+  actions: NonNullable<ScheduledTask["actions"]>;
   // Repository/folder the run clones into. Empty string = "No Repository".
   workingDir: string;
   tags: string[];
@@ -118,7 +131,10 @@ function draftOf(task: ScheduledTask): Draft {
     name: task.name,
     cardDescription: task.cardDescription,
     agentPrompt: task.agentPrompt,
-    schedule: task.schedule,
+    // Schedule and event triggers are independent — keep whatever the task has.
+    schedule: task.schedule ?? null,
+    eventTriggers: task.eventTriggers ?? [],
+    actions: task.actions ?? [],
     workingDir: task.workingDir ?? "",
     tags: task.tags ?? [],
     agentPresetId: task.agentPresetId,
@@ -448,7 +464,7 @@ function ScheduleEditScreen() {
   const validateRequired = useCallback(
     (d: Draft) => {
       const missing: string[] = [];
-      if (!d.schedule) missing.push(t("fields.trigger"));
+      if (!d.schedule && d.eventTriggers.length === 0) missing.push(t("fields.trigger"));
       if (!d.agentPrompt.trim()) {
         missing.push(t("fields.instruction"));
         flagMissingPrompt();
@@ -469,7 +485,7 @@ function ScheduleEditScreen() {
 
   const save = useCallback(async () => {
     if (!task || !draft || !dirty) return;
-    if (!validateRequired(draft) || !draft.schedule) return;
+    if (!validateRequired(draft)) return;
     setSaving(true);
     try {
       const input: UpdateScheduleInput = {
@@ -480,7 +496,9 @@ function ScheduleEditScreen() {
         cardDescription: draft.cardDescription,
         agentPrompt: draft.agentPrompt,
         tags: draft.tags,
-        schedule: draft.schedule,
+        schedule: draft.schedule ?? undefined,
+        eventTriggers: draft.eventTriggers.length ? draft.eventTriggers : undefined,
+        actions: draft.actions.length ? draft.actions : undefined,
         enabled: draft.enabled,
         agentPresetId: draft.agentPresetId,
         agentFlags: draft.agentFlags.length ? draft.agentFlags : undefined,
@@ -508,7 +526,7 @@ function ScheduleEditScreen() {
   const add = useCallback(
     async (enabled: boolean) => {
       if (!task || !draft) return;
-      if (!validateRequired(draft) || !draft.schedule) return;
+      if (!validateRequired(draft)) return;
       setSaving(true);
       try {
         const input: CreateScheduleInput = {
@@ -518,7 +536,9 @@ function ScheduleEditScreen() {
           cardDescription: draft.cardDescription,
           agentPrompt: draft.agentPrompt,
           tags: draft.tags,
-          schedule: draft.schedule,
+          schedule: draft.schedule ?? undefined,
+          eventTriggers: draft.eventTriggers.length ? draft.eventTriggers : undefined,
+          actions: draft.actions.length ? draft.actions : undefined,
           enabled,
           agentPresetId: draft.agentPresetId,
           agentFlags: draft.agentFlags.length ? draft.agentFlags : undefined,
@@ -1367,8 +1387,31 @@ function SettingsTab({
         <span className="px-2 text-[12px] text-text-secondary">{t("triggers")}</span>
         <TriggersCard
           schedule={draft.schedule}
-          onChange={(schedule) => setDraft((d) => (d ? { ...d, schedule } : d))}
-          onRemove={() => setDraft((d) => (d ? { ...d, schedule: null } : d))}
+          eventTriggers={draft.eventTriggers}
+          onChangeSchedule={(schedule) => setDraft((d) => (d ? { ...d, schedule } : d))}
+          onRemoveSchedule={() => setDraft((d) => (d ? { ...d, schedule: null } : d))}
+          onAddEventTrigger={(et) =>
+            setDraft((d) => (d ? { ...d, eventTriggers: [...d.eventTriggers, et] } : d))
+          }
+          onChangeEventTrigger={(i, et) =>
+            setDraft((d) =>
+              d ? { ...d, eventTriggers: d.eventTriggers.map((x, idx) => (idx === i ? et : x)) } : d,
+            )
+          }
+          onRemoveEventTrigger={(i) =>
+            setDraft((d) => (d ? { ...d, eventTriggers: d.eventTriggers.filter((_, idx) => idx !== i) } : d))
+          }
+          t={t}
+        />
+      </section>
+
+      {/* Actions — post-run side effects dispatched to a connector once this
+          patrol's card finishes. */}
+      <section className="flex flex-col gap-2.5">
+        <span className="px-2 text-[12px] text-text-secondary">{t("actionsSection.title")}</span>
+        <ActionsCard
+          actions={draft.actions}
+          onChange={(actions) => setDraft((d) => (d ? { ...d, actions } : d))}
           t={t}
         />
       </section>
@@ -2122,7 +2165,7 @@ function MultiBranchSelect({
 // clicking a row edits it, "Add Trigger" picks/replaces the schedule kind.
 
 /** Friendlier wording than describeSchedule for the common cadences. */
-function triggerLabel(kind: ScheduledTask["schedule"]): string {
+function triggerLabel(kind: ScheduleKind): string {
   if (kind.type === "interval" && kind.minutes % 60 === 0) {
     const h = kind.minutes / 60;
     return h === 1 ? "Every hour" : `Every ${h} hours`;
@@ -2132,24 +2175,74 @@ function triggerLabel(kind: ScheduledTask["schedule"]): string {
 
 function TriggersCard({
   schedule,
-  onChange,
-  onRemove,
+  eventTriggers,
+  onChangeSchedule,
+  onRemoveSchedule,
+  onAddEventTrigger,
+  onChangeEventTrigger,
+  onRemoveEventTrigger,
   t,
 }: {
-  schedule: ScheduledTask["schedule"] | null;
-  onChange: (s: ScheduledTask["schedule"]) => void;
-  onRemove: () => void;
+  schedule: ScheduleKind | null;
+  eventTriggers: EventTrigger[];
+  onChangeSchedule: (s: ScheduleKind) => void;
+  onRemoveSchedule: () => void;
+  onAddEventTrigger: (e: EventTrigger) => void;
+  onChangeEventTrigger: (index: number, e: EventTrigger) => void;
+  onRemoveEventTrigger: (index: number) => void;
   t: ReturnType<typeof useTranslations>;
 }) {
-  const triggers = schedule ? [schedule] : [];
+  const plugins = usePluginCatalog();
+  // Connectors with at least one connected account (an enabled instance) — a
+  // connector trigger is disabled until one exists.
+  const { settings } = useSettings();
+  const connectedConnectors = useMemo(
+    () =>
+      new Set(
+        Object.values(settings.pluginInstances ?? {})
+          .filter((i) => i.enabled)
+          .map((i) => i.plugin),
+      ),
+    [settings],
+  );
+  // Index of the event-trigger row whose config popover is auto-opened (the one
+  // just added from the menu). Cleared when the user closes it.
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const addEvent = (et: EventTrigger) => {
+    setOpenIdx(eventTriggers.length); // the index the new one will land at
+    onAddEventTrigger(et);
+  };
   return (
     <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
-      {triggers.map((trig, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: single positional schedule trigger.
-        <TriggerRow key={i} value={trig} onChange={onChange} onRemove={onRemove} t={t} />
+      {/* Schedule and connector event triggers are independent — a patrol can
+          run on a schedule AND fire on events. The schedule row (if any) and
+          every event-trigger row are shown side by side. */}
+      {schedule && <TriggerRow value={schedule} onChange={onChangeSchedule} onRemove={onRemoveSchedule} t={t} />}
+      {eventTriggers.map((et, i) => (
+        <EventTriggerRow
+          // biome-ignore lint/suspicious/noArrayIndexKey: positional trigger list.
+          key={i}
+          value={et}
+          plugin={plugins.find((p) => p.name === et.connector)}
+          open={openIdx === i}
+          onOpenChange={(o) => setOpenIdx(o ? i : null)}
+          onChange={(next) => onChangeEventTrigger(i, next)}
+          onRemove={() => {
+            setOpenIdx(null);
+            onRemoveEventTrigger(i);
+          }}
+          t={t}
+        />
       ))}
-      {/* Only one scheduled trigger is supported → tell the menu to disable it. */}
-      <AddTriggerMenu onPick={onChange} hasScheduled={schedule !== null} t={t} />
+      {/* One schedule max; connector event triggers can stack. */}
+      <AddTriggerMenu
+        onPickSchedule={onChangeSchedule}
+        onPickEvent={addEvent}
+        hasSchedule={schedule !== null}
+        plugins={plugins}
+        connectedConnectors={connectedConnectors}
+        t={t}
+      />
     </div>
   );
 }
@@ -2161,8 +2254,8 @@ function TriggerRow({
   onRemove,
   t,
 }: {
-  value: ScheduledTask["schedule"];
-  onChange: (s: ScheduledTask["schedule"]) => void;
+  value: ScheduleKind;
+  onChange: (s: ScheduleKind) => void;
   onRemove: () => void;
   t: ReturnType<typeof useTranslations>;
 }) {
@@ -2194,41 +2287,449 @@ function TriggerRow({
   );
 }
 
-/** "+ Add Trigger" row → dropdown with a search box and trigger categories. */
-function AddTriggerMenu({
-  onPick,
-  hasScheduled,
+/**
+ * Installed plugins declaring `catalog` verbs — shared by the trigger and
+ * action pickers (and the trigger row's connector name lookup). Fetched once
+ * per mount; the editor is a short-lived page so no live-refresh subscription.
+ */
+function usePluginCatalog(): PluginInfo[] {
+  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const id = connectionManager.primaryId();
+    connectionManager
+      .invokeOne<PluginInfo[]>(id, "list_plugins")
+      .then((list) => {
+        if (!cancelled) setPlugins(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPlugins([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return plugins;
+}
+
+/** One event-trigger row — click to edit its rule; trash icon on hover removes it. */
+/**
+ * A searchable, lazy-loading dropdown for a `dynamic` select fed by the
+ * connector's `optionsExec` (via the `connector_options` rpc). Search runs
+ * server-side; results paginate (a page loads on first open, the next appends
+ * when you scroll to the bottom). `context` carries sibling field values the
+ * option list depends on (e.g. an author list scoped to the selected project) —
+ * when it changes, the list resets. Always allows a free-typed value.
+ */
+function DynamicSelect({
+  connector,
+  field,
+  value,
+  placeholder,
+  context,
+  onChange,
   t,
 }: {
-  onPick: (s: ScheduledTask["schedule"]) => void;
-  hasScheduled: boolean;
+  connector: string;
+  field: string;
+  value: string;
+  placeholder?: string;
+  context?: Record<string, unknown>;
+  onChange: (v: string | undefined) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<{ value: string; label: string }[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false); // first page (replaces the list)
+  const [loadingMore, setLoadingMore] = useState(false); // appending a page
+  const [error, setError] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const ctxKey = JSON.stringify(context ?? {});
+
+  const fetchPage = useCallback(
+    async (pageNum: number, search: string, replace: boolean) => {
+      if (replace) setLoading(true);
+      else setLoadingMore(true);
+      setError(false);
+      try {
+        const id = connectionManager.primaryId();
+        const res = await connectionManager.invokeOne<{
+          options: { value: string; label: string }[];
+          hasMore?: boolean;
+        }>(id, "connector_options", {
+          connector,
+          field,
+          search: search || undefined,
+          page: pageNum,
+          context: context ?? {},
+        });
+        const opts = res?.options ?? [];
+        setOptions((prev) => (replace ? opts : [...prev, ...opts]));
+        setHasMore(!!res?.hasMore);
+        setPage(pageNum);
+      } catch {
+        setError(true);
+      } finally {
+        if (replace) setLoading(false);
+        else setLoadingMore(false);
+      }
+      // biome-ignore lint/correctness/useExhaustiveDependencies: ctxKey stands in for context.
+    },
+    [connector, field, ctxKey],
+  );
+
+  // Fetch page 1 whenever the dropdown is open and the query (debounced) or the
+  // context changes. Reopening always refetches fresh.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ctxKey drives the refetch.
+  useEffect(() => {
+    if (!open) return;
+    const h = setTimeout(() => void fetchPage(1, query.trim(), true), query ? 300 : 0);
+    return () => clearTimeout(h);
+  }, [open, query, ctxKey, fetchPage]);
+
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (hasMore && !loading && !loadingMore && el.scrollHeight - el.scrollTop - el.clientHeight < 48) {
+      void fetchPage(page + 1, query.trim(), false);
+    }
+  };
+
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
+  const typed = query.trim();
+  const canUseTyped = typed.length > 0 && !options.some((o) => o.value === typed);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex h-8 items-center justify-between gap-2 rounded-md border border-border px-2.5 text-left text-[13px] transition-colors hover:bg-muted/20"
+        >
+          <span className={cn("truncate", !value && "text-text-tertiary")}>
+            {value ? selectedLabel : (placeholder ?? t("dynamicSelect.placeholder"))}
+          </span>
+          <ChevronDownIcon className="size-3.5 shrink-0 text-icon-tertiary" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("dynamicSelect.search")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="max-h-56 overflow-y-auto p-1" onScroll={onScroll}>
+          {loading && (
+            <div className="flex items-center justify-center gap-2 px-2 py-3 text-[13px] text-text-tertiary">
+              <MyraLoader size={16} className="text-primary" />
+              {t("dynamicSelect.loading")}
+            </div>
+          )}
+          {error && !loading && (
+            <button
+              type="button"
+              onClick={() => void fetchPage(1, query.trim(), true)}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-destructive hover:bg-muted/40"
+            >
+              <RefreshCwIcon className="size-3.5" />
+              {t("dynamicSelect.error")}
+            </button>
+          )}
+          {!loading &&
+            !error &&
+            options.map((o) => (
+              <button
+                type="button"
+                key={o.value}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                  setQuery("");
+                }}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] hover:bg-muted/40"
+              >
+                <CheckIcon className={cn("size-3.5 shrink-0", value === o.value ? "opacity-100" : "opacity-0")} />
+                <span className="truncate">{o.label}</span>
+              </button>
+            ))}
+          {loadingMore && (
+            <div className="flex items-center justify-center py-2">
+              <MyraLoader size={14} className="text-primary" />
+            </div>
+          )}
+          {!loading && !error && options.length === 0 && !canUseTyped && (
+            <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("dynamicSelect.empty")}</p>
+          )}
+          {canUseTyped && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange(typed);
+                setOpen(false);
+                setQuery("");
+              }}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-text-secondary hover:bg-muted/40"
+            >
+              <PlusIcon className="size-3.5 shrink-0" />
+              {t("dynamicSelect.use", { value: typed })}
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function EventTriggerRow({
+  value,
+  plugin,
+  open,
+  onOpenChange,
+  onChange,
+  onRemove,
+  t,
+}: {
+  value: EventTrigger;
+  plugin: PluginInfo | undefined;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onChange: (e: EventTrigger) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const rule = value.rules[0] ?? {};
+  const parts = [rule.from, rule.subjectContains, rule.bodyContains, rule.regex].filter(Boolean);
+  const rulesSummary =
+    parts.length > 0 ? t("eventTrigger.matches", { summary: parts.join(" · ") }) : t("eventTrigger.anyEvent");
+  const name = plugin?.catalog?.name ?? value.connector;
+  const setRule = (patch: Partial<ConnectorRule>) => onChange({ ...value, rules: [{ ...rule, ...patch }] });
+
+  // Connector-specific trigger settings (e.g. GitLab project), declared by the
+  // plugin's catalog.trigger.config and stored on eventTrigger.config. `hidden`
+  // fields (the event kind — fixed by the Add-Trigger menu) aren't shown as
+  // editable inputs.
+  const triggerConfig = (plugin?.catalog?.trigger?.config ?? []).filter((f) => !f.hidden);
+  const cfg = value.config ?? {};
+  const setCfg = (key: string, v: unknown) => onChange({ ...value, config: { ...cfg, [key]: v } });
+  const project = typeof cfg.project === "string" ? cfg.project : "";
+  // A connector can back a generic rule field with a dynamic dropdown (e.g.
+  // GitLab's `from` → an author picker scoped to the selected project). The
+  // dropdown's context is the declared `dependsOn` config values.
+  const fromOpt = plugin?.catalog?.trigger?.ruleOptions?.from;
+  const ruleContext = (deps?: string[]) =>
+    Object.fromEntries((deps ?? []).map((k) => [k, cfg[k]]));
+  // One event kind per trigger — surface it in the row so stacked triggers are
+  // distinguishable (GitLab · Merge request vs GitLab · Issue).
+  const eventKind =
+    Array.isArray(cfg.events) && typeof cfg.events[0] === "string" ? humanizeEvent(cfg.events[0]) : "";
+  const title = eventKind ? `${name} · ${eventKind}` : name;
+  const summary = project ? `${project} · ${rulesSummary}` : rulesSummary;
+
+  return (
+    <div className="group relative flex items-center">
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 py-3.5 pr-12 pl-4 text-left transition-colors hover:bg-muted/20"
+          >
+            <GitBranchIcon className="size-[18px] shrink-0 text-icon-secondary" />
+            <div className="flex flex-col">
+              <span className="text-[14px] text-text-primary">{title}</span>
+              <span className="text-[12px] text-text-tertiary">{summary}</span>
+            </div>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex max-h-[70vh] w-80 flex-col gap-3 overflow-y-auto">
+          {triggerConfig.map((field) => (
+            <div key={field.key} className="flex flex-col gap-1">
+              <span className="text-[12px] text-text-secondary">
+                {field.label}
+                {field.required && <span className="text-destructive"> *</span>}
+              </span>
+              {field.type === "multiselect" ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {(field.options ?? []).map((opt) => {
+                    const current = Array.isArray(cfg[field.key]) ? (cfg[field.key] as string[]) : [];
+                    const on = current.includes(opt);
+                    return (
+                      <button
+                        type="button"
+                        key={opt}
+                        aria-pressed={on}
+                        onClick={() =>
+                          setCfg(field.key, on ? current.filter((x) => x !== opt) : [...current, opt])
+                        }
+                        className={cn(
+                          "rounded-full border px-2 py-0.5 text-[12px] transition-colors",
+                          on
+                            ? "border-primary/50 bg-primary/10 text-text-primary"
+                            : "border-border text-text-tertiary hover:text-text-primary",
+                        )}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : field.type === "select" && field.dynamic ? (
+                <DynamicSelect
+                  connector={value.connector}
+                  field={field.key}
+                  value={typeof cfg[field.key] === "string" ? (cfg[field.key] as string) : ""}
+                  placeholder={field.placeholder}
+                  onChange={(v) => setCfg(field.key, v)}
+                  t={t}
+                />
+              ) : (
+                <Input
+                  value={typeof cfg[field.key] === "string" ? (cfg[field.key] as string) : ""}
+                  placeholder={field.placeholder}
+                  onChange={(e) => setCfg(field.key, e.target.value || undefined)}
+                  className="h-8 text-[13px]"
+                />
+              )}
+              {field.description && <span className="text-[11px] text-text-tertiary">{field.description}</span>}
+            </div>
+          ))}
+          {triggerConfig.length > 0 && <div className="border-border border-t" />}
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.from")}</span>
+            {fromOpt ? (
+              <DynamicSelect
+                connector={value.connector}
+                field={fromOpt.optionsField}
+                value={rule.from ?? ""}
+                placeholder={t("eventTrigger.fromAny")}
+                context={ruleContext(fromOpt.dependsOn)}
+                onChange={(v) => setRule({ from: v || undefined })}
+                t={t}
+              />
+            ) : (
+              <Input
+                value={rule.from ?? ""}
+                onChange={(e) => setRule({ from: e.target.value || undefined })}
+                className="h-8 text-[13px]"
+              />
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.subjectContains")}</span>
+            <Input
+              value={rule.subjectContains ?? ""}
+              onChange={(e) => setRule({ subjectContains: e.target.value || undefined })}
+              className="h-8 text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.bodyContains")}</span>
+            <Input
+              value={rule.bodyContains ?? ""}
+              onChange={(e) => setRule({ bodyContains: e.target.value || undefined })}
+              className="h-8 text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.regex")}</span>
+            <Input
+              value={rule.regex ?? ""}
+              onChange={(e) => setRule({ regex: e.target.value || undefined })}
+              className="h-8 font-mono text-[13px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] text-text-secondary">{t("eventTrigger.prompt")}</span>
+            <Textarea
+              value={rule.prompt ?? ""}
+              onChange={(e) => setRule({ prompt: e.target.value || undefined })}
+              placeholder={t("eventTrigger.promptPlaceholder")}
+              className="min-h-16 text-[13px]"
+            />
+            <span className="text-[11px] text-text-tertiary">{t("eventTrigger.promptHint")}</span>
+          </div>
+          <label className="flex items-center justify-between gap-2 text-[13px]">
+            {t("eventTrigger.requireReview")}
+            <Switch checked={rule.requireReview ?? false} onCheckedChange={(c) => setRule({ requireReview: c })} />
+          </label>
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={t("removeTrigger")}
+        onClick={onRemove}
+        className="absolute right-3 flex size-7 items-center justify-center rounded-md text-icon-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2Icon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+/** "merge_request" → "Merge request" for the per-event trigger menu. */
+function humanizeEvent(opt: string): string {
+  const s = opt.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** "+ Add Trigger" row → dropdown with a search box, the scheduled options,
+ * and every installed connector plugin whose `catalog.verbs` includes
+ * `"trigger"`. One schedule max; connector event triggers can stack. */
+function AddTriggerMenu({
+  onPickSchedule,
+  onPickEvent,
+  hasSchedule,
+  plugins,
+  connectedConnectors,
+  t,
+}: {
+  onPickSchedule: (s: ScheduleKind) => void;
+  onPickEvent: (e: EventTrigger) => void;
+  hasSchedule: boolean;
+  plugins: PluginInfo[];
+  connectedConnectors: Set<string>;
   t: ReturnType<typeof useTranslations>;
 }) {
   const [query, setQuery] = useState("");
 
-  const scheduled: { key: "hourly" | "daily" | "weekly" | "custom"; make: () => ScheduledTask["schedule"] }[] = [
+  const scheduled: { key: "hourly" | "daily" | "weekly" | "custom"; make: () => ScheduleKind }[] = [
     { key: "hourly", make: () => ({ type: "interval", start: "09:00", minutes: 60 }) },
     { key: "daily", make: () => defaultScheduleKind("daily") },
     { key: "weekly", make: () => defaultScheduleKind("weekly") },
     { key: "custom", make: () => defaultScheduleKind("cron") },
   ];
 
-  // Event-driven connectors aren't in the schedule model yet — surfaced for parity
-  // with the design, flagged as coming soon.
-  const connectors: { key: "github" | "slack" | "teams" | "sentry" | "linear"; icon: React.ReactNode }[] = [
-    { key: "github", icon: <GitBranchIcon className="size-4 text-icon-secondary" /> },
-    { key: "slack", icon: <MessageSquareIcon className="size-4 text-icon-secondary" /> },
-    { key: "teams", icon: <UsersIcon className="size-4 text-icon-secondary" /> },
-    { key: "sentry", icon: <TriangleAlertIcon className="size-4 text-icon-secondary" /> },
-    { key: "linear", icon: <ActivityIcon className="size-4 text-icon-secondary" /> },
-  ];
+  const triggerPlugins = useMemo(() => plugins.filter((p) => p.catalog?.verbs?.includes("trigger")), [plugins]);
 
   const q = query.trim().toLowerCase();
   const showScheduled = !q || t("categories.scheduled").toLowerCase().includes(q);
-  const visibleConnectors = connectors.filter((c) => !q || t(`categories.${c.key}`).toLowerCase().includes(q));
+
+  // Flat list of pickable connector triggers — one per event kind (so search
+  // matches "Merge request", not just "GitLab"), or one bare entry for a
+  // connector that declares no event kinds. `opt` = the chosen event kind.
+  const eventOptsOf = (p: PluginInfo) =>
+    p.catalog?.trigger?.config?.find((f) => f.type === "multiselect")?.options ?? [];
+  const connectorEntries = triggerPlugins.flatMap((p) => {
+    const name = p.catalog?.name ?? p.name;
+    const opts = eventOptsOf(p);
+    return opts.length
+      ? opts.map((opt) => ({ plugin: p, opt: opt as string | undefined, label: `${name} · ${humanizeEvent(opt)}` }))
+      : [{ plugin: p, opt: undefined as string | undefined, label: name }];
+  });
+  const matchingEntries = connectorEntries.filter((e) => !q || e.label.toLowerCase().includes(q));
+  const pickEntry = (e: { plugin: PluginInfo; opt?: string }) =>
+    onPickEvent({ connector: e.plugin.name, rules: [{}], ...(e.opt ? { config: { events: [e.opt] } } : {}) });
+  // A connector trigger needs a connected account; until then it's disabled.
+  const isConnected = (p: PluginInfo) => connectedConnectors.has(p.name);
 
   return (
-    <DropdownMenu>
+    // Reset the search box each time the menu closes, so it reopens clean.
+    <DropdownMenu onOpenChange={(o) => !o && setQuery("")}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -2251,8 +2752,8 @@ function AddTriggerMenu({
         </div>
         <div className="p-1">
           {showScheduled &&
-            (hasScheduled ? (
-              // A scheduled trigger already exists — only one is supported, so the
+            (hasSchedule ? (
+              // A schedule already exists — only one is supported, so the
               // category is disabled with a tooltip explaining why.
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2275,28 +2776,289 @@ function AddTriggerMenu({
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   {scheduled.map((s) => (
-                    <DropdownMenuItem key={s.key} className="text-[13px]" onSelect={() => onPick(s.make())}>
+                    <DropdownMenuItem key={s.key} className="text-[13px]" onSelect={() => onPickSchedule(s.make())}>
                       {t(`scheduledOptions.${s.key}`)}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             ))}
-          {visibleConnectors.map((c) => (
-            <DropdownMenuSub key={c.key}>
-              <DropdownMenuSubTrigger className="gap-2 text-[13px]">
-                {c.icon}
-                {t(`categories.${c.key}`)}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem disabled className="text-[13px]">
-                  {t("comingSoon")}
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ))}
-          {!showScheduled && visibleConnectors.length === 0 && (
+          {/* While searching, flatten every connector's event kinds into direct
+              picks so a query like "mer" surfaces "GitLab · Merge request". With
+              no query, keep the compact connector → event-kind submenu. */}
+          {q
+            ? matchingEntries.map((e) =>
+                isConnected(e.plugin) ? (
+                  <DropdownMenuItem key={e.label} className="gap-2 text-[13px]" onSelect={() => pickEntry(e)}>
+                    <GitBranchIcon className="size-4 text-icon-secondary" />
+                    {e.label}
+                  </DropdownMenuItem>
+                ) : (
+                  <Tooltip key={e.label}>
+                    <TooltipTrigger asChild>
+                      <div
+                        aria-disabled
+                        className="flex cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-text-tertiary opacity-60"
+                      >
+                        <GitBranchIcon className="size-4 text-icon-tertiary" />
+                        {e.label}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{t("connectAccountFirst")}</TooltipContent>
+                  </Tooltip>
+                ),
+              )
+            : triggerPlugins.map((p) => {
+                const name = p.catalog?.name ?? p.name;
+                const eventOpts = eventOptsOf(p);
+                // No connected account → the whole connector is disabled with a
+                // tooltip pointing at Integrations.
+                if (!isConnected(p)) {
+                  return (
+                    <Tooltip key={p.name}>
+                      <TooltipTrigger asChild>
+                        <div
+                          aria-disabled
+                          className="flex cursor-not-allowed items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-text-tertiary opacity-60"
+                        >
+                          <GitBranchIcon className="size-4 text-icon-tertiary" />
+                          {name}
+                          <ChevronRightIcon className="ml-auto size-4 text-icon-tertiary" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{t("connectAccountFirst")}</TooltipContent>
+                    </Tooltip>
+                  );
+                }
+                // No declared event kinds → one entry for the whole connector.
+                if (eventOpts.length === 0) {
+                  return (
+                    <DropdownMenuItem
+                      key={p.name}
+                      className="gap-2 text-[13px]"
+                      onSelect={() => pickEntry({ plugin: p })}
+                    >
+                      <GitBranchIcon className="size-4 text-icon-secondary" />
+                      {name}
+                    </DropdownMenuItem>
+                  );
+                }
+                // One entry per event kind (GitLab → merge request / issue /
+                // push); each adds a separate trigger, connectors can stack.
+                return (
+                  <DropdownMenuSub key={p.name}>
+                    <DropdownMenuSubTrigger className="gap-2 text-[13px]">
+                      <GitBranchIcon className="size-4 text-icon-secondary" />
+                      {name}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {eventOpts.map((opt) => (
+                        <DropdownMenuItem
+                          key={opt}
+                          className="text-[13px]"
+                          onSelect={() => pickEntry({ plugin: p, opt })}
+                        >
+                          {humanizeEvent(opt)}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                );
+              })}
+          {triggerPlugins.length === 0 && (
+            <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noConnectors")}</p>
+          )}
+          {q && !showScheduled && triggerPlugins.length > 0 && matchingEntries.length === 0 && (
             <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("noTriggers")}</p>
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Actions card — post-run side effects dispatched to a connector when this
+ * patrol's card finishes. Same row/popover/add-menu shape as Triggers, but a
+ * plain list (not capped at one) since a patrol can run several actions. */
+function ActionsCard({
+  actions,
+  onChange,
+  t,
+}: {
+  actions: PatrolAction[];
+  onChange: (a: PatrolAction[]) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const plugins = usePluginCatalog();
+  const actionPlugins = useMemo(() => plugins.filter((p) => (p.catalog?.actions?.length ?? 0) > 0), [plugins]);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+  const updateAt = (i: number, next: PatrolAction) => onChange(actions.map((a, idx) => (idx === i ? next : a)));
+  const removeAt = (i: number) => onChange(actions.filter((_, idx) => idx !== i));
+  const addAction = (a: PatrolAction) => {
+    setOpenIdx(actions.length);
+    onChange([...actions, a]);
+  };
+
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-xl border border-border-cards bg-card-background">
+      {actions.map((action, i) => {
+        const plugin = plugins.find((p) => p.name === action.connector);
+        const def = plugin?.catalog?.actions?.find((a) => a.id === action.type);
+        return (
+          <ActionRow
+            // biome-ignore lint/suspicious/noArrayIndexKey: positional action list, no stable id.
+            key={i}
+            action={action}
+            label={def?.label ?? `${plugin?.catalog?.name ?? action.connector}: ${action.type}`}
+            fields={def?.config ?? []}
+            open={openIdx === i}
+            onOpenChange={(o) => setOpenIdx(o ? i : null)}
+            onChange={(next) => updateAt(i, next)}
+            onRemove={() => {
+              setOpenIdx(null);
+              removeAt(i);
+            }}
+            t={t}
+          />
+        );
+      })}
+      <AddActionMenu plugins={actionPlugins} onPick={addAction} t={t} />
+    </div>
+  );
+}
+
+function ActionRow({
+  action,
+  label,
+  fields,
+  open,
+  onOpenChange,
+  onChange,
+  onRemove,
+  t,
+}: {
+  action: PatrolAction;
+  label: string;
+  fields: PluginCatalogAction["config"];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onChange: (a: PatrolAction) => void;
+  onRemove: () => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const setConfig = (key: string, value: string) =>
+    onChange({ ...action, config: { ...action.config, [key]: value } });
+  return (
+    <div className="group relative flex items-center">
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-3 py-3.5 pr-12 pl-4 text-left transition-colors hover:bg-muted/20"
+          >
+            <PlayIcon className="size-[18px] shrink-0 text-icon-secondary" />
+            <span className="text-[14px] text-text-primary">{label}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-80 flex-col gap-3">
+          {fields.length === 0 && <p className="text-[13px] text-text-tertiary">—</p>}
+          {fields.map((f) => (
+            <div key={f.key} className="flex flex-col gap-1">
+              <span className="text-[12px] text-text-secondary">
+                {f.label}
+                {f.required && <span className="text-destructive"> *</span>}
+              </span>
+              {f.type === "select" && f.dynamic ? (
+                <DynamicSelect
+                  connector={action.connector}
+                  field={f.key}
+                  value={String(action.config[f.key] ?? "")}
+                  placeholder={f.placeholder}
+                  onChange={(v) => setConfig(f.key, v ?? "")}
+                  t={t}
+                />
+              ) : (
+                <Input
+                  value={String(action.config[f.key] ?? "")}
+                  placeholder={f.placeholder}
+                  onChange={(e) => setConfig(f.key, e.target.value)}
+                  className="h-8 text-[13px]"
+                />
+              )}
+              {f.description && <span className="text-[11px] text-text-tertiary">{f.description}</span>}
+            </div>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={t("actionsSection.remove")}
+        onClick={onRemove}
+        className="absolute right-3 flex size-7 items-center justify-center rounded-md text-icon-tertiary opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2Icon className="size-4" />
+      </button>
+    </div>
+  );
+}
+
+function AddActionMenu({
+  plugins,
+  onPick,
+  t,
+}: {
+  plugins: PluginInfo[];
+  onPick: (a: PatrolAction) => void;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+
+  const entries = useMemo(
+    () => plugins.flatMap((p) => (p.catalog?.actions ?? []).map((def) => ({ plugin: p, def }))),
+    [plugins],
+  );
+  const visible = entries.filter(
+    ({ plugin, def }) => !q || `${plugin.catalog?.name ?? plugin.name} ${def.label}`.toLowerCase().includes(q),
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left text-text-secondary transition-colors hover:bg-muted/20 hover:text-text-primary"
+        >
+          <PlusIcon className="size-[18px] shrink-0" />
+          <span className="text-[14px]">{t("actionsSection.addAction")}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64 p-0">
+        <div className="border-border border-b p-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("actionsSection.searchActions")}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 border-0 bg-transparent text-[13px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+        <div className="p-1">
+          {visible.map(({ plugin, def }) => (
+            <DropdownMenuItem
+              key={`${plugin.name}:${def.id}`}
+              className="flex-col items-start gap-0.5 text-[13px]"
+              onSelect={() => onPick({ connector: plugin.name, type: def.id, config: {} })}
+            >
+              <span>
+                {plugin.catalog?.name ?? plugin.name} — {def.label}
+              </span>
+              {def.summary && <span className="text-[11px] text-text-tertiary">{def.summary}</span>}
+            </DropdownMenuItem>
+          ))}
+          {visible.length === 0 && (
+            <p className="px-2 py-1.5 text-[13px] text-text-tertiary">{t("actionsSection.noActions")}</p>
           )}
         </div>
       </DropdownMenuContent>
@@ -2310,8 +3072,8 @@ function ScheduleKindFields({
   onChange,
   t,
 }: {
-  value: ScheduledTask["schedule"];
-  onChange: (s: ScheduledTask["schedule"]) => void;
+  value: ScheduleKind;
+  onChange: (s: ScheduleKind) => void;
   t: ReturnType<typeof useTranslations>;
 }) {
   const kinds: ScheduleKindType[] = ["once", "daily", "weekly", "interval", "cron"];

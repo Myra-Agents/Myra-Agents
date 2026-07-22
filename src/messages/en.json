@@ -1003,8 +1003,8 @@
       },
       "inboundUrl": "Inbound URL — paste this into the sender (e.g. GitHub webhook).",
       "webhookWarning": {
-        "title": "Webhooks run in the local server",
-        "body": "They only fire while Myra is running and stop when you quit the app or shut down. For 24/7 delivery, install the background service or use a remote instance."
+        "title": "Webhooks run on your machine",
+        "body": "They fire only while Myra's server is running and stop when you quit the app. Install the background service to keep receiving 24/7, and expose it through a tunnel so external services can reach it."
       },
       "secret": {
         "save": "Save",
@@ -1023,11 +1023,17 @@
       "firesOn": "Fires on: {events}",
       "noTriggers": "No triggers",
       "noMachines": "No machines",
+      "connecting": "Connecting…",
+      "connected": "Connected",
+      "connectedAs": "Connected as {account}",
+      "disconnect": "Disconnect",
+      "sameAccount": "Another integration is connected to this same account.",
+      "capabilities": { "triggers": "Triggers", "actions": "Actions" },
       "deleteConfirm": "Delete the “{label}” integration from every machine?",
       "deletePartial": "Some machines couldn't be updated — try again.",
       "webhookWarning": {
-        "title": "Webhooks run in the local server",
-        "body": "They only fire while Myra is running and stop when you quit the app or shut down. For 24/7 delivery, install the background service or use a remote instance."
+        "title": "Webhooks run on your machine",
+        "body": "They fire only while Myra's server is running and stop when you quit the app. Install the background service to keep receiving 24/7, and expose it through a tunnel so external services can reach it."
       },
       "wizard": {
         "titleNew": "New integration",
@@ -1040,6 +1046,7 @@
         "noPlugins": "No webhook plugins installed. Drop one under ~/.myra-agents/plugins.",
         "label": "Label",
         "labelPlaceholder": "e.g. #eng-alerts",
+        "labelTaken": "Another integration already uses this name.",
         "events": "Triggers",
         "eventsHint": "Task statuses that fire this integration's outbound webhook.",
         "template": "Message template",
@@ -1049,6 +1056,11 @@
         "inboundUrl": "Inbound URL (per machine) — paste into the sender",
         "secretNote": "Secrets are pushed to each selected machine's keychain now. Keychains can't be copied between machines, so a machine added later will prompt for the secret again.",
         "secretSet": "Set",
+        "authMethod": "Authentication",
+        "signIn": "Sign in",
+        "signedIn": "Signed in",
+        "signInNoMachine": "Connect a machine first.",
+        "connectVia": "Connect via {methods}",
         "cancel": "Cancel",
         "back": "Back",
         "next": "Next",
@@ -1440,8 +1452,17 @@
       "folder": "a folder"
     },
     "addTrigger": "Add Trigger",
+    "dynamicSelect": {
+      "placeholder": "Select…",
+      "search": "Search…",
+      "loading": "Loading…",
+      "error": "Couldn't load — retry",
+      "empty": "No matches",
+      "use": "Use \"{value}\""
+    },
     "searchTriggers": "Search Triggers...",
     "comingSoon": "Coming soon",
+    "connectAccountFirst": "Connect an account in Integrations to use this trigger",
     "noTriggers": "No matching triggers",
     "categories": {
       "scheduled": "Scheduled",
@@ -1469,6 +1490,29 @@
     },
     "removeTrigger": "Remove trigger",
     "oneScheduledOnly": "Only one scheduled trigger is allowed. Remove the existing one to add another.",
+    "noConnectors": "No trigger-capable plugins connected. Connect one from Integrations.",
+    "eventTrigger": {
+      "anyEvent": "Any event",
+      "matches": "Matches: {summary}",
+      "from": "From",
+      "fromAny": "Anyone",
+      "subjectContains": "Subject / title contains",
+      "bodyContains": "Body contains",
+      "regex": "Regex",
+      "regexField": "Regex field",
+      "prompt": "Prompt override",
+      "promptPlaceholder": "Leave blank to use the patrol's own instruction",
+      "promptHint": "Templated: '{{subject}}' '{{from}}' '{{body}}' '{{id}}'.",
+      "requireReview": "Hold for review before running"
+    },
+    "actionsSection": {
+      "title": "Actions",
+      "description": "Run after this patrol's card finishes.",
+      "addAction": "Add Action",
+      "searchActions": "Search actions...",
+      "noActions": "No action-capable plugins connected.",
+      "remove": "Remove action"
+    },
     "noRepository": "No Repository",
     "recents": "Recents",
     "allRepositories": "All Repositories",

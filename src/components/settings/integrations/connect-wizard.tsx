@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { CheckIcon, KeyRoundIcon, Loader2Icon } from "lucide-react";
+import { CheckIcon, KeyRoundIcon, Loader2Icon, PlugZapIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -19,7 +19,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { connectionManager } from "@/lib/connections/manager";
 import type { Connection } from "@/lib/connections/types";
 import { deployInstance, type SecretInput } from "@/lib/integrations/deploy";
 import { track } from "@/lib/posthog/events";
@@ -66,6 +68,7 @@ export function ConnectWizard({
   plugins,
   connections,
   editing,
+  existingLabels = [],
   onDeployed,
 }: {
   open: boolean;
@@ -73,9 +76,19 @@ export function ConnectWizard({
   plugins: PluginInfo[];
   connections: Connection[];
   editing?: WizardEditTarget;
+  /** Labels of the OTHER instances — used to auto-suffix the default and reject a collision. */
+  existingLabels?: string[];
   onDeployed: () => void;
 }) {
   const t = useTranslations("settings.integrations.wizard");
+
+  // A label unique among existing instances: "gitlab", then "gitlab 2", …
+  const uniqueLabel = (base: string) => {
+    if (!existingLabels.includes(base)) return base;
+    let n = 2;
+    while (existingLabels.includes(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
+  };
 
   // Only webhook-declaring plugins can be instanced.
   const webhookPlugins = useMemo(() => plugins.filter((p) => (p.webhooks?.length ?? 0) > 0), [plugins]);
@@ -109,6 +122,85 @@ export function ConnectWizard({
   // Effective events/template: instance override falls back to the manifest's.
   const effectiveEvents = events.length > 0 ? events : (out?.events ?? []);
 
+  // Auth methods (catalog.auth): the FIRST is the primary path (big Sign in up
+  // front); the rest hide under a "connect another way" link. Falls back to a
+  // flat field list for connectors that declare no auth methods.
+  const authMethods = plugin?.catalog?.auth ?? [];
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advancedTab, setAdvancedTab] = useState<string>("");
+  const claimedFieldKeys = new Set(authMethods.flatMap((m) => m.fields ?? []));
+  const nonHiddenFields = (plugin?.config ?? []).filter((f) => !f.hidden);
+  const commonFields = nonHiddenFields.filter((f) => !claimedFieldKeys.has(f.key));
+
+  // Sign in (`run_plugin_setup`) progress for this instance, streamed over the bus.
+  // Seed "already signed in" when editing an instance that has a stored credential
+  // (an OAuth refresh token or a pasted token) — so the button reads "Signed in"
+  // and the user can move past this step without re-connecting.
+  const [signInState, setSignInState] = useState<{ running: boolean; ok?: boolean; line?: string }>(() => ({
+    running: false,
+    ok: (editing?.secretKeys?.length ?? 0) > 0 ? true : undefined,
+  }));
+  useEffect(() => {
+    let offLog: (() => void) | undefined;
+    let offDone: (() => void) | undefined;
+    void connectionManager
+      .listenAll<{ id: string; line: string }>("plugin-setup-log", ({ payload }) => {
+        if (payload.id === instanceId) setSignInState((s) => ({ ...s, line: payload.line }));
+      })
+      .then((un) => {
+        offLog = un;
+      });
+    void connectionManager
+      .listenAll<{ id: string; ok: boolean }>("plugin-setup-done", ({ payload }) => {
+        if (payload.id === instanceId) setSignInState({ running: false, ok: payload.ok });
+      })
+      .then((un) => {
+        offDone = un;
+      });
+    return () => {
+      offLog?.();
+      offDone?.();
+    };
+  }, [instanceId]);
+
+  const signIn = useCallback(async () => {
+    if (!plugin) return;
+    const primary = connectionManager.primaryId();
+    if (!primary) {
+      setSignInState({ running: false, ok: false, line: t("signInNoMachine") });
+      return;
+    }
+    setSignInState({ running: true });
+    try {
+      const instance: PluginInstance = {
+        id: instanceId,
+        plugin: plugin.name,
+        label: label.trim() || plugin.name,
+        enabled: true,
+        config,
+        events: events.length > 0 ? events : undefined,
+        template: template.trim().length > 0 ? template : undefined,
+      };
+      const secretInputs: SecretInput[] = Object.entries(secrets)
+        .filter(([, v]) => v.length > 0)
+        .map(([key, value]) => ({ key, value }));
+      // Write config + secrets to the primary machine only, then run the OAuth
+      // consent there — the refresh token lands in that machine's keychain. The
+      // final Deploy step fans the instance out to the rest.
+      await deployInstance({
+        instance,
+        secrets: secretInputs,
+        selectedConnIds: [primary],
+        allConnIds: [primary],
+        secretKeys: allSecretKeys,
+      });
+      await connectionManager.invokeOne(primary, "run_plugin_setup", { instanceId });
+      // completion arrives via the plugin-setup-done listener above
+    } catch (e) {
+      setSignInState({ running: false, ok: false, line: e instanceof Error ? e.message : String(e) });
+    }
+  }, [plugin, instanceId, label, config, events, template, secrets, allSecretKeys, t]);
+
   const reset = useCallback(() => {
     onClose();
   }, [onClose]);
@@ -118,7 +210,7 @@ export function ConnectWizard({
     const p = plugins.find((x) => x.name === name);
     // Seed label + events/template from the manifest so the form starts populated.
     if (!editing) {
-      setLabel((l) => l || (p?.manifestName ?? name));
+      setLabel((l) => l || uniqueLabel(p?.manifestName ?? name));
       const o = p ? outboundSpec(p) : undefined;
       setEvents(o?.events ?? []);
       setTemplate(o?.template ?? "");
@@ -168,7 +260,67 @@ export function ConnectWizard({
   };
 
   const canConfigure = pluginName.length > 0;
-  const canDeploy = canConfigure && label.trim().length > 0 && selectedConns.size > 0;
+  const labelTaken = label.trim().length > 0 && existingLabels.includes(label.trim());
+  // A connector with an OAuth `setup` needs a credential before proceeding:
+  // either a completed sign-in, a pasted token, or an already-stored secret.
+  const tokenProvided =
+    allSecretKeys.some((k) => (secrets[k] ?? "").trim().length > 0) || (editing?.secretKeys?.length ?? 0) > 0;
+  const connectedConfirmed = signInState.ok === true || tokenProvided;
+  const needsConnect = !!plugin?.catalog?.setup;
+  const configReady =
+    canConfigure && label.trim().length > 0 && !labelTaken && (!needsConnect || connectedConfirmed);
+  const canDeploy = configReady && selectedConns.size > 0;
+
+  // One config field row (shared by common fields + the auth methods' fields).
+  const renderField = (field: PluginConfigField) => (
+    <WizardField
+      key={field.key}
+      field={field}
+      value={config[field.key]}
+      secretDraft={secrets[field.key] ?? ""}
+      secretAlreadySet={editing?.secretKeys.includes(field.key) ?? false}
+      onValue={(v) => setConfig((c) => ({ ...c, [field.key]: v }))}
+      onSecret={(v) => setSecrets((s) => ({ ...s, [field.key]: v }))}
+    />
+  );
+
+  // The Sign in button + its live status. `big` = the prominent primary CTA.
+  // Once signed in, the button becomes a disabled "Signed in" indicator — no
+  // re-clicking an already-connected account.
+  const renderSignIn = (big: boolean) => {
+    const signedIn = signInState.ok === true;
+    const iconClass = big ? "size-4" : "size-3.5";
+    return (
+      <div className="space-y-1.5">
+        <Button
+          type="button"
+          variant={big ? "default" : "outline"}
+          size={big ? "lg" : "sm"}
+          className="w-full"
+          disabled={signInState.running || signedIn}
+          onClick={() => void signIn()}
+        >
+          {signInState.running ? (
+            <Loader2Icon className={cn("animate-spin", iconClass)} />
+          ) : signedIn ? (
+            <CheckIcon className={cn("text-green-600", iconClass)} />
+          ) : (
+            <PlugZapIcon className={iconClass} />
+          )}
+          {signedIn ? t("signedIn") : (plugin?.catalog?.setup?.label ?? t("signIn"))}
+        </Button>
+        {signInState.running && signInState.line && (
+          <p className="truncate text-muted-foreground text-xs">{signInState.line}</p>
+        )}
+        {signInState.ok === false && signInState.line && (
+          <p className="truncate text-destructive text-xs">{signInState.line}</p>
+        )}
+      </div>
+    );
+  };
+
+  const fieldsOfMethod = (m: (typeof authMethods)[number]) =>
+    nonHiddenFields.filter((f) => (m.fields ?? []).includes(f.key));
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && reset()}>
@@ -207,20 +359,65 @@ export function ConnectWizard({
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{t("label")}</Label>
-              <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("labelPlaceholder")} />
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={t("labelPlaceholder")}
+                aria-invalid={labelTaken}
+              />
+              {labelTaken && <p className="text-destructive text-xs">{t("labelTaken")}</p>}
             </div>
 
-            {(plugin.config ?? []).map((field) => (
-              <WizardField
-                key={field.key}
-                field={field}
-                value={config[field.key]}
-                secretDraft={secrets[field.key] ?? ""}
-                secretAlreadySet={editing?.secretKeys.includes(field.key) ?? false}
-                onValue={(v) => setConfig((c) => ({ ...c, [field.key]: v }))}
-                onSecret={(v) => setSecrets((s) => ({ ...s, [field.key]: v }))}
-              />
-            ))}
+            {authMethods.length > 0 &&
+              (() => {
+                const primary = authMethods[0];
+                const advanced = authMethods.slice(1);
+                const advActive = advancedTab || advanced[0]?.id || "";
+                return (
+                  <div className="space-y-3">
+                    {/* Primary path — big and up front */}
+                    <div className="space-y-2">
+                      {primary.summary && <p className="text-muted-foreground text-xs">{primary.summary}</p>}
+                      {fieldsOfMethod(primary).map(renderField)}
+                      {primary.kind === "oauth" && renderSignIn(true)}
+                    </div>
+
+                    {/* The rest, tucked under a discreet link */}
+                    {advanced.length > 0 && (
+                      <div className="border-t pt-2">
+                        {!showAdvanced ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowAdvanced(true)}
+                            className="text-muted-foreground text-xs underline underline-offset-2 transition-colors hover:text-foreground"
+                          >
+                            {t("connectVia", { methods: advanced.map((m) => m.label).join(" / ") })}
+                          </button>
+                        ) : (
+                          <Tabs value={advActive} onValueChange={setAdvancedTab}>
+                            <TabsList className="w-full">
+                              {advanced.map((m) => (
+                                <TabsTrigger key={m.id} value={m.id} className="flex-1 text-xs">
+                                  {m.label}
+                                </TabsTrigger>
+                              ))}
+                            </TabsList>
+                            {advanced.map((m) => (
+                              <TabsContent key={m.id} value={m.id} className="space-y-3 pt-3">
+                                {m.summary && <p className="text-muted-foreground text-xs">{m.summary}</p>}
+                                {fieldsOfMethod(m).map(renderField)}
+                                {m.kind === "oauth" && renderSignIn(false)}
+                              </TabsContent>
+                            ))}
+                          </Tabs>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+            {commonFields.length > 0 && <div className="space-y-4 border-t pt-4">{commonFields.map(renderField)}</div>}
 
             {out && (
               <>
@@ -289,7 +486,10 @@ export function ConnectWizard({
               })}
             </div>
 
-            {inbound && selectedConns.size > 0 && (
+            {/* Poll-first connectors mark their inbound webhook `optional` — the
+                route still works on a routable host, but there's nothing to paste
+                into a sender by default, so don't surface it. */}
+            {inbound && !inbound.optional && selectedConns.size > 0 && (
               <div className="space-y-1.5 rounded-lg border p-3">
                 <Label className="text-xs">{t("inboundUrl")}</Label>
                 {connections
@@ -323,7 +523,7 @@ export function ConnectWizard({
           {step < 3 ? (
             <Button
               size="sm"
-              disabled={step === 1 ? !canConfigure : !canConfigure || label.trim().length === 0}
+              disabled={step === 1 ? !canConfigure : !configReady}
               onClick={() => setStep((s) => (s + 1) as Step)}
             >
               {t("next")}
