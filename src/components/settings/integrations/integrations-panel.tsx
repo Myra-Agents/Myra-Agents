@@ -83,6 +83,15 @@ export function IntegrationsPanel() {
   // connector that exposes an `identity` options field (e.g. GitLab's GET /user).
   // Connectors without one just show a plain "Connected".
   const [identities, setIdentities] = useState<Record<string, string>>({});
+  // The single source of truth for "is this instance connected". Set true on a
+  // successful identity fetch or a completed sign-in; set false explicitly on
+  // disconnect. Never inferred from transient connect progress, so a disconnect
+  // can't be misread as "Connected".
+  const [connectedIds, setConnectedIds] = useState<Record<string, boolean>>({});
+  const setConnected = useCallback(
+    (id: string, value: boolean) => setConnectedIds((s) => (s[id] === value ? s : { ...s, [id]: value })),
+    [],
+  );
 
   // Fetch one instance's connected account. `retries` backs off and re-tries on
   // error — right after a sign-in the token may not be queryable yet, so a fresh
@@ -100,14 +109,17 @@ export function IntegrationsPanel() {
             { connector: inst.plugin, field: "identity" },
           );
           const label = res?.options?.[0]?.label;
-          if (label) setIdentities((s) => (s[inst.id] === label ? s : { ...s, [inst.id]: label }));
+          if (label) {
+            setIdentities((s) => (s[inst.id] === label ? s : { ...s, [inst.id]: label }));
+            setConnected(inst.id, true);
+          }
           return; // resolved (connected, or genuinely not) — stop
         } catch {
           if (attempt < retries) await new Promise((r) => setTimeout(r, 800));
         }
       }
     },
-    [catalog],
+    [catalog, setConnected],
   );
 
   useEffect(() => {
@@ -148,9 +160,10 @@ export function IntegrationsPanel() {
     void connectionManager
       .listenAll<{ id: string; ok: boolean }>("plugin-setup-done", ({ payload }) => {
         if (disconnectingRef.current.has(payload.id)) {
-          // Disconnect finished — drop the progress state (so the Sign-in row
-          // returns) and the shown account; never render "Connected".
+          // Disconnect finished — mark not-connected, drop the progress state and
+          // the shown account; never render "Connected".
           disconnectingRef.current.delete(payload.id);
+          setConnectedIds((s) => ({ ...s, [payload.id]: false }));
           setConnectState((s) => {
             const { [payload.id]: _, ...rest } = s;
             return rest;
@@ -167,6 +180,7 @@ export function IntegrationsPanel() {
           [payload.id]: { lines: s[payload.id]?.lines ?? [], running: false, ok: payload.ok },
         }));
         if (payload.ok) {
+          setConnectedIds((s) => ({ ...s, [payload.id]: true }));
           void load();
           // Pull the account right away (retrying while the token settles) so the
           // card flips to "Connected as …" without waiting for a manual refresh.
@@ -188,9 +202,10 @@ export function IntegrationsPanel() {
       const connId = (membership[instance.id] ?? [])[0];
       if (!connId) return;
       disconnectingRef.current.add(instance.id);
+      // Optimistically mark not-connected + drop the shown account so the card
+      // returns to Sign-in the instant Disconnect is clicked.
+      setConnected(instance.id, false);
       setConnectState((s) => ({ ...s, [instance.id]: { lines: [], running: true } }));
-      // Optimistically drop the shown account — the identity re-fetch will fail
-      // (token gone) and leave it cleared.
       setIdentities((s) => {
         const { [instance.id]: _, ...rest } = s;
         return rest;
@@ -209,7 +224,7 @@ export function IntegrationsPanel() {
         }));
       }
     },
-    [membership],
+    [membership, setConnected],
   );
 
   const pluginFor = useCallback((name: string) => catalog.find((p) => p.name === name), [catalog]);
@@ -340,10 +355,10 @@ export function IntegrationsPanel() {
             const out = plugin?.webhooks?.find((w) => w.direction === "out");
             const events = inst.events && inst.events.length > 0 ? inst.events : (out?.events ?? []);
             const deployed = machines.length > 0;
-            // "Connected" flips instantly on sign-in success (connectState.ok);
-            // the @account name fills in once the identity fetch resolves.
+            // `connected` is the explicit connectedIds signal; the @account name
+            // fills in once the identity fetch resolves.
             const account = identities[inst.id];
-            const connected = !!account || connectState[inst.id]?.ok === true;
+            const connected = connectedIds[inst.id] === true;
             return (
               <div key={inst.id} className="space-y-2 rounded-lg border p-3">
                 <div className="flex items-start justify-between gap-2">
