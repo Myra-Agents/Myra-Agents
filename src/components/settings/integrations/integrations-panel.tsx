@@ -340,6 +340,10 @@ export function IntegrationsPanel() {
             const out = plugin?.webhooks?.find((w) => w.direction === "out");
             const events = inst.events && inst.events.length > 0 ? inst.events : (out?.events ?? []);
             const deployed = machines.length > 0;
+            // "Connected" flips instantly on sign-in success (connectState.ok);
+            // the @account name fills in once the identity fetch resolves.
+            const account = identities[inst.id];
+            const connected = !!account || connectState[inst.id]?.ok === true;
             return (
               <div key={inst.id} className="space-y-2 rounded-lg border p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -408,11 +412,13 @@ export function IntegrationsPanel() {
                   );
                 })()}
 
-                {identities[inst.id] && (
+                {connected && (
                   <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
                     <span className="flex min-w-0 items-center gap-1.5">
                       <UserIcon className="size-3.5 shrink-0" />
-                      <span className="truncate">{t("connectedAs", { account: identities[inst.id] })}</span>
+                      <span className="truncate">
+                        {account ? t("connectedAs", { account }) : t("connected")}
+                      </span>
                     </span>
                     {plugin?.catalog?.disconnect && (
                       <button
@@ -453,11 +459,10 @@ export function IntegrationsPanel() {
                   </div>
                 )}
 
-                {/* Sign in only when not already connected — a live account
-                    (identity) means there's nothing to sign into; use Disconnect
+                {/* Sign in only when not already connected — use Disconnect
                     instead. Opens the wizard at its Configure step, where the
                     Sign-in itself runs. */}
-                {plugin?.catalog?.setup && deployed && !identities[inst.id] && (
+                {plugin?.catalog?.setup && deployed && !connected && (
                   <div className="border-t pt-2">
                     <Button variant="outline" size="sm" className="w-full" onClick={() => void openEdit(inst)}>
                       <PlugZapIcon className="size-3.5" />
