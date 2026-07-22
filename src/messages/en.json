@@ -1045,6 +1045,7 @@
         "noPlugins": "No webhook plugins installed. Drop one under ~/.myra-agents/plugins.",
         "label": "Label",
         "labelPlaceholder": "e.g. #eng-alerts",
+        "labelTaken": "Another integration already uses this name.",
         "events": "Triggers",
         "eventsHint": "Task statuses that fire this integration's outbound webhook.",
         "template": "Message template",

@@ -68,6 +68,7 @@ export function ConnectWizard({
   plugins,
   connections,
   editing,
+  existingLabels = [],
   onDeployed,
 }: {
   open: boolean;
@@ -75,9 +76,19 @@ export function ConnectWizard({
   plugins: PluginInfo[];
   connections: Connection[];
   editing?: WizardEditTarget;
+  /** Labels of the OTHER instances — used to auto-suffix the default and reject a collision. */
+  existingLabels?: string[];
   onDeployed: () => void;
 }) {
   const t = useTranslations("settings.integrations.wizard");
+
+  // A label unique among existing instances: "gitlab", then "gitlab 2", …
+  const uniqueLabel = (base: string) => {
+    if (!existingLabels.includes(base)) return base;
+    let n = 2;
+    while (existingLabels.includes(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
+  };
 
   // Only webhook-declaring plugins can be instanced.
   const webhookPlugins = useMemo(() => plugins.filter((p) => (p.webhooks?.length ?? 0) > 0), [plugins]);
@@ -195,7 +206,7 @@ export function ConnectWizard({
     const p = plugins.find((x) => x.name === name);
     // Seed label + events/template from the manifest so the form starts populated.
     if (!editing) {
-      setLabel((l) => l || (p?.manifestName ?? name));
+      setLabel((l) => l || uniqueLabel(p?.manifestName ?? name));
       const o = p ? outboundSpec(p) : undefined;
       setEvents(o?.events ?? []);
       setTemplate(o?.template ?? "");
@@ -245,7 +256,8 @@ export function ConnectWizard({
   };
 
   const canConfigure = pluginName.length > 0;
-  const canDeploy = canConfigure && label.trim().length > 0 && selectedConns.size > 0;
+  const labelTaken = label.trim().length > 0 && existingLabels.includes(label.trim());
+  const canDeploy = canConfigure && label.trim().length > 0 && !labelTaken && selectedConns.size > 0;
 
   // One config field row (shared by common fields + the auth methods' fields).
   const renderField = (field: PluginConfigField) => (
@@ -333,7 +345,13 @@ export function ConnectWizard({
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs">{t("label")}</Label>
-              <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("labelPlaceholder")} />
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder={t("labelPlaceholder")}
+                aria-invalid={labelTaken}
+              />
+              {labelTaken && <p className="text-destructive text-xs">{t("labelTaken")}</p>}
             </div>
 
             {authMethods.length > 0 &&
@@ -491,7 +509,7 @@ export function ConnectWizard({
           {step < 3 ? (
             <Button
               size="sm"
-              disabled={step === 1 ? !canConfigure : !canConfigure || label.trim().length === 0}
+              disabled={step === 1 ? !canConfigure : !canConfigure || label.trim().length === 0 || labelTaken}
               onClick={() => setStep((s) => (s + 1) as Step)}
             >
               {t("next")}

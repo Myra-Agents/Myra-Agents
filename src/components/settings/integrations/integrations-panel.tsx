@@ -445,6 +445,9 @@ export function IntegrationsPanel() {
           plugins={catalog}
           connections={connections}
           editing={editing}
+          existingLabels={Object.values(instances)
+            .filter((i) => i.id !== editing?.instance.id)
+            .map((i) => i.label)}
           onDeployed={() => void load()}
         />
       )}
