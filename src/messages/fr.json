@@ -1027,6 +1027,7 @@
       "connected": "Connecté",
       "connectedAs": "Connecté en tant que {account}",
       "disconnect": "Déconnecter",
+      "sameAccount": "Une autre intégration est connectée à ce même compte.",
       "capabilities": { "triggers": "Déclencheurs", "actions": "Actions" },
       "deleteConfirm": "Supprimer l'intégration « {label} » de toutes les machines ?",
       "deletePartial": "Certaines machines n'ont pas pu être mises à jour — réessayez.",

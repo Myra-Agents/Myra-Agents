@@ -1027,6 +1027,7 @@
       "connected": "Connected",
       "connectedAs": "Connected as {account}",
       "disconnect": "Disconnect",
+      "sameAccount": "Another integration is connected to this same account.",
       "capabilities": { "triggers": "Triggers", "actions": "Actions" },
       "deleteConfirm": "Delete the “{label}” integration from every machine?",
       "deletePartial": "Some machines couldn't be updated — try again.",

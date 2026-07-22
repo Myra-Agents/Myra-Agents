@@ -259,6 +259,21 @@ export function IntegrationsPanel() {
   const list = Object.values(instances);
   const anyWebhooks = catalog.some((p) => p.webhooks?.length);
 
+  // Instances of the same connector connected to the SAME account (same fetched
+  // identity) — flagged so the user notices a redundant duplicate.
+  const duplicateAccountIds = useMemo(() => {
+    const byAccount = new Map<string, string[]>();
+    for (const inst of Object.values(instances)) {
+      const id = identities[inst.id];
+      if (!id) continue;
+      const key = `${inst.plugin} ${id}`;
+      byAccount.set(key, [...(byAccount.get(key) ?? []), inst.id]);
+    }
+    const dups = new Set<string>();
+    for (const ids of byAccount.values()) if (ids.length > 1) ids.forEach((i) => dups.add(i));
+    return dups;
+  }, [instances, identities]);
+
   return (
     <Card>
       {confirmDialog}
@@ -383,6 +398,13 @@ export function IntegrationsPanel() {
                         {plugin.catalog.disconnect.label || t("disconnect")}
                       </button>
                     )}
+                  </div>
+                )}
+
+                {duplicateAccountIds.has(inst.id) && (
+                  <div className="flex items-start gap-1.5 text-amber-600 text-xs">
+                    <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
+                    <span>{t("sameAccount")}</span>
                   </div>
                 )}
 
