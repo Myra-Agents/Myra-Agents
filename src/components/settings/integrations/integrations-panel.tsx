@@ -215,31 +215,40 @@ export function IntegrationsPanel() {
   const startDisconnect = useCallback(
     async (instance: PluginInstance) => {
       const connId = (membership[instance.id] ?? [])[0];
-      if (!connId) return;
+      // FORCE the UI first, unconditionally: not-connected + no account + no
+      // stale progress. The card flips to Sign-in the instant Disconnect is
+      // clicked — no early return, no dependence on bus events. The generation
+      // bump discards any in-flight identity fetch from the prior sign-in.
       disconnectingRef.current.add(instance.id);
-      // Optimistically mark not-connected + drop the shown account so the card
-      // returns to Sign-in the instant Disconnect is clicked. Bump the generation
-      // so any in-flight identity fetch from the prior sign-in is discarded.
       bumpGen(instance.id);
       setConnected(instance.id, false);
-      setConnectState((s) => ({ ...s, [instance.id]: { lines: [], running: true } }));
+      setConnectState((s) => {
+        const { [instance.id]: _, ...rest } = s;
+        return rest;
+      });
       setIdentities((s) => {
         const { [instance.id]: _, ...rest } = s;
         return rest;
       });
+      // Best-effort backend clear (fall back to the primary machine when the
+      // membership map hasn't loaded). UI stays disconnected regardless.
+      const target = connId ?? connectionManager.primaryId();
       try {
-        await connectionManager.invokeOne(connId, "run_plugin_setup", {
+        await connectionManager.invokeOne(target, "run_plugin_setup", {
           instanceId: instance.id,
           action: "disconnect",
         });
         track("integration_disconnect_started", { plugin: instance.plugin });
-      } catch (e) {
-        disconnectingRef.current.delete(instance.id);
-        setConnectState((s) => ({
-          ...s,
-          [instance.id]: { lines: [e instanceof Error ? e.message : String(e)], running: false, ok: false },
-        }));
+      } catch {
+        // token may already be gone / machine offline — the UI is authoritative
       }
+      // Safety valve: don't rely on plugin-setup-done. Clear the disconnecting
+      // flag ourselves and re-probe the source of truth once — if genuinely
+      // disconnected the probe fails and the card stays on Sign-in.
+      setTimeout(() => {
+        disconnectingRef.current.delete(instance.id);
+        void fetchIdentityRef.current(instance);
+      }, 1500);
     },
     [membership, setConnected, bumpGen],
   );
