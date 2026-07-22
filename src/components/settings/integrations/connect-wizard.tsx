@@ -133,9 +133,13 @@ export function ConnectWizard({
   const commonFields = nonHiddenFields.filter((f) => !claimedFieldKeys.has(f.key));
 
   // Sign in (`run_plugin_setup`) progress for this instance, streamed over the bus.
-  const [signInState, setSignInState] = useState<{ running: boolean; ok?: boolean; line?: string }>({
+  // Seed "already signed in" when editing an instance that has a stored credential
+  // (an OAuth refresh token or a pasted token) — so the button reads "Signed in"
+  // and the user can move past this step without re-connecting.
+  const [signInState, setSignInState] = useState<{ running: boolean; ok?: boolean; line?: string }>(() => ({
     running: false,
-  });
+    ok: (editing?.secretKeys?.length ?? 0) > 0 ? true : undefined,
+  }));
   useEffect(() => {
     let offLog: (() => void) | undefined;
     let offDone: (() => void) | undefined;
@@ -257,7 +261,15 @@ export function ConnectWizard({
 
   const canConfigure = pluginName.length > 0;
   const labelTaken = label.trim().length > 0 && existingLabels.includes(label.trim());
-  const canDeploy = canConfigure && label.trim().length > 0 && !labelTaken && selectedConns.size > 0;
+  // A connector with an OAuth `setup` needs a credential before proceeding:
+  // either a completed sign-in, a pasted token, or an already-stored secret.
+  const tokenProvided =
+    allSecretKeys.some((k) => (secrets[k] ?? "").trim().length > 0) || (editing?.secretKeys?.length ?? 0) > 0;
+  const connectedConfirmed = signInState.ok === true || tokenProvided;
+  const needsConnect = !!plugin?.catalog?.setup;
+  const configReady =
+    canConfigure && label.trim().length > 0 && !labelTaken && (!needsConnect || connectedConfirmed);
+  const canDeploy = configReady && selectedConns.size > 0;
 
   // One config field row (shared by common fields + the auth methods' fields).
   const renderField = (field: PluginConfigField) => (
@@ -511,7 +523,7 @@ export function ConnectWizard({
           {step < 3 ? (
             <Button
               size="sm"
-              disabled={step === 1 ? !canConfigure : !canConfigure || label.trim().length === 0 || labelTaken}
+              disabled={step === 1 ? !canConfigure : !configReady}
               onClick={() => setStep((s) => (s + 1) as Step)}
             >
               {t("next")}
