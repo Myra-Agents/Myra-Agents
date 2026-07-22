@@ -92,6 +92,14 @@ export function IntegrationsPanel() {
     (id: string, value: boolean) => setConnectedIds((s) => (s[id] === value ? s : { ...s, [id]: value })),
     [],
   );
+  // Per-instance generation counter — bumped whenever the connection changes
+  // (sign-in / disconnect). An identity fetch captures the generation when it
+  // starts and discards its result if the generation changed meanwhile, so a
+  // slow in-flight fetch from a just-ended connection can't revive "Connected".
+  const genRef = useRef<Record<string, number>>({});
+  const bumpGen = useCallback((id: string) => {
+    genRef.current[id] = (genRef.current[id] ?? 0) + 1;
+  }, []);
 
   // Fetch one instance's connected account. `retries` backs off and re-tries on
   // error — right after a sign-in the token may not be queryable yet, so a fresh
@@ -100,6 +108,7 @@ export function IntegrationsPanel() {
     async (inst: PluginInstance, retries = 0) => {
       const plugin = catalog.find((p) => p.name === inst.plugin);
       if (!plugin?.optionsExec) return;
+      const gen = genRef.current[inst.id] ?? 0;
       const primary = connectionManager.primaryId();
       for (let attempt = 0; attempt <= retries; attempt++) {
         try {
@@ -108,6 +117,7 @@ export function IntegrationsPanel() {
             "connector_options",
             { connector: inst.plugin, field: "identity" },
           );
+          if (genRef.current[inst.id] !== gen) return; // connection changed mid-fetch — discard
           const label = res?.options?.[0]?.label;
           if (label) {
             setIdentities((s) => (s[inst.id] === label ? s : { ...s, [inst.id]: label }));
@@ -115,6 +125,7 @@ export function IntegrationsPanel() {
           }
           return; // resolved (connected, or genuinely not) — stop
         } catch {
+          if (genRef.current[inst.id] !== gen) return; // aborted by a connection change
           if (attempt < retries) await new Promise((r) => setTimeout(r, 800));
         }
       }
@@ -163,6 +174,7 @@ export function IntegrationsPanel() {
           // Disconnect finished — mark not-connected, drop the progress state and
           // the shown account; never render "Connected".
           disconnectingRef.current.delete(payload.id);
+          genRef.current[payload.id] = (genRef.current[payload.id] ?? 0) + 1;
           setConnectedIds((s) => ({ ...s, [payload.id]: false }));
           setConnectState((s) => {
             const { [payload.id]: _, ...rest } = s;
@@ -180,6 +192,9 @@ export function IntegrationsPanel() {
           [payload.id]: { lines: s[payload.id]?.lines ?? [], running: false, ok: payload.ok },
         }));
         if (payload.ok) {
+          // New generation for this fresh connection; the identity fetch below
+          // captures it, so a later disconnect invalidates it.
+          genRef.current[payload.id] = (genRef.current[payload.id] ?? 0) + 1;
           setConnectedIds((s) => ({ ...s, [payload.id]: true }));
           void load();
           // Pull the account right away (retrying while the token settles) so the
@@ -203,7 +218,9 @@ export function IntegrationsPanel() {
       if (!connId) return;
       disconnectingRef.current.add(instance.id);
       // Optimistically mark not-connected + drop the shown account so the card
-      // returns to Sign-in the instant Disconnect is clicked.
+      // returns to Sign-in the instant Disconnect is clicked. Bump the generation
+      // so any in-flight identity fetch from the prior sign-in is discarded.
+      bumpGen(instance.id);
       setConnected(instance.id, false);
       setConnectState((s) => ({ ...s, [instance.id]: { lines: [], running: true } }));
       setIdentities((s) => {
@@ -224,7 +241,7 @@ export function IntegrationsPanel() {
         }));
       }
     },
-    [membership, setConnected],
+    [membership, setConnected, bumpGen],
   );
 
   const pluginFor = useCallback((name: string) => catalog.find((p) => p.name === name), [catalog]);
