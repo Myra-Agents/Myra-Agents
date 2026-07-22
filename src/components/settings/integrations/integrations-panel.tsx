@@ -83,23 +83,43 @@ export function IntegrationsPanel() {
   // connector that exposes an `identity` options field (e.g. GitLab's GET /user).
   // Connectors without one just show a plain "Connected".
   const [identities, setIdentities] = useState<Record<string, string>>({});
-  useEffect(() => {
-    const primary = connectionManager.primaryId();
-    for (const inst of Object.values(instances)) {
+
+  // Fetch one instance's connected account. `retries` backs off and re-tries on
+  // error — right after a sign-in the token may not be queryable yet, so a fresh
+  // connection resolves without waiting for a manual page refresh.
+  const fetchIdentity = useCallback(
+    async (inst: PluginInstance, retries = 0) => {
       const plugin = catalog.find((p) => p.name === inst.plugin);
-      if (!plugin?.optionsExec) continue;
-      connectionManager
-        .invokeOne<{ options?: { value: string; label: string }[] }>(primary, "connector_options", {
-          connector: inst.plugin,
-          field: "identity",
-        })
-        .then((res) => {
+      if (!plugin?.optionsExec) return;
+      const primary = connectionManager.primaryId();
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const res = await connectionManager.invokeOne<{ options?: { value: string; label: string }[] }>(
+            primary,
+            "connector_options",
+            { connector: inst.plugin, field: "identity" },
+          );
           const label = res?.options?.[0]?.label;
           if (label) setIdentities((s) => (s[inst.id] === label ? s : { ...s, [inst.id]: label }));
-        })
-        .catch(() => {});
-    }
-  }, [instances, catalog]);
+          return; // resolved (connected, or genuinely not) — stop
+        } catch {
+          if (attempt < retries) await new Promise((r) => setTimeout(r, 800));
+        }
+      }
+    },
+    [catalog],
+  );
+
+  useEffect(() => {
+    for (const inst of Object.values(instances)) void fetchIdentity(inst);
+  }, [instances, fetchIdentity]);
+
+  // Refs so the bus-listener effect (below) can call the latest versions without
+  // re-subscribing on every render.
+  const fetchIdentityRef = useRef(fetchIdentity);
+  fetchIdentityRef.current = fetchIdentity;
+  const instancesRef = useRef(instances);
+  instancesRef.current = instances;
 
   // Connect (`run_plugin_setup`) progress per instance id — a plugin's `catalog
   // .setup` (OAuth consent, etc.) runs server-side and streams back over the
@@ -146,7 +166,13 @@ export function IntegrationsPanel() {
           ...s,
           [payload.id]: { lines: s[payload.id]?.lines ?? [], running: false, ok: payload.ok },
         }));
-        if (payload.ok) void load();
+        if (payload.ok) {
+          void load();
+          // Pull the account right away (retrying while the token settles) so the
+          // card flips to "Connected as …" without waiting for a manual refresh.
+          const inst = instancesRef.current[payload.id];
+          if (inst) void fetchIdentityRef.current(inst, 5);
+        }
       })
       .then((un) => {
         unlistenDone = un;
