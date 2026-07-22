@@ -273,37 +273,39 @@ export function ConnectWizard({
   );
 
   // The Sign in button + its live status. `big` = the prominent primary CTA.
-  const renderSignIn = (big: boolean) => (
-    <div className="space-y-1.5">
-      <Button
-        type="button"
-        variant={big ? "default" : "outline"}
-        size={big ? "lg" : "sm"}
-        className="w-full"
-        disabled={signInState.running}
-        onClick={() => void signIn()}
-      >
-        {signInState.running ? (
-          <Loader2Icon className={cn("animate-spin", big ? "size-4" : "size-3.5")} />
-        ) : (
-          <PlugZapIcon className={big ? "size-4" : "size-3.5"} />
+  // Once signed in, the button becomes a disabled "Signed in" indicator — no
+  // re-clicking an already-connected account.
+  const renderSignIn = (big: boolean) => {
+    const signedIn = signInState.ok === true;
+    const iconClass = big ? "size-4" : "size-3.5";
+    return (
+      <div className="space-y-1.5">
+        <Button
+          type="button"
+          variant={big ? "default" : "outline"}
+          size={big ? "lg" : "sm"}
+          className="w-full"
+          disabled={signInState.running || signedIn}
+          onClick={() => void signIn()}
+        >
+          {signInState.running ? (
+            <Loader2Icon className={cn("animate-spin", iconClass)} />
+          ) : signedIn ? (
+            <CheckIcon className={cn("text-green-600", iconClass)} />
+          ) : (
+            <PlugZapIcon className={iconClass} />
+          )}
+          {signedIn ? t("signedIn") : (plugin?.catalog?.setup?.label ?? t("signIn"))}
+        </Button>
+        {signInState.running && signInState.line && (
+          <p className="truncate text-muted-foreground text-xs">{signInState.line}</p>
         )}
-        {plugin?.catalog?.setup?.label ?? t("signIn")}
-      </Button>
-      {signInState.ok === true && (
-        <p className="flex items-center gap-1 text-green-600 text-xs">
-          <CheckIcon className="size-3" />
-          {t("signedIn")}
-        </p>
-      )}
-      {signInState.running && signInState.line && (
-        <p className="truncate text-muted-foreground text-xs">{signInState.line}</p>
-      )}
-      {signInState.ok === false && signInState.line && (
-        <p className="truncate text-destructive text-xs">{signInState.line}</p>
-      )}
-    </div>
-  );
+        {signInState.ok === false && signInState.line && (
+          <p className="truncate text-destructive text-xs">{signInState.line}</p>
+        )}
+      </div>
+    );
+  };
 
   const fieldsOfMethod = (m: (typeof authMethods)[number]) =>
     nonHiddenFields.filter((f) => (m.fields ?? []).includes(f.key));
